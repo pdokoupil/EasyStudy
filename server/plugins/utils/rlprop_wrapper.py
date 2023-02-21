@@ -1,6 +1,5 @@
 import os
 import pickle
-import time
 
 import numpy as np
 

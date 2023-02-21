@@ -6,7 +6,6 @@
 
 import json
 from pathlib import Path
-import pickle
 import sys
 
 
@@ -22,10 +21,8 @@ from models import UserStudy
 
 
 import os
-import time
 from flask import Blueprint, jsonify, request, redirect, url_for, make_response, render_template, session
 
-from app import db, pm
 from common import get_tr, load_languages, multi_lang, load_user_study_config
 
 

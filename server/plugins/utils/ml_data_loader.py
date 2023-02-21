@@ -1,5 +1,4 @@
 import datetime
-import glob
 import time
 from imdb import Cinemagoer
 
@@ -8,7 +7,6 @@ import numpy as np
 from collections import defaultdict
 import os
 
-import pickle
 
 from scipy.spatial.distance import squareform, pdist
 

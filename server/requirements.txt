@@ -1,5 +1,6 @@
 flask
 matplotlib
+pandas
 numpy
 pandas
 scikit-learn
@@ -7,7 +8,9 @@ scipy
 flask-login
 flask-sqlalchemy
 bcrypt
+lenskit
 flask-wtf
+pillow
 pyaml
 gunicorn
 cinemagoer

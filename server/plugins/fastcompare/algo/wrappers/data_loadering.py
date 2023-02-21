@@ -4,7 +4,7 @@ import time
 import pandas as pd
 import requests
 
-from plugins.fastcompare.algo.algorithm_base import Parameter, ParameterType, DataLoaderBase
+from plugins.fastcompare.algo.algorithm_base import DataLoaderBase
 from plugins.utils.ml_data_loader import MLDataLoader, RatingLowFilter, MovieFilterByYear, RatingFilterOld, RatingsPerYearFilter, RatingUserFilter, RatedMovieFilter, LinkFilter
 
 from common import load_system_config

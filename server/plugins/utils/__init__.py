@@ -1,13 +1,10 @@
 # -*- coding: utf-8 -*-
 
 import os
-import random
-import re
 import secrets
-from flask import Blueprint, jsonify, request, redirect, current_app, url_for, make_response, render_template
+from flask import Blueprint, jsonify, request, url_for, make_response, render_template
 from flask_login import current_user
-import numpy as np
-from common import gen_url_prefix, get_tr, load_languages, multi_lang, load_user_study_config, load_user_study_config_by_guid
+from common import get_tr, load_languages, multi_lang, load_user_study_config, load_user_study_config_by_guid
 import flask
 import json
 

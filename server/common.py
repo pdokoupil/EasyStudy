@@ -8,6 +8,8 @@ from flask import request, session
 
 from models import UserStudy
 
+from urllib.parse import urlparse
+
 def load_system_config(file_name="config.yaml"):
     location = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
     with open(os.path.join(location, file_name), "r") as f:
@@ -22,7 +24,7 @@ def load_system_config(file_name="config.yaml"):
 yaml_config = load_system_config()
 print(f"Yaml config={yaml_config}")
 
-from urllib.parse import urlparse, urljoin
+
 
 def gen_url_prefix():
     p = urlparse(request.url, ".")

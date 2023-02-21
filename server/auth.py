@@ -1,7 +1,6 @@
 import flask
 
-from flask_sqlalchemy import SQLAlchemy
-from flask_login import LoginManager, login_required, current_user, login_user, logout_user
+from flask_login import login_required, current_user, login_user, logout_user
 from is_safe_url import is_safe_url
 
 from werkzeug.security import generate_password_hash, check_password_hash

@@ -1,8 +1,7 @@
 from app import db
 
-from wtforms import BooleanField, PasswordField, SubmitField, EmailField
-from wtforms.validators import DataRequired, Email, EqualTo, Length
-from wtforms import ValidationError
+from wtforms import PasswordField, EmailField
+from wtforms.validators import DataRequired, Length
 from flask_wtf import FlaskForm
 
 # Represents authenticated user (Different from user study participant who were may not be authenticated)
