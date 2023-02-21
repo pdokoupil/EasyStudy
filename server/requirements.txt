@@ -1,11 +1,13 @@
 flask
 matplotlib
+pandas
 numpy
 scikit-learn
 scipy
 flask-login
 flask-sqlalchemy
 bcrypt
+lenskit
 flask-wtf
 pyaml
 gunicorn
