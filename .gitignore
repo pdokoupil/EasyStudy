@@ -6,4 +6,3 @@ __pycache__
 *.npy
 flask_session
 server/cache/
-server/instance

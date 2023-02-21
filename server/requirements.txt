@@ -1,6 +1,7 @@
 flask
 matplotlib
 numpy
+pandas
 scikit-learn
 scipy
 flask-login
