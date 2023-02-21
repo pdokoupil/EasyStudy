@@ -2,13 +2,11 @@
 # Ensure this code work even if in different directory (so that others who whill add new wrappers for different frameworks in the future have a freedom where to put that code?)
 
 # !! TODO note that there is a restriction such that all python files containing algorithm declarations should be placed in module directory (i.e. __init__.py should be present at their level)
-from abc import ABC, abstractmethod
-import json
+from abc import ABC
 import numpy as np
 
 import pandas as pd
 from plugins.fastcompare.algo.algorithm_base import AlgorithmBase, Parameter, ParameterType
-from plugins.fastcompare.loading import is_algorithm
 
 from lenskit.algorithms import als, item_knn, user_knn, Recommender, basic
 

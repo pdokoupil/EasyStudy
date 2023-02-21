@@ -1,13 +1,9 @@
-from abc import ABC, abstractmethod
-import json
-
-import pandas as pd
+from abc import ABC
 from plugins.fastcompare.algo.algorithm_base import AlgorithmBase, Parameter, ParameterType
 from plugins.utils.tfrs_model import get_model_25m
-from plugins.utils.preference_elicitation import prepare_tf_data, prepare_tf_model
+from plugins.utils.preference_elicitation import prepare_tf_data
 
 import tensorflow as tf
-import tensorflow_recommenders as tfrs
 
 class TFRecommendersWrapper(AlgorithmBase, ABC):
     def __init__(self, loader, model, epochs, **kwargs):

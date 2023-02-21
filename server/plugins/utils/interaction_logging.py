@@ -1,6 +1,6 @@
 import datetime
 import json
-from models import Interaction, Participation, Message
+from models import Interaction, Participation
 from app import db
 
 def log_interaction(participation_id, interaction_type, **kwargs):

@@ -1,17 +1,15 @@
 # -*- coding: utf-8 -*-
 
-import datetime
 import json
 import os
-import time
-from flask import Blueprint, jsonify, request, redirect, url_for, make_response, render_template, session
+from flask import Blueprint, request, redirect, url_for, render_template, session
 from sklearn.preprocessing import QuantileTransformer
 
 from plugins.utils.preference_elicitation import recommend_2_3, rlprop, weighted_average, result_layout_variants, get_objective_importance
 from plugins.utils.interaction_logging import log_interaction, study_ended
 
 from models import Interaction, Participation, UserStudy
-from app import db, pm
+from app import db
 from common import get_tr, load_languages, multi_lang, load_user_study_config
 
 import numpy as np
