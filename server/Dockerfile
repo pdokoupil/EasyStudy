@@ -22,4 +22,4 @@ RUN pip install tensorflow-recommenders
 EXPOSE 5555
 
 ENTRYPOINT [ "python" ]
-CMD ["-m", "gunicorn", "-w", "1", "--bind", "0.0.0.0:5555", "app:create_app()"]
+CMD ["-m", "gunicorn", "-w", "4", "--bind", "0.0.0.0:5555", "app:create_app()"]

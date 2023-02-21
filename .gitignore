@@ -7,3 +7,4 @@ __pycache__
 flask_session
 server/cache/
 server/instance/
+*.sqlite
