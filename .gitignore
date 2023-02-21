@@ -4,6 +4,5 @@ __pycache__
 *.pckl
 *.csv
 *.npy
-ml-latest
 flask_session
 server/cache/
