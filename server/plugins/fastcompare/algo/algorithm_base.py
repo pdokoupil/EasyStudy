@@ -129,6 +129,8 @@ class PreferenceElicitationBase(ABC):
             pickle.dump(self.__dict__, f)
 
 # Base classes must take **kwargs in __init__
+# there should be user, item columns in the ratings_df
+# there should also be title column in the items_df
 class DataLoaderBase(ABC):
     _my_id = "60169475d436925316ff7a2b03b52253" # MD5 hash of "DataLoaderBase"
 

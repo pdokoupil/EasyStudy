@@ -18,7 +18,7 @@ __plugin_name__ = "layoutshuffling"
 __version__ = "0.1.0"
 __author__ = "Patrik Dokoupil"
 __author_contact__ = "Patrik.Dokoupil@matfyz.cuni.cz"
-__description__ = "Simple plugin comparing RLprop with Matrix Factorization while shuffling result layouts."
+__description__ = "Simple plugin comparing RLprop with Matrix Factorization while shuffling result layouts (for illustration purposes only)."
 
 bp = Blueprint(__plugin_name__, __plugin_name__, url_prefix=f"/{__plugin_name__}")
 

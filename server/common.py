@@ -62,14 +62,12 @@ def multi_lang(func):
         return func(*args, **kwargs)
     return inner
 
-@functools.lru_cache(maxsize=None)
 def load_user_study_config(user_study_id):
     user_study = UserStudy.query.filter(UserStudy.id == user_study_id).first()
     if not user_study:
         return None
     return json.loads(user_study.settings)
 
-@functools.lru_cache(maxsize=None)
 def load_user_study_config_by_guid(guid):
     user_study = UserStudy.query.filter(UserStudy.guid == guid).first()
     if not user_study:

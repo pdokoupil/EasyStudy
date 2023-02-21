@@ -20,7 +20,7 @@ tf.config.set_visible_devices([], 'GPU') # Disable GPU because of adagrad issues
 
 from popularity_sampling import PopularitySamplingElicitation, PopularitySamplingFromBucketsElicitation
 from multi_obj_sampling import MultiObjectiveSamplingFromBucketsElicitation
-from tfrs_model import get_model_25m
+from tfrs_model import get_model_mf
 
 import time
 from sklearn.preprocessing import QuantileTransformer
@@ -118,7 +118,7 @@ def prepare_tf_data(loader):
 def prepare_tf_model(loader):
 
     unique_user_ids, unique_movie_titles, movies, cached_train, train = prepare_tf_data(loader)
-    model = get_model_25m(unique_user_ids, unique_movie_titles, movies)
+    model = get_model_mf(unique_user_ids, unique_movie_titles, movies)
     cache_path = os.path.join(basedir, "static", "ml-latest", "tf_weights_cache")
 
     # Try load
