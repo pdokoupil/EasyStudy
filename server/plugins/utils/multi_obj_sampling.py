@@ -3,7 +3,7 @@ import numpy as np
 # Samples from N buckets where each bucket corresponds to a single objective
 class MultiObjectiveSamplingFromBucketsElicitation:
     # Objectives is a dictionary mapping objective name to its implementation (e.g. we can use different implementations of diversity etc..)
-    def __init__(self, rating_matrix, similarity_matrix, n_relevance_buckets, n_diversity_buckets, n_novelty_buckets, n_samples_per_bucket, k, **kwargs):
+    def __init__(self, rating_matrix, similarity_matrix, n_relevance_buckets, n_diversity_buckets, n_novelty_buckets, n_samples_per_bucket, k=1.0, **kwargs):
         
         self.rating_matrix = rating_matrix
         self.similarity_matrix = similarity_matrix

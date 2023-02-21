@@ -13,13 +13,13 @@ class TFRecommendersWrapper(AlgorithmBase, ABC):
         self.loader = loader
         # data is pandas dataset, we have to transform it for tensorflow
         ratings_df = self.loader.ratings_df.copy()
-        # Add movie_title
-        ratings_df.loc[:, "movie_title"] = ratings_df.item_id.map(self.loader.items_df_indexed.title)
+        # Add item_title
+        ratings_df.loc[:, "item_title"] = ratings_df.item_id.map(self.loader.items_df_indexed.title)
         # Rename column and cast to string
         ratings_df = ratings_df.rename(columns={"user": "user_id"})
         self.new_user = str(ratings_df.user_id.max() + 1)
         ratings_df.user_id = ratings_df.user_id.astype(str)
-        ratings = tf.data.Dataset.from_tensor_slices(dict(ratings_df[["user_id", "movie_title"]]))
+        ratings = tf.data.Dataset.from_tensor_slices(dict(ratings_df[["user_id", "item_title"]]))
         train = ratings.shuffle(100_000, seed=42, reshuffle_each_iteration=True)
         self.train = train # Store train for future use
         self.dataset = train.batch(8192).cache()
@@ -37,11 +37,11 @@ class TFRecommendersWrapper(AlgorithmBase, ABC):
         def data_gen():
             for x in selected_items:
                 yield {
-                    "movie_title": tf.constant(self.loader.items_df.loc[x].title),
+                    "item_title": tf.constant(self.loader.items_df.loc[x].title),
                     "user_id": new_user,
                 }
         ratings2 = tf.data.Dataset.from_generator(data_gen, output_signature={
-            "movie_title": tf.TensorSpec(shape=(), dtype=tf.string),
+            "item_title": tf.TensorSpec(shape=(), dtype=tf.string),
             "user_id": tf.TensorSpec(shape=(), dtype=tf.string)
         })
 
@@ -49,16 +49,16 @@ class TFRecommendersWrapper(AlgorithmBase, ABC):
         # fine-tuning for two epochs seems fine
         self.model.fit(ratings2.concatenate(self.train.take(100)).batch(256), epochs=2)
 
-        seen_movies_tensor = tf.stack(
+        seen_items_tensor = tf.stack(
             [tf.constant(self.loader.items_df.loc[x].title) for x in selected_items]
             +
             [tf.constant(self.loader.items_df.loc[x].title) for x in filter_out_items]
         )
         
-        predictions = tf.squeeze(self.model.predict_for_user(new_user, seen_movies_tensor, k)).numpy()
+        predictions = tf.squeeze(self.model.predict_for_user(new_user, seen_items_tensor, k)).numpy()
         
         # The underlying model has to implement predict_for_user since it is not obvious how to do this in a generic way in TFRecommenders (models may behave very differently so just having generic predict() method is not enough because it is not obvious whetehr it will return scores, items or anything else)
-        top_k = [self.loader.get_item_index(self.loader.items_df[self.loader.items_df.title == x.decode("UTF-8")].movieId.values[0]) for x in predictions]
+        top_k = [self.loader.get_item_index(self.loader.items_df[self.loader.items_df.title == x.decode("UTF-8")].item_id.values[0]) for x in predictions]
 
         return top_k
 
@@ -82,12 +82,12 @@ class SimpleMatrixFactorization(TFRecommendersWrapper):
         self.loader = loader
 
         new_user = str(self.loader.ratings_df.user.max() + 1)
-        self.movies = tf.data.Dataset.from_tensor_slices(dict(self.loader.items_df.rename(columns={"title": "movie_title"})[["movie_title"]])).map(lambda x: x["movie_title"])
-        self.movie_titles = self.movies.batch(1_000)
+        self.items = tf.data.Dataset.from_tensor_slices(dict(self.loader.items_df.rename(columns={"title": "item_title"})[["item_title"]])).map(lambda x: x["item_title"])
+        self.item_titles = self.items.batch(1_000)
         self.unique_user_ids = np.concatenate([self.loader.ratings_df.user.astype(str).unique(), np.array([new_user])])
-        self.unique_movie_titles = np.unique(np.concatenate(list(self.movie_titles)))
+        self.unique_item_titles = np.unique(np.concatenate(list(self.item_titles)))
 
-        model = get_model_mf(self.unique_user_ids, self.unique_movie_titles, self.movies, self.embedding_dimension, self.learning_rate)
+        model = get_model_mf(self.unique_user_ids, self.unique_item_titles, self.items, self.embedding_dimension, self.learning_rate)
         super().__init__(loader, model, epochs, **kwargs)
 
     @classmethod

@@ -36,10 +36,9 @@ def login_post():
 
             return flask.redirect(next or flask.url_for('main.administration'))
         else:
-            "Invalid uername or password"
+            return "Invalid username or password"
     else:
         return "Invalid username or password"
-    return flask.render_template('login.html', form=form)
 
 @auth.route('/login')
 def login():

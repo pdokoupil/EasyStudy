@@ -140,11 +140,12 @@ class GoodbooksDataLoader(DataLoaderBase):
         self.book_tags_df = pd.read_csv(self.book_tags_path)
         self.book_tags_df = self.book_tags_df.reset_index(drop=True)
 
-        self.books_df_indexed = self.books_df.set_index("book_id")
-
         self.book_index_to_id = pd.Series(self.books_df.book_id.values,index=self.books_df.index).to_dict()
         self.book_id_to_index = pd.Series(self.books_df.index,index=self.books_df.book_id.values).to_dict()
 
+        self.books_df = self.books_df.rename(columns={"book_id": "item_id"})
+        self.books_df_indexed = self.books_df.set_index("item_id")
+        
         self.books_df.loc[:, "description"] = self.books_df.title # + ' ' + self.books_df.genres
         self.book_index_to_description = dict(zip(self.books_df.index, self.books_df.description))
         

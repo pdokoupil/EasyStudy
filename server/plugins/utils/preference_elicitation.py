@@ -83,15 +83,15 @@ def compute_once(func):
 def prepare_tf_data(loader):
     ratings_df = loader.ratings_df.copy()
 
-    # Add movie_title
-    ratings_df.loc[:, "movie_title"] = ratings_df.movieId.map(loader.movies_df_indexed.title)
+    # Add item_title
+    ratings_df.loc[:, "item_title"] = ratings_df.movieId.map(loader.movies_df_indexed.title)
 
     # Rename column and cast to string
     ratings_df = ratings_df.rename(columns={"userId": "user_id"})
     ratings_df.user_id = ratings_df.user_id.astype(str)
 
-    ratings = tf.data.Dataset.from_tensor_slices(dict(ratings_df[["user_id", "movie_title"]]))
-    movies = tf.data.Dataset.from_tensor_slices(dict(loader.movies_df.rename(columns={"title": "movie_title"})[["movie_title"]])).map(lambda x: x["movie_title"])
+    ratings = tf.data.Dataset.from_tensor_slices(dict(ratings_df[["user_id", "item_title"]]))
+    movies = tf.data.Dataset.from_tensor_slices(dict(loader.movies_df.rename(columns={"title": "item_title"})[["item_title"]])).map(lambda x: x["item_title"])
 
     import numpy as np
     tf.random.set_seed(42)
@@ -381,11 +381,11 @@ def recommend_2_3(selected_movies, filter_out_movies = [], return_model = False,
     def data_gen():
         for x in selected_movies:
             yield {
-                "movie_title": tf.constant(loader.movies_df.loc[x].title),
+                "item_title": tf.constant(loader.movies_df.loc[x].title),
                 "user_id": new_user,
             }
     ratings2 = tf.data.Dataset.from_generator(data_gen, output_signature={
-        "movie_title": tf.TensorSpec(shape=(), dtype=tf.string),
+        "item_title": tf.TensorSpec(shape=(), dtype=tf.string),
         "user_id": tf.TensorSpec(shape=(), dtype=tf.string)
     })
 
