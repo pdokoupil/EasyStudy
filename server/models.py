@@ -68,12 +68,12 @@ class Participation(db.Model):
 
 class LoginForm(FlaskForm):
     email = EmailField('email', validators=[DataRequired("missing mail")])
-    password = PasswordField('password', validators=[DataRequired("missing password"), Length(8, 128, "short password")])
+    password = PasswordField('password', validators=[DataRequired("missing password"), Length(6, 128, "short password")])
     #submit = SubmitField('Log in')
 
 class SignupForm(FlaskForm):
     email = EmailField('email', validators=[DataRequired("missing mail")])
-    password = PasswordField('password', validators=[DataRequired("missing password"), Length(8, 128, "short password")])
+    password = PasswordField('password', validators=[DataRequired("missing password"), Length(6, 128, "short password")])
     #submit = SubmitField('Sign up')
 
 # class InteractionType(db.Model):
