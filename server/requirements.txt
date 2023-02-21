@@ -9,6 +9,7 @@ flask-sqlalchemy
 bcrypt
 lenskit
 flask-wtf
+pillow
 pyaml
 gunicorn
 cinemagoer
