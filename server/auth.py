@@ -18,15 +18,14 @@ def login_post():
     form = LoginForm()
     if form.validate_on_submit():
         user = User.query.get(form.email.data)
-        print(f"A1, user={user}, email={form.email.data}")
         if user:
-            print("A2")
             if check_password_hash(user.password, form.password.data):
-                print("A3")
                 user.authenticated = True
                 db.session.add(user)
                 db.session.commit()
                 login_user(user, remember=True)
+            else:
+                return "Invalid username or password"
 
             next = flask.request.args.get('next')
             # is_safe_url should check if the url is safe for redirects.
@@ -36,9 +35,10 @@ def login_post():
                 return flask.abort(400)
 
             return flask.redirect(next or flask.url_for('main.administration'))
+        else:
+            "Invalid uername or password"
     else:
-        print(f"Errors = {form.errors}")
-    print("A5")
+        return "Invalid username or password"
     return flask.render_template('login.html', form=form)
 
 @auth.route('/login')

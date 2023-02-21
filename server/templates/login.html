@@ -39,21 +39,20 @@
           <b-btn variant="primary" href="https://bootstrap-vue.org/">More Info</b-btn> -->
         </b-jumbotron>
 
-        <b-form action="{{url_for('auth.login')}}" method="POST">
+        <b-form @submit="onSubmit">
           <b-form-group
             horizontal
             :label-cols="4"
             label="Account details"
           >
-              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
-              <b-form-input  name="email" type="email" placeholder="Enter your email"></b-form-input>
-              <b-form-input class="mb-2 mt-2" name="password" type="password" placeholder="Enter your password"></b-form-input>
+              <b-form-input  name="email" v-model="name" type="email" placeholder="Enter your email"></b-form-input>
+              <b-form-input class="mb-2 mt-2" v-model="pswd" name="password" type="password" placeholder="Enter your password"></b-form-input>
               <b-btn variant="primary" type="submit">Login</b-btn>
               <b-btn variant="warning" type="button" href="{{url_for('auth.signup')}}">Go to signup page</b-btn>
           </b-form-group>
         </b-form>
 
-        
+        <b-alert class="mt-2 mb-2" variant="danger" :show="showAlert">[[ errorMessage ]]</b-alert>
 
       </b-container>
 
@@ -72,12 +71,48 @@
     <script>
       window.app = new Vue({
         el: '#app',
+        delimiters: ['[[',']]'],
         data: function() {
           let x = "{{authenticated}}";
           let auth = x === "True" ? true : false;
           return {
-            is_authenticated: auth
+            is_authenticated: auth,
+            errorMessage: "",
+            name: "",
+            pswd: "",
+            csrfToken: "{{ csrf_token() }}"
           }
+        },
+        computed: {
+          showAlert() {
+            return this.errorMessage.length > 0;
+          }
+        },
+        methods: {
+          async onSubmit() {
+            this.errorMessage = "";
+            event.preventDefault();
+            let url = "{{url_for('auth.login')}}";
+            
+            data = new FormData();
+            data.append("email", this.name);
+            data.append("password", this.pswd);
+            data.append("csrf_token", this.csrfToken)
+
+            await fetch(url, {
+              method: "POST",
+              body: data,
+              redirect: 'follow'
+            }).then(response => {
+              if (response.redirected) {
+                window.location.href = response.url;
+              } else {
+                return response.text()
+              }
+            }).then(responseText => {
+              this.errorMessage = responseText;
+            });
+          },
         }
       })
     </script>
