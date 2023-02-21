@@ -1,6 +1,5 @@
 flask
 matplotlib
-mlflow
 numpy
 scikit-learn
 scipy
@@ -11,5 +10,4 @@ flask-wtf
 pyaml
 gunicorn
 cinemagoer
-Flask-Session
 boto3

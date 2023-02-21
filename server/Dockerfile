@@ -14,6 +14,7 @@ RUN conda update conda --yes \
 # Some packages are not available in conda
 RUN pip install --upgrade pip
 RUN pip install Flask-PluginKit
+RUN pip install Flask-Session
 RUN pip install is-safe-url
 RUN pip install tensorflow
 RUN pip install tensorflow-recommenders
