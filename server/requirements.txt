@@ -2,6 +2,7 @@ flask
 matplotlib
 pandas
 numpy
+pandas
 scikit-learn
 scipy
 flask-login
