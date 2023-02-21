@@ -1,0 +1,22 @@
+{% include 'header.html' %}
+
+<div id="app">
+    <b-container fluid>
+        <b-jumbotron header="{{header}}" lead="">
+            {{hint}}
+        </b-jumbotron>
+        <b-row align-h="center">
+            <h3>TODO add additional questions (case when the user finished after {{ iteration }}) iterations</h3>
+        </b-row>
+        <b-row class="mb-3" align-h="center">
+            <b-col sm="3">
+                <b-form method="GET" action="{{ url_for('layoutshuffling.finish_user_study') }}">
+                    <b-btn type="submit" block variant="primary" center>{{finish}}</b-btn>
+                </b-form>
+            </b-col>
+        </b-row>
+    </b-container>
+</div>
+
+{{ emit_assets('layoutshuffling','refinement_feedback.js') }}     
+{% include 'footer.html' %}

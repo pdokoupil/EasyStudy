@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <!-- Required meta tags -->
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
+    <meta http-equiv="content-type" content="text/html; charset=UTF-8" />
+
+    <title>{{ title }}</title>
+
+    <!-- Required Stylesheets -->
+    <link
+      type="text/css"
+      rel="stylesheet"
+      href="https://unpkg.com/bootstrap@4.6.2/dist/css/bootstrap.min.css"
+    />
+    <link
+      type="text/css"
+      rel="stylesheet"
+      href="https://unpkg.com/bootstrap-vue@2.22.0/dist/bootstrap-vue.css"
+    />
+
+    <!-- Required scripts -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/vue/2.6.12/vue.min.js"></script>
+
+    
+    <!-- Load polyfills to support older browsers -->
+    <script src="https://unpkg.com/babel-polyfill@6.26.0/dist/polyfill.min.js"></script>
+    
+    <!-- Required scripts -->
+    <script src="https://unpkg.com/bootstrap-vue@2.22.0/dist/bootstrap-vue.js"></script>
+    <script src="https://unpkg.com/bootstrap-vue@2.22.0/dist/bootstrap-vue-icons.js"></script> <!-- Needed just for the Icons -->
+    <style>
+      img.selected {
+          outline: 5px solid green;
+          outline-offset: -5px;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Our application root element -->
+    <div id="app">
+      <b-container >
+        <b-jumbotron header="GRS Movies" lead="User study evaluating GRS recommending movies">
+          <p>
+            <strong>Version</strong>: {{ version }}, <strong>Author</strong>: {{ author }}, <strong>Contact</strong>: {{ author_contact }}
+          </p>
+        </b-jumbotron>
+      </b-container>
+
+      <h2 class="text-center">
+        Your recommendations
+        <b-icon id="info-icon-1" icon="exclamation-circle-fill" variant="info"></b-icon>
+        <b-tooltip target="info-icon-1" triggers="hover">
+          Select {{ num_to_select }} images
+        </b-tooltip>
+      </h2>
+      
+      <b-row align-h="center">
+        <b-table show-empty :items="items"  current-page="3" small="true" table-class="w-auto">
+          <template #cell()="data">
+            <!-- [[ data.value.url ]] -->
+            <img width="60" height="60" v-on:click="handleRecommendationClick($event)" :id="data.value.id" :src="data.value.url"/>
+          </template>
+        </b-table>
+      </b-row>
+
+      <b-row align-h="center">
+        <b-button-group class="w-auto">
+          <b-button v-on:click="handleClearClick">Clear</b-button>
+          <b-button :disabled="!enoughItemsSelected">Finish</b-button>
+        </b-button-group>
+      </b-row>
+      
+      <b-alert show variant="primary">Primary Alert! {{plugin_name}}</b-alert>
+    </div>
+
+    <!-- Start running your app -->
+    <script>
+
+
+      // TODO REMOVE
+      let blackSquareUrl = "https://images.squarespace-cdn.com/content/v1/55fc0004e4b069a519961e2d/1442590746571-RPGKIXWGOO671REUNMCB/image-asset.gif?format=300w";
+      let whiteSquareUrl = "https://upload.wikimedia.org/wikipedia/commons/thumb/1/17/Square-white.svg/1200px-Square-white.svg.png";
+      let redSquareUrl = "https://upload.wikimedia.org/wikipedia/commons/thumb/2/27/Red_square.svg/1024px-Red_square.svg.png";
+
+
+      window.app = new Vue({
+        el: '#app',
+        delimiters: ['[[',']]'], // Used to replace double { escaping with double [ escaping (to prevent jinja vs vue inference)
+        data: function() {
+          console.log("Called");
+          return {
+            name: '',
+            perPage: 4,
+            lastItemId: 0,
+            items: [
+              // 1. item (roughly corresponds to a single row)
+              {1: this.buildItem(blackSquareUrl), 2: this.buildItem(whiteSquareUrl), 3: this.buildItem(redSquareUrl)},
+              {1: this.buildItem(redSquareUrl), 2: this.buildItem(blackSquareUrl), 3: this.buildItem(whiteSquareUrl)},
+              {1: this.buildItem(whiteSquareUrl), 2: this.buildItem(redSquareUrl), 3: this.buildItem(blackSquareUrl)}
+            ],
+            fields: [1,2,3],
+            selectedIds: new Set(),
+            numToSelect: 0
+          }
+        },
+        computed: {
+          showAlert() {
+            return this.name.length > 4 ? true : false
+          },
+          enoughItemsSelected() {
+            console.log("ABC");
+            return this.selectedIds.size == this.numToSelect;
+          }
+        },
+        methods: {
+          handleRecommendationClick(event) {
+            let selectedId = event.target.id;
+            console.log("Clicked on recommendation %s", selectedId);
+            if (!this.selectedIds.has(selectedId) && this.selectedIds.size < this.numToSelect) {
+              this.selectedIds.add(selectedId);
+              event.target.classList.add("selected");
+            } else {
+              this.selectedIds.delete(selectedId);
+              event.target.classList.remove("selected");
+            }
+          },
+          buildItem(url) {
+            if (this.lastItemId === undefined) {
+              this.lastItemId = 0;
+            }
+            console.log("Building item with ID=%s", this.lastItemId);
+            return {
+              url: url,
+              id: this.lastItemId++
+            }
+          },
+          handleClearClick() {
+            console.log("Clearing");
+            this.selectedIds.clear();
+          }
+        },
+        async mounted() {
+          console.log("Mounted was called");
+          // Get the number of items user is supposed to select
+          this.numToSelect = await fetch("/num-to-select").then((resp) => resp.json()).then((resp) => resp["num_to_select"]);
+        }
+      })
+    </script>
+  </body>
+</html>

@@ -1,0 +1,3 @@
+hostname: 127.0.0.1
+port: 5000
+datasets_base_path: "plugins/utils/static" # Either absolute path or path relative (WITHOUT ./ prefix) to this config file

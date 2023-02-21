@@ -1,0 +1,679 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <!-- Required meta tags -->
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
+    <meta http-equiv="content-type" content="text/html; charset=UTF-8" />
+
+    <title>{{administration}}</title>
+
+    <!-- Required Stylesheets -->
+    <link
+      type="text/css"
+      rel="stylesheet"
+      href="https://unpkg.com/bootstrap@4.6.2/dist/css/bootstrap.min.css"
+    />
+    <link
+      type="text/css"
+      rel="stylesheet"
+      href="https://unpkg.com/bootstrap-vue@2.22.0/dist/bootstrap-vue.css"
+    />
+
+    <!-- Required scripts -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/vue/2.6.12/vue.min.js"></script>
+
+    
+    <!-- Load polyfills to support older browsers -->
+    <script src="https://unpkg.com/babel-polyfill@6.26.0/dist/polyfill.min.js"></script>
+    
+    <!-- Required scripts -->
+    <script src="https://unpkg.com/bootstrap-vue@2.22.0/dist/bootstrap-vue.js"></script>
+    <script src="https://unpkg.com/bootstrap-vue@2.22.0/dist/bootstrap-vue-icons.js"></script> <!-- Needed just for the Icons -->
+    <!-- WYSIWYG HTML Editor -->
+    <script src="../static/tinymce/tinymce.min.js" referrerpolicy="origin"></script>
+  </head>
+  <body>
+    <!-- Our application root element -->
+    <div id="app">
+      <b-container align-h="center" fluid>
+        <b-jumbotron header="fastcompare Create" lead="Create user study">
+            
+          </b-jumbotron>
+
+
+          <!-- Handle data loader setting -->
+          <b-row align-v="center" align-h="center" class="mb-3">
+            <b-col class="text-right mt-1" align-h="start" cols="2">
+              <b-row align-v="center" align-h="start">
+                <b-icon class="h2" id="dataLoaderIcon" icon="question-circle-fill" variant="primary"></b-icon>
+                <b-tooltip target="dataLoaderIcon" triggers="hover">{{data_loader_hint}}</b-tooltip>
+                <div class="ml-3">
+                  {{data_loader}}
+                </div>
+              </b-row>
+            </b-col>
+            <b-col cols="6">
+              <b-form-select v-model="dataLoader" :options="dataLoaderNames" :state="dataLoader != null" required="True" type=""></b-form-select>
+            </b-col>
+          </b-row>
+          <b-row align-v="center" align-h="center" class="mb-3">
+            <b-col cols="8" class="text-center" align-h="center">
+              <b-card v-if="dataLoader!= null && Object.keys(dataLoadersParameters[dataLoaderNames.indexOf(dataLoader)]).length" :title="dataLoader" sub-title="{{settings}}" :set="dataLoaderIdx = dataLoaderNames.indexOf(dataLoader)">
+                <b-card-body>
+                  <template>
+                    <b-row align-v="center" v-for="parameter in dataLoaderData[dataLoaderIdx]['parameters']" :key="parameter.name">
+                      <b-col class="text-right mt-1" align-h="end" cols="1">
+                        <b-icon class="h2" :id="dataLoader.concat('_').concat(parameter.name).concat('_icon')" icon="question-circle-fill" variant="primary"></b-icon>
+                        <b-tooltip :target="dataLoader.concat('_').concat(parameter.name).concat('_icon')" triggers="hover">[[parameter.help]]</b-tooltip>
+                      </b-col>
+                      <b-col cols="1">
+                        [[parameter.name]]
+                      </b-col>
+                      <b-col>
+                        <template v-if="parameter.type == 'int'">
+                          <b-input type="number" step="1" min="1" v-on:change="paramChanged" :state="dataLoadersParameters[dataLoaderIdx][parameter.name].value != ''" v-model.number="dataLoadersParameters[dataLoaderIdx][parameter.name].value" :name="parameter.name"/>
+                        </template>
+                        <template v-if="parameter.type == 'string'">
+                          <b-input type="text" v-on:change="paramChanged" :state="dataLoadersParameters[dataLoaderIdx][parameter.name].value != ''" v-model="dataLoadersParameters[dataLoaderIdx][parameter.name].value" :name="parameter.name"/>
+                        </template>
+                        <template v-if="parameter.type == 'bool'">
+                          <b-form-checkbox v-model="dataLoadersParameters[dataLoaderIdx][parameter.name].value">[[ parameter.help ]]</b-form-checkbox>
+                        </template>
+                        <template v-if="parameter.type == 'float'">
+                          <b-input type="number" v-on:change="paramChanged" :state="dataLoadersParameters[dataLoaderIdx][parameter.name].value != ''" v-model.number="dataLoadersParameters[dataLoaderIdx][parameter.name].value" :name="parameter.name"/>
+                        </template>
+                        <template v-if="parameter.type == 'options'">
+                          <b-form-select v-on:change="paramChanged" :state="dataLoadersParameters[dataLoaderIdx][parameter.name].value != null" v-model="dataLoadersParameters[dataLoaderIdx][parameter.name].value" :options="dataLoadersParameters[dataLoaderIdx][parameter.name].options" :name="parameter.name" required="True" type=""/>
+                        </template>
+                      </b-col>
+                    </b-row>
+                  </template>
+                </b-card-body>
+              </b-card>
+            </b-col>
+          </b-row>
+
+          <!-- Handle preference elicitation setting -->
+          <b-row align-v="center" align-h="center" class="mb-3">
+            <b-col class="text-right mt-1" align-h="start" cols="2">
+              <b-row align-v="center" align-h="start">
+                <b-icon class="h2" id="elicitationIcon" icon="question-circle-fill" variant="primary"></b-icon>
+                <b-tooltip target="elicitationIcon" triggers="hover">{{preference_elicitation_hint}}</b-tooltip>
+                <div class="ml-3">
+                  {{preference_elicitation}}
+                </div>
+              </b-row>
+            </b-col>
+            <b-col cols="6">
+              <b-form-select v-model="preferenceElicitation" :options="preferenceElicitationNames" :state="preferenceElicitation != null" required="True" type=""></b-form-select>
+            </b-col>
+          </b-row>
+          <b-row align-v="center" align-h="center" class="mb-3">
+            <b-col cols="8" class="text-center" align-h="center">
+              <b-card v-if="preferenceElicitation!= null && Object.keys(preferenceElicitationsParameters[preferenceElicitationNames.indexOf(preferenceElicitation)]).length" :title="preferenceElicitation" sub-title="{{settings}}" :set="elicitationIdx = preferenceElicitationNames.indexOf(preferenceElicitation)">                
+                <b-card-body>
+                  <template>
+                    <b-row align-v="center" v-for="parameter in preferenceElicitationData[elicitationIdx]['parameters']" :key="parameter.name">
+                      <b-col class="text-right mt-1" align-h="end" cols="1">
+                        <b-icon class="h2" :id="preferenceElicitation.concat('_').concat(parameter.name).concat('_icon')" icon="question-circle-fill" variant="primary"></b-icon>
+                        <b-tooltip :target="preferenceElicitation.concat('_').concat(parameter.name).concat('_icon')" triggers="hover">[[parameter.help]]</b-tooltip>
+                      </b-col>
+                      <b-col cols="1">
+                        [[parameter.name]]
+                      </b-col>
+                      <b-col>
+                        <template v-if="parameter.type == 'int'">
+                          <b-input type="number" v-on:change="paramChanged" :state="preferenceElicitationsParameters[elicitationIdx][parameter.name].value != ''" step="1" min="1" v-model.number="preferenceElicitationsParameters[elicitationIdx][parameter.name].value" :name="parameter.name"/>
+                        </template>
+                        <template v-if="parameter.type == 'string'">
+                          <b-input type="text" v-on:change="paramChanged" :state="preferenceElicitationsParameters[elicitationIdx][parameter.name].value != ''" v-model="preferenceElicitationsParameters[elicitationIdx][parameter.name].value" :name="parameter.name"/>
+                        </template>
+                        <template v-if="parameter.type == 'bool'">
+                          <b-form-checkbox v-model="preferenceElicitationsParameters[elicitationIdx][parameter.name].value">[[ parameter.help ]]</b-form-checkbox>
+                        </template>
+                        <template v-if="parameter.type == 'float'">
+                          <b-input type="number" v-on:change="paramChanged" :state="preferenceElicitationsParameters[elicitationIdx][parameter.name].value != ''" v-model.number="preferenceElicitationsParameters[elicitationIdx][parameter.name].value" :name="parameter.name"/>
+                        </template>
+                        <template v-if="parameter.type == 'options'">
+                          <b-form-select v-on:change="paramChanged" :state="preferenceElicitationsParameters[elicitationIdx][parameter.name].value != null" v-model="preferenceElicitationsParameters[elicitationIdx][parameter.name].value" :options="preferenceElicitationsParameters[elicitationIdx][parameter.name].options" :name="parameter.name" required="True" type=""/>
+                        </template>
+                      </b-col>
+                    </b-row>
+                  </template>
+                </b-card-body>
+              </b-card>
+            </b-col>
+          </b-row>
+          <b-row align-v="center" align-h="center" class="mb-3">
+            <b-col class="text-right mt-1" align-h="start" cols="2">
+              <b-row align-v="center" align-h="start">
+                <b-icon class="h2" id="kIcon" icon="question-circle-fill" variant="primary"></b-icon>
+                <b-tooltip target="kIcon" triggers="hover">{{recommendation_size_hint}}</b-tooltip>
+                <div class="ml-3">
+                  {{recommendation_size}} (<em>K</em>)
+                </div>
+              </b-row>
+            </b-col>
+            <b-col cols="6">
+              <b-input type="number" id="k" name="k" v-model.number="k" :state="k != ''" placeholder="{{please_enter_k}}"/>
+            </b-col>
+          </b-row>
+          <b-row align-h="center" class="mb-3">
+            <b-col class="text-right mt-1" align-h="start" cols="2">
+              <b-row align-v="center" align-h="start">
+                <b-icon class="h2" id="prolificIcon" icon="question-circle-fill" variant="primary"></b-icon>
+                <b-tooltip target="prolificIcon" triggers="hover">{{prolific_code_hint}}</b-tooltip>
+                <div class="ml-3">
+                  {{prolific_code}}
+                </div>
+              </b-row>
+            </b-col>
+            <b-col cols="6">
+              <b-input type="text" id="prolific_code" name="prolific_code" v-model="prolificCode" placeholder="{{please_enter_prolific}}"/>
+            </b-col>
+          </b-row>
+          <b-row align-h="center" class="mb-3">
+            <b-col class="text-right mt-1" align-h="start" cols="2">
+              <b-row align-v="center" align-h="start">
+                <b-icon class="h2" id="numAlgorithmsIcon" icon="question-circle-fill" variant="primary"></b-icon>
+                <b-tooltip target="numAlgorithmsIcon" triggers="hover">{{number_of_algorithms_hint}}</b-tooltip>
+                <div class="ml-3">
+                  {{number_of_algorithms}}
+                </div>
+              </b-row>
+            </b-col>
+            <b-col cols="6" class="text-right" align-h="end">
+              <b-form-select v-model="numAlgorithms" :options="numAlgorithmsOptions" name="numAlgorithms" :state="numAlgorithms != null" required="True" type=""></b-form-select>
+            </b-col>
+          </b-row>
+          <b-row align-h="center" class="mb-3">
+            <b-col class="text-right mt-1" align-h="start" cols="2">
+              <b-row align-v="center" align-h="start">
+                <b-icon class="h2" id="iterationsIcon" icon="question-circle-fill" variant="primary"></b-icon>
+                <b-tooltip target="iterationsIcon" triggers="hover">{{number_of_iterations_hint}}</b-tooltip>
+                <div class="ml-3">
+                  {{number_of_iterations}}
+                </div>
+              </b-row>
+            </b-col>
+            <b-col cols="6">
+              <b-input type="number" step="1" v-model.number="numIterations" :state="numIterations != ''" placeholder="{{please_enter_n_iterations}}"/>
+            </b-col>
+          </b-row>
+          <b-row align-h="center" class="mb-3">
+            <b-col class="text-right mt-1" align-h="start" cols="2">
+              <b-row align-v="center" align-h="start">
+                <b-icon class="h2" id="layoutIcon" icon="question-circle-fill" variant="primary"></b-icon>
+                <b-tooltip target="layoutIcon" triggers="hover">{{recommendation_layout_hint}}</b-tooltip>
+                <div class="ml-3">
+                  {{recommendation_layout}}
+                </div>
+              </b-row>
+            </b-col>
+            <b-col cols="6" class="text-right" align-h="end">
+              <b-form-select v-model="resultLayout" :options="resultLayoutOptions" name="resultLayout" :state="resultLayout != null" required="True" type=""></b-form-select>
+            </b-col>
+          </b-row>
+          <b-row align-h="center" class="mb-3">
+            <b-col cols="4" class="text-right" align-h="end">
+              <b-form-checkbox v-model="shuffleAlgorithms">
+                {{shuffle_algorithms}}
+              </b-form-checkbox>
+            </b-col>
+            <b-col cols="4" class="text-left" align-h="start">
+              <b-form-checkbox v-model="shuffleRecommendations">
+                {{shuffle_recommendations}}
+              </b-form-checkbox>
+            </b-col>
+          </b-row>
+          <b-row align-h="center" class="mb-3">
+            <b-col cols="8">
+              <textarea placeholder="{{footer_placeholder}}" id="footer"></textarea>
+            </b-col>
+          </b-row>
+          <b-row align-h="center" class="mb-3">
+            <b-col class="text-center" cols="8">
+              <b-form-checkbox v-model="overrideAbout">{{override_about}}</b-form-checkbox>
+            </b-col>
+          </b-row>
+          <b-row :hidden="!overrideAbout" align-h="center" class="mb-3">
+            <b-col cols="8">
+              <textarea placeholder="{{about_placeholder}}" id="about"></textarea>
+            </b-col>
+          </b-row>
+          <b-row align-h="center" class="mb-3">
+            <b-col class="text-center" cols="8">
+              <b-form-checkbox v-model="overrideInformedConsent">{{override_informed_consent}}</b-form-checkbox>
+            </b-col>
+          </b-row>
+          <b-row :hidden="!overrideInformedConsent" align-h="center" class="mb-3">
+            <b-col cols="8">
+              <textarea placeholder="{{informed_consent_placeholder}}" id="informedConsent"></textarea>
+            </b-col>
+          </b-row>
+          <b-row align-h="center" class="mb-3">
+            <b-col class="text-center" cols="8">
+              <b-form-checkbox v-model="overrideElicitationHint">{{override_preference_elicitation_hint}}</b-form-checkbox>
+            </b-col>
+          </b-row>
+          <b-row :hidden="!overrideElicitationHint" align-h="center" class="mb-3">
+            <b-col cols="8">
+              <textarea placeholder="{{preference_elicitation_placeholder}}" id="elicitationHint"></textarea>
+            </b-col>
+          </b-row>
+          <b-row align-h="center" class="mb-3">
+            <b-col class="text-center" cols="8">
+              <b-form-checkbox v-model="overrideComparisonHint">{{override_algorithm_comparison_hint}}</b-form-checkbox>
+            </b-col>
+          </b-row>
+          <b-row :hidden="!overrideComparisonHint" align-h="center" class="mb-3">
+            <b-col cols="8">
+              <textarea placeholder="{{algorithm_comparison_placeholder}}" id="comparisonHint"></textarea>
+            </b-col>
+          </b-row>
+          <b-row align-h="center" class="mb-3">
+            <b-col class="text-center" cols="8">
+              <b-form-checkbox v-model="overrideFinishedText">{{override_finished_text}}</b-form-checkbox>
+            </b-col>
+          </b-row>
+          <b-row :hidden="!overrideFinishedText" align-h="center" class="mb-3">
+            <b-col cols="8">
+              <textarea placeholder="{{finished_text_placeholder}}" id="finishedText"></textarea>
+            </b-col>
+          </b-row>
+          <b-row align-h="center" class="mb-3">
+            <b-col class="text-center" cols="8">
+              <b-form-checkbox v-model="showFinalStatistics">{{show_final_statistics}}</b-form-checkbox>
+            </b-col>
+          </b-row>
+          <b-row align-h="center" class="mb-3" v-for="i in numAlgorithms" :key="i">
+            <b-col cols="8" class="text-center" align-h="center">
+              <b-form-select v-on:change="selectedAlgorithmChanged($event, i - 1)" v-bind:value="selectedAlgorithms[i - 1]" :options="availableAlgorithms" name="numAlgorithms" :state="selectedAlgorithms[i - 1] != null" required="True" type=""></b-form-select>
+              <b-card v-if="selectedAlgorithms[i - 1] != null" :title="selectedAlgorithms[i-1]" sub-title="{{settings}}" :set="algoIdx = availableAlgorithmNames.indexOf(selectedAlgorithms[i - 1])">
+                <!-- <b-card-text>
+                  Some quick example text to build on the <em>card title</em> and make up the bulk of the card's
+                  content.
+                </b-card-text> -->
+            
+                <!-- <b-card-text>A second paragraph of text in the card.</b-card-text> -->
+                <b-card-body>
+                  <template>
+                    <b-row align-v="center" v-for="parameter in availableAlgorithmsData[algoIdx]['parameters']" :key="parameter.name.concat(i)">
+                      <b-col class="text-right mt-1" align-h="end" cols="1">
+                        <b-icon class="h2" :id="selectedAlgorithms[i - 1].concat('_' + i + '_').concat(parameter.name).concat('_icon')" icon="question-circle-fill" variant="primary"></b-icon>
+                        <b-tooltip :target="selectedAlgorithms[i - 1].concat('_' + i + '_').concat(parameter.name).concat('_icon')" triggers="hover">[[parameter.help]]</b-tooltip>
+                      </b-col>
+                      <b-col cols="1">
+                        [[parameter.name]]
+                      </b-col>
+                      <b-col>
+                        <template v-if="parameter.type == 'int'">
+                          <b-input type="number" step="1" min="1" v-on:change="paramChanged" :state="selectedAlgorithmsParameters[i - 1][parameter.name].value != ''" v-model.number="selectedAlgorithmsParameters[i - 1][parameter.name].value" :name="parameter.name"/>
+                        </template>
+                        <template v-if="parameter.type == 'string'">
+                          <b-input type="text" v-on:change="paramChanged" :state="selectedAlgorithmsParameters[i - 1][parameter.name].value != ''" v-model="selectedAlgorithmsParameters[i - 1][parameter.name].value" :name="parameter.name"/>
+                        </template>
+                        <template v-if="parameter.type == 'bool'">
+                          <b-form-checkbox v-model="selectedAlgorithmsParameters[i - 1][parameter.name].value">[[ parameter.help ]]</b-form-checkbox>
+                        </template>
+                        <template v-if="parameter.type == 'float'">
+                          <b-input type="number" v-on:change="paramChanged" :state="selectedAlgorithmsParameters[i - 1][parameter.name].value != ''" v-model.number="selectedAlgorithmsParameters[i - 1][parameter.name].value" :name="parameter.name"/>
+                        </template>
+                        <template v-if="parameter.type == 'options'">
+                          <b-form-select v-on:change="paramChanged" :state="selectedAlgorithmsParameters[i - 1][parameter.name].value != null" v-model="selectedAlgorithmsParameters[i - 1][parameter.name].value" :options="selectedAlgorithmsParameters[i - 1][parameter.name].options" :name="parameter.name" required="True" type=""/>
+                        </template>
+                      </b-col>
+                    </b-row>
+                  </template>
+                  <b-row align-v="center">
+                    <b-col class="text-right mt-1" align-h="end" cols="1">
+                      <b-icon class="h2" :id="selectedAlgorithms[i - 1].concat('_' + i + '_').concat('displayed_name').concat('_icon')" icon="question-circle-fill" variant="primary"></b-icon>
+                      <b-tooltip :target="selectedAlgorithms[i - 1].concat('_' + i + '_').concat('displayed_name').concat('_icon')" triggers="hover">{{displayed_name_help}}</b-tooltip>
+                    </b-col>
+                    <b-col cols="1">
+                      {{displayed_name}}
+                    </b-col>
+                    <b-col>
+                      <b-input type="text" :state="displayedNameState[i-1]" v-model="selectedAlgorithmsParameters[i-1]['displayed_name'].value" />
+                    </b-col>
+                  </b-row>
+                </b-card-body>
+              </b-card>
+            </b-col>
+          </b-row>
+          <b-row align-h="center">
+            <b-col cols="8" class="text-right" align-h="end">
+              <b-btn variant="warning" v-on:click="cancelCreateUserStudy">{{cancel}}</b-btn>
+              <b-btn variant="primary" v-on:click="onCreateUserStudy">{{create}}</b-btn>
+            </b-col>
+          </b-row>
+      </b-container>
+    </div>
+
+    <!-- Start running your app -->
+    <script>
+      tinymce.init({
+        selector: '#about',
+        plugins: 'lists, advlist, link, image',
+      });
+      tinymce.init({
+        selector: '#footer',
+        plugins: 'lists, advlist, link, image',
+      });
+      tinymce.init({
+        selector: '#informedConsent',
+        plugins: 'lists, advlist, link, image',
+      });
+      tinymce.init({
+        selector: '#elicitationHint',
+        plugins: 'lists, advlist, link, image',
+      });
+      tinymce.init({
+        selector: '#comparisonHint',
+        plugins: 'lists, advlist, link, image',
+      });
+      tinymce.init({
+        selector: '#finishedText',
+        plugins: 'lists, advlist, link, image',
+      });
+      window.app = new Vue({
+        el: '#app',
+        delimiters: ['[[',']]'], // Used to replace double { escaping with double [ escaping (to prevent jinja vs vue inference)
+        data: function() {
+            return {
+              numAlgorithmsOptions: [
+                { value: null, text: '{{select_num_algorithms}}' },
+                { value: 2, text: 2 },
+                { value: 3, text: 3 },
+              ],
+              resultLayoutOptions: [
+                { value: null, text: '{{select_result_layout}}' },
+                { value: "rows", text: "{{rows}}" },
+                { value: "row-single", text: "{{row_single}}" },
+                { value: "row-single-scrollable", text: "{{row_single_scrollable}}" },
+                { value: "columns", text: "{{columns}}" },
+                { value: "column-single", text: "{{column_single}}" },
+                { value: "max-columns", text: "{{max_columns}}" },
+              ],
+              availableAlgorithms: [
+                { value: null, text: '{{select_algorithm}}' }
+              ],
+              numAlgorithms: null,
+              resultLayout: null,
+              shuffleAlgorithms: true,
+              shuffleRecommendations: true,
+              selectedAlgorithms: [null, null, null],
+              selectedAlgorithmsParameters: [null, null, null],
+              displayedNameState: [null, null, null],
+              availableAlgorithmsData: null,
+              availableAlgorithmNames: null,
+              availableAlgorithmsParameters: [],
+              prolificCode: null,
+              k: 10,
+              numIterations: 5,
+              preferenceElicitation: null,
+              preferenceElicitations: [
+                { value: null, text: '{{select_elicitation}}' }
+              ],
+              preferenceElicitationData: null,
+              preferenceElicitationNames: null,
+              preferenceElicitationsParameters: [],
+              dataLoader: null,
+              dataLoaders: [
+                { value: null, text: '{{select_loader}}' }
+              ],
+              dataLoaderData: null,
+              dataLoaderNames: null,
+              dataLoadersParameters: [],
+              overrideInformedConsent: false,
+              overrideElicitationHint: false,
+              overrideComparisonHint: false,
+              overrideFinishedText: false,
+              overrideAbout: false,
+              showFinalStatistics: true
+            };
+        },
+        methods: {
+            paramChanged() {
+              this.$forceUpdate();
+            },
+            prepareOverrides() {
+              let textOverrides = {};
+              if (this.overrideInformedConsent) {
+                textOverrides["informed_consent"] = tinymce.get("informedConsent").getContent();
+              }
+              if (this.overrideElicitationHint) {
+                textOverrides["elicitation_hint"] = tinymce.get("elicitationHint").getContent();
+              }
+              if (this.overrideComparisonHint) {
+                textOverrides["comparison_hint"] = tinymce.get("comparisonHint").getContent();
+              }
+              if (this.overrideFinishedText) {
+                textOverrides["finished_text"] = tinymce.get("finishedText").getContent();
+              }
+              if (this.overrideAbout) {
+                textOverrides["about"] = tinymce.get("about").getContent();
+              }
+              textOverrides["footer"] = tinymce.get("footer").getContent();
+              return textOverrides;
+            },
+            allValidated() {
+              console.log(this.dataLoader);
+              console.log(this.preferenceElicitation);
+              console.log(this.numAlgorithms);
+              console.log(this.resultLayout);
+              console.log(this.numIterations);
+              console.log(this.k);
+              let result = this.dataLoader != null && this.preferenceElicitation != null && this.numAlgorithms != null && this.resultLayout != null && this.k != '' && this.numIterations != '';
+              if (result) {
+                // Continue validating we have selected all the algorithms
+                for (let i = 0; i < this.numAlgorithms; ++i) {
+                  result = result && this.selectedAlgorithms[i] != null;
+                  if (result) {
+                    for (let j in this.selectedAlgorithmsParameters[i]) {
+                      result = result && this.selectedAlgorithmsParameters[i][j].value != null && this.selectedAlgorithmsParameters[i][j].value != '';
+                    }
+                  } else {
+                    return false;
+                  }
+                }
+                if (result) {
+                  // Validate displayed names
+                  let displayNames = new Set();
+                  for (let i = 0; i < this.numAlgorithms; ++i) {
+                    let displayedName = this.selectedAlgorithmsParameters[i]["displayed_name"].value;
+                    if (displayNames.has(displayedName)) {
+                      this.displayedNameState[i] = false;
+                      result = false;
+                    } else {
+                      this.displayedNameState[i] = true;
+                    }
+                    displayNames.add(displayedName);
+                  }
+                  // Validate parameters of preference elicitation and data loader
+                  for (let p in this.dataLoaderParameters) {
+                    result = result && p.value != null && p.value != '';
+                  }
+                  for (let p in this.preferenceElicitationParameters) {
+                    result = result && p.value != null && p.value != '';
+                  }
+                }
+              }
+              this.$forceUpdate();
+              return result;
+            },
+            async onCreateUserStudy() {
+                let pluginName = "{{plugin_name}}";
+                
+                if (!this.allValidated()) {
+                  return;
+                }
+                
+                let algorithmsParameters = [];
+                for (let i = 0; i < this.numAlgorithms; ++i) {
+                  let name = this.selectedAlgorithms[i];
+                  //let idx = this.availableAlgorithmNames.indexOf(name);
+                  let idx = i;
+                  let param = {};
+                  for (let j in this.selectedAlgorithmsParameters[idx]) {
+                    param[j] = this.selectedAlgorithmsParameters[idx][j].value;
+                  }
+                  param["name"] = name;
+                  algorithmsParameters.push(param);
+                }
+
+                let param = {};
+                let elicitationParams = this.preferenceElicitationsParameters[this.preferenceElicitationNames.indexOf(this.preferenceElicitation)];
+                for (let p in elicitationParams) {
+                  param[p] = elicitationParams[p].value;
+                }
+                let preferenceElicitationParameters = param;
+
+                // Get rid of {"value": actualValue} and make it just [actualValue]
+                let dataLoaderParam = {};
+                let dataLoaderParams = this.dataLoadersParameters[this.dataLoaderNames.indexOf(this.dataLoader)];
+                for (let p in dataLoaderParams) {
+                  param[p] = dataLoaderParams[p].value;
+                }
+                let dataLoaderParameters = dataLoaderParam;
+
+
+                let textOverrides = this.prepareOverrides();
+
+                let userStudyConfiguration = {
+                    "k": parseInt(this.k),
+                    "prolific_code": this.prolificCode,
+                    "n_algorithms_to_compare": this.numAlgorithms,
+                    "result_layout": this.resultLayout,
+                    "shuffle_algorithms": this.shuffleAlgorithms,
+                    "shuffle_recommendations": this.shuffleRecommendations,
+                    "algorithm_parameters": this.availableAlgorithmsParameters,
+                    "n_iterations": this.numIterations,
+                    "selected_algorithms": this.selectedAlgorithms.slice(0, this.numAlgorithms),
+                    "algorithm_parameters": algorithmsParameters,
+                    "selected_preference_elicitation": this.preferenceElicitation,
+                    "preference_elicitation_parameters": preferenceElicitationParameters,
+                    "selected_data_loader": this.dataLoader,
+                    "data_loader_parameters": dataLoaderParameters,
+                    "text_overrides": textOverrides,
+                    "show_final_statistics": this.showFinalStatistics
+                };
+
+                let userStudyData = {
+                    "parent_plugin": pluginName,
+                    "config": userStudyConfiguration
+                };
+
+                let res = await fetch("/create-user-study",
+                    {
+                        method: "POST",
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRFToken': '{{ csrf_token() }}'
+                        },
+                        body: JSON.stringify(userStudyData),
+                        redirect: "follow"
+                    }
+                ).then(response => {
+                    if (response.redirected) {
+                        console.log(response);
+                        window.location.href = response.url;
+                    } else {
+                        return response.text()
+                    }
+                });
+            },
+            
+            cancelCreateUserStudy() {
+                window.location.href = "{{ url_for('main.administration') }}"
+            },
+            selectedAlgorithmChanged(algorithmName, i) {
+              let algoIdx = this.availableAlgorithmNames.indexOf(algorithmName);
+              this.selectedAlgorithmsParameters[i] = structuredClone(this.availableAlgorithmsParameters[algoIdx]);
+              this.selectedAlgorithms[i] = algorithmName;
+              this.$forceUpdate();
+            }
+        },
+        async mounted() {
+          this.availableAlgorithmsData = await fetch("{{ url_for('fastcompare.available_algorithms') }}").then(resp => resp.json());
+          this.availableAlgorithms = this.availableAlgorithms.concat(this.availableAlgorithmsData.map(x => {
+            return {
+              value: x["name"],
+              text: x["name"]
+            };
+          }));
+          this.availableAlgorithmNames = this.availableAlgorithmsData.map(x => x["name"]);
+          this.availableAlgorithmsParameters = [];
+          for (let idx in this.availableAlgorithmsData) {
+            let data = this.availableAlgorithmsData[idx];
+            let d = {};
+            for (let paramIdx in data["parameters"]) {
+              let parameter = data["parameters"][paramIdx];
+              d[parameter.name] = {
+                "value": parameter.default
+              }
+              if (parameter["options"]) {
+                d[parameter.name]["options"] = parameter["options"];
+              }
+            }
+            d["displayed_name"] = { // TODO Add check that displayed names of all the algorithms are UNIQUE!
+              "value": data["name"]
+            };
+            this.availableAlgorithmsParameters.push(d);
+          }
+
+          this.preferenceElicitationData = await fetch("{{ url_for('fastcompare.available_preference_elicitations') }}").then(resp => resp.json());
+          this.preferenceElicitations = this.preferenceElicitations.concat(this.preferenceElicitationData.map(x => {
+            return {
+              value: x["name"],
+              text: x["name"]
+            }
+          }));
+          this.preferenceElicitationNames = this.preferenceElicitationData.map(x => x["name"]);
+          this.preferenceElicitationsParameters = [];
+          for (let idx in this.preferenceElicitationData) {
+            let data = this.preferenceElicitationData[idx];
+            let d = {};
+            for (let paramIdx in data["parameters"]) {
+              let parameter = data["parameters"][paramIdx];
+              d[parameter.name] = {
+                "value": parameter.default
+              }
+              if (parameter["options"]) {
+                d[parameter.name]["options"] = parameter["options"];
+              }
+            }
+            this.preferenceElicitationsParameters.push(d);
+          }
+
+          
+          // TODO reuse above steps
+          this.dataLoaderData = await fetch("{{ url_for('fastcompare.available_data_loaders') }}").then(resp => resp.json());
+          this.dataLoaders = this.dataLoaders.concat(this.dataLoaderData.map(x => {
+            return {
+              value: x["name"],
+              text: x["name"]
+            }
+          }));
+          this.dataLoaderNames = this.dataLoaderData.map(x => x["name"]);
+          this.dataLoadersParameters = [];
+          for (let idx in this.dataLoaderData) {
+            let data = this.dataLoaderData[idx];
+            let d = {};
+            for (let paramIdx in data["parameters"]) {
+              let parameter = data["parameters"][paramIdx];
+              d[parameter.name] = {
+                "value": parameter.default
+              }
+              if (parameter["options"]) {
+                d[parameter.name]["options"] = parameter["options"];
+              }
+            }
+            this.dataLoadersParameters.push(d);
+          }
+        }
+      })
+    </script>
+  </body>
+</html>

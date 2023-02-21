@@ -1,0 +1,31 @@
+{% include 'header.html' %}
+<div id="app">
+<b-container fluid>
+    <b-jumbotron lead="{{hint_lead}}" class="smallJumbotron" header="{{header}}">
+      {{hint}}
+    </b-jumbotron>
+    <b-alert show variant="danger">{{alert_text}}</b-alert>
+</b-container>
+</div>
+
+<script type='text/javascript'>
+  window.app = new Vue({
+        el: '#app',
+        delimiters: ['[[',']]'], // Used to replace double { escaping with double [ escaping (to prevent jinja vs vue inference)
+        data: function() {
+            return {}
+        },
+        methods: {
+            
+        }
+      })
+</script>
+{% if footer_override is defined and footer_override is not none %}
+  <div class="footerDiv mt-3">
+    {{ footer_override|safe }}
+  </div>
+</body>
+</html>
+{% else %}
+{% include 'footer.html' %}
+{% endif %}

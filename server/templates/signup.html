@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <!-- Required meta tags -->
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
+    <meta http-equiv="content-type" content="text/html; charset=UTF-8" />
+
+    <title>Signup page</title>
+
+    <!-- Required Stylesheets -->
+    <link
+      type="text/css"
+      rel="stylesheet"
+      href="https://unpkg.com/bootstrap@5.2.0/dist/css/bootstrap.min.css"
+    />
+    <link
+      type="text/css"
+      rel="stylesheet"
+      href="https://unpkg.com/bootstrap-vue@2.22.0/dist/bootstrap-vue.css"
+    />
+
+    <!-- Required scripts -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/vue/2.5.16/vue.min.js"></script>
+
+    
+    <!-- Load polyfills to support older browsers -->
+    <script src="https://unpkg.com/babel-polyfill@6.26.0/dist/polyfill.min.js"></script>
+    
+    <!-- Required scripts -->
+    <script src="https://unpkg.com/bootstrap-vue@2.22.0/dist/bootstrap-vue.js"></script>
+  </head>
+  <body>
+    <!-- Our application root element -->
+    <div id="app">
+      <b-container>
+        <b-jumbotron header="Signing up">
+          <!-- <p>For more information visit our website</p>
+          <b-btn variant="primary" href="https://bootstrap-vue.org/">More Info</b-btn> -->
+        </b-jumbotron>
+        <b-form @submit="onSubmit" @reset="onReset" v-if="show">
+          <b-form-group
+            horizontal
+            :label-cols="4"
+            label="Account details"
+          >
+              <input type="hidden" name="csrf_token" v-model="csrf_token" />
+              <b-form-input required="true" v-model="name" type="email" placeholder="Enter email"></b-form-input>
+              <b-form-input required="true" class="mb-2 mt-2" v-model="pswd" type="password" :state="lengthValidation" placeholder="Enter your password"></b-form-input>
+              <b-form-invalid-feedback :state="lengthValidation">
+                Password is too short.
+              </b-form-invalid-feedback>
+              <b-form-input required="true" class="mb-2 mt-2" v-model="pswd2" type="password" :state="validation" placeholder="Repeat your password"></b-form-input>
+              <b-form-invalid-feedback :state="validation">
+                Passwords are different.
+              </b-form-invalid-feedback>
+              <!-- <b-btn variant="primary" type="submit" href="{{url_for('auth.signup')}}">Sign Up</b-btn>
+              <b-btn variant="warning" type="button" href="{{url_for('auth.login')}}">Go to login page</b-btn> -->
+              <b-button type="submit" variant="primary">Submit</b-button>
+              <b-button type="reset" variant="danger">Reset</b-button>
+              <b-button type="button" variant="warning" href="{{url_for('auth.login')}}">Go to login page</b-button>
+          </b-form-group>
+        </b-form>
+
+        <b-alert variant="danger" :show="showAlert">[[ errorMessage ]]</b-alert>
+      </b-container>
+    </div>
+
+    <!-- Start running your app -->
+    <script>
+      window.app = new Vue({
+        el: '#app',
+        delimiters: ['[[',']]'],
+        data: {
+          name: '',
+          pswd: '',
+          pswd2: '',
+          show: true,
+          errorMessage: "",
+          csrf_token: "{{ csrf_token() }}"
+        },
+        computed: {
+          showAlert() {
+            return this.errorMessage.length > 0;
+          },
+          validation() {
+            return this.pswd === this.pswd2;
+          },
+          lengthValidation() {
+            return this.pswd.length >= 1 && this.pswd.length <= 128;
+          }
+        },
+        methods: {
+          async onSubmit() {
+            this.errorMessage = "";
+            event.preventDefault();
+            let url = "{{url_for('auth.signup')}}";
+            
+            data = new FormData();
+            data.append("email", this.name);
+            data.append("password", this.pswd);
+            data.append("csrf_token", this.csrf_token);
+
+            await fetch(url, {
+              method: "POST",
+              body: data,
+              redirect: 'follow'
+            }).then(response => {
+              if (response.redirected) {
+                console.log(response);
+                window.location.href = response.url;
+              } else {
+                return response.text()
+              }
+            }).then(responseText => {
+              this.errorMessage = responseText;
+            });
+          },
+          onReset() {
+            event.preventDefault();
+            this.name = "";
+            this.pswd = "";
+            this.pswd2 = "";
+            // Trick to reset/clear native browser form validation state
+            this.show = false;
+            this.$nextTick(() => {
+              this.show = true;
+            })
+          }
+        }
+      })
+    </script>
+  </body>
+</html>

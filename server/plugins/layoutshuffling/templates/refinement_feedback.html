@@ -1,0 +1,204 @@
+{% include 'header.html' %}
+
+<div id="app">
+    <b-container fluid>
+        <b-jumbotron header="Refine the results" lead="">
+            <p>Please adjust/fine-tune the results by moving the sliders below. You can set priority for each of the metrics (improving one will automatically decrease the others)</p>
+            Iteration {{ iteration }}
+        </b-jumbotron>
+        {% if version == "1" %}
+        <b-row align-h="center">
+            <b-col sm="3">
+                <b-form method="GET" action="{{ url_for('layoutshuffling.refine_results') }}">
+                    <b-row>
+                        <label for="range-1">Relevance: [[ relevance ]]</label>
+                        <b-form-input id="range-1" type="range" :formatter="onRelevanceChange" v-model="relevance" min="0" max="100"></b-form-input>
+                        <!-- <div class="mt-2">Value: [[ relevance ]]</div> -->
+                    </b-row>
+                    <b-row class="mt-3">
+                        <label for="range-2">Diversity: [[ diversity ]]</label>
+                        <b-form-input id="range-2" type="range" v-model="diversity" :formatter="onDiversityChange" value="50" min="0" max="100"></b-form-input>
+                        <!-- <div class="mt-2">Value: [[ diversity ]]</div> -->
+                    </b-row>
+                    <b-row class="mt-3">
+                        <label for="range-3">Novelty: [[ novelty ]]</label>
+                        <b-form-input id="range-3" type="range" v-model="novelty" :formatter="onNoveltyChange" min="0" max="100"></b-form-input>
+                        <!-- <div class="mt-2">Value: [[ novelty ]]</div> -->
+                    </b-row>
+                    <b-row class="mt-3 mb-3">
+                        <b-col>
+                            <b-btn type="submit" block variant="primary" center>Next</b-btn>
+                        </b-col>
+                    </b-row>
+                </b-form>
+            </b-col>
+        </b-row>
+        {% elif version == "2" %}
+        <b-row align-h="center">
+            <b-col sm="3">
+                <b-form method="GET" action="{{ url_for('layoutshuffling.refine_results') }}">
+                    <b-row>
+                        <b-col>
+                            <b-form-group>
+                                <label>
+                                    Results were <strong>relevant</strong>
+                                </label>
+                                <b-icon id="relevance-help" icon="question-circle-fill" variant="primary"></b-icon>
+                                <b-tooltip target="relevance-help" triggers="hover">TODO</b-tooltip>
+                                <b-form-radio-group
+                                id="radio-group-1"
+                                required="True"
+                                :state="relevanceValue != null"
+                                v-model="relevanceValue"
+                                >
+                                <b-form-radio value="first">Strongly disagree</b-form-radio>
+                                <b-form-radio value="second">Disagree</b-form-radio>
+                                <b-form-radio value="third">Neutral</b-form-radio>
+                                <b-form-radio value="fourth">Agree</b-form-radio>
+                                <b-form-radio value="fifth">Strongly agree</b-form-radio>
+                                </b-form-radio-group>
+                            </b-form-group>
+                        </b-col>
+                    </b-row>
+                    <b-row class="mt-3">
+                        <b-col>
+                            <b-form-group>
+                                <label>
+                                    Results were <strong>diverse</strong>
+                                </label>
+                                <b-icon id="diverse-help" icon="question-circle-fill" variant="primary"></b-icon>
+                                <b-tooltip target="diverse-help" triggers="hover">TODO</b-tooltip>
+                                <b-form-radio-group
+                                id="radio-group-2"
+                                required="True"
+                                :state="diversityValue != null"
+                                v-model="diversityValue"
+                                >
+                                <b-form-radio value="first">Strongly disagree</b-form-radio>
+                                <b-form-radio value="second">Disagree</b-form-radio>
+                                <b-form-radio value="third">Neutral</b-form-radio>
+                                <b-form-radio value="fourth">Agree</b-form-radio>
+                                <b-form-radio value="fifth">Strongly agree</b-form-radio>
+                                </b-form-radio-group>
+                            </b-form-group>
+                        </b-col>
+                    </b-row>
+                    <b-row class="mt-3">
+                        <b-col>
+                            <b-form-group>
+                                <label>
+                                    Results were <strong>novel</strong>
+                                </label>
+                                <b-icon id="novelty-help" icon="question-circle-fill" variant="primary"></b-icon>
+                                <b-tooltip target="novelty-help" triggers="hover">TODO</b-tooltip>
+                                <b-form-radio-group
+                                id="radio-group-3"
+                                required="True"
+                                :state="noveltyValue != null"
+                                v-model="noveltyValue"
+                                >
+                                <b-form-radio value="first">Strongly disagree</b-form-radio>
+                                <b-form-radio value="second">Disagree</b-form-radio>
+                                <b-form-radio value="third">Neutral</b-form-radio>
+                                <b-form-radio value="fourth">Agree</b-form-radio>
+                                <b-form-radio value="fifth">Strongly agree</b-form-radio>
+                                </b-form-radio-group>
+                            </b-form-group>
+                        </b-col>
+                    </b-row>
+                    <b-row class="mt-3 mb-3">
+                        <b-col>
+                                <b-btn block type="submit" variant="primary" center>Next</b-btn>
+                        </b-col>
+                    </b-row>
+                </b-form>
+            </b-col>
+        </b-row>
+        {% elif version == "3" %}
+        <b-row align-h="center">
+            <b-col cols="6">
+                <b-form method="GET" @submit="onSubmit" action="{{ url_for('layoutshuffling.refine_results') }}">
+                    <input type="hidden" hidden="true" :value="newWeights" name="new_weights"/>
+                    <b-row>
+                        <label for="range-1">
+                            Would you like to make the algorithm pay more/less attention to <strong>relevance</strong>?
+                            <b-icon id="relevance-help" icon="question-circle-fill" variant="primary"></b-icon>
+                            <b-tooltip target="relevance-help" triggers="hover">TODO</b-tooltip>
+                        </label>
+                        <b-form-input id="range-1" :formatter="onRelevanceDeltaChange" type="range" v-model="relevanceDelta" min="-4" max="4"></b-form-input>
+                        
+                        <!-- <div class="mt-2">Value: [[ relevance ]]</div> -->
+                    </b-row>
+                    <b-row>
+                        <b-col class="text-left" align-h="start">
+                            <div>No attention</div>
+                        </b-col>
+                        <b-col class="text-center" align-h="center">
+                            <div>[[ deltaDescription[parseInt(relevanceDelta) + 4] ]]</div>
+                        </b-col>
+                        <b-col class="text-right" align-h="end">
+                            <div>Full attention</div>
+                        </b-col>
+                    </b-row>
+                    <b-row class="mt-3">
+                        <label for="range-2">
+                            Would you like to make the algorithm pay more/less attention to <strong>diversity</strong>?
+                            <b-icon id="diverse-help" icon="question-circle-fill" variant="primary"></b-icon>
+                            <b-tooltip target="diverse-help" triggers="hover">TODO</b-tooltip>
+                        </label>
+                        <b-form-input id="range-2" :formatter="onDiversityDeltaChange" type="range" v-model="diversityDelta" min="-4" max="4"></b-form-input>
+                        <!-- <div class="mt-2">Value: [[ diversity ]]</div> -->
+                    </b-row>
+                    <b-row>
+                        <b-col class="text-left" align-h="start">
+                            <div>No attention</div>
+                        </b-col>
+                        <b-col class="text-center" align-h="center">
+                            <div>[[ deltaDescription[parseInt(diversityDelta) + 4] ]]</div>
+                        </b-col>
+                        <b-col class="text-right" align-h="end">
+                            <div>Full attention</div>
+                        </b-col>
+                    </b-row>
+                    <b-row class="mt-3">
+                        <label for="range-3">
+                            Would you like to make the algorithm pay more/less attention to <strong>novelty</strong>?
+                            <b-icon id="novelty-help" icon="question-circle-fill" variant="primary"></b-icon>
+                            <b-tooltip target="novelty-help" triggers="hover">TODO</b-tooltip>
+                        </label>
+                        <b-form-input id="range-3" :formatter="onNoveltyDeltaChange" type="range" v-model="noveltyDelta" min="-4" max="4"></b-form-input>
+                        <!-- <div class="mt-2">Value: [[ novelty ]]</div> -->
+                    </b-row>
+                    <b-row>
+                        <b-col class="text-left" align-h="start">
+                            <div>No attention</div>
+                        </b-col>
+                        <b-col class="text-center" align-h="center">
+                            <div>[[ deltaDescription[parseInt(noveltyDelta) + 4] ]]</div>
+                        </b-col>
+                        <b-col class="text-right" align-h="end">
+                            <div>Full attention</div>
+                        </b-col>
+                    </b-row>
+                    <b-row class="mt-3 mb-3">
+                        <b-col>
+                            <b-btn type="submit" block variant="primary" center>Next</b-btn>
+                        </b-col>
+                    </b-row>
+                </b-form>
+            </b-col>
+        </b-row>
+        {% endif %}
+    </b-container>
+</div>
+<script>
+    var defaultRelevance = parseFloat({{ metrics['relevance'] }});
+    var defaultDiversity = parseFloat({{ metrics['diversity'] }});
+    var defaultNovelty = parseFloat({{ metrics['novelty'] }});
+    var csrfToken = "{{csrf_token()}}";
+    var resultLayout = "{{version}}";
+</script>
+<script src="{{url_for('static', filename='resolution_handling.js')}}"></script>
+<script src="{{url_for('static', filename='interaction_reporting.js')}}"></script>
+{{ emit_assets('layoutshuffling','refinement_feedback.js') }}     
+{% include 'footer.html' %}

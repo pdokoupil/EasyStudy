@@ -1,0 +1,11 @@
+flask
+matplotlib
+mlflow
+numpy
+scikit-learn
+scipy
+flask-login
+flask-sqlalchemy
+bcrypt
+flask-wtf
+pyaml

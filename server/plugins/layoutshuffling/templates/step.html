@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <!-- Required meta tags -->
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
+    <meta http-equiv="content-type" content="text/html; charset=UTF-8" />
+
+    <title>{{ title }}</title>
+
+    <!-- Required Stylesheets -->
+    <link
+        type="text/css"
+        rel="stylesheet"
+        href="https://unpkg.com/bootstrap@4.6.2/dist/css/bootstrap.min.css"
+    />
+    <link
+        type="text/css"
+        rel="stylesheet"
+        href="https://unpkg.com/bootstrap-vue@2.22.0/dist/bootstrap-vue.css"
+    />
+
+    <!-- Required scripts -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/vue/2.6.12/vue.min.js"></script>
+
+    
+    <!-- Load polyfills to support older browsers -->
+    <script src="https://unpkg.com/babel-polyfill@6.26.0/dist/polyfill.min.js"></script>
+    
+    <!-- Required scripts -->
+    <script src="https://unpkg.com/bootstrap-vue@2.22.0/dist/bootstrap-vue.js"></script>
+    <script src="https://unpkg.com/bootstrap-vue@2.22.0/dist/bootstrap-vue-icons.js"></script> <!-- Needed just for the Icons -->
+    <style>
+        img.selected {
+            outline: 5px solid green;
+            outline-offset: -5px;
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <b-container>
+            <b-jumbotron header="Resulting recommendations" lead="">
+                
+              </b-jumbotron>
+            <h1>STEP {{step_number}}</h1>
+            {% if step_number == 2 %}
+                <b-btn variant="primary" href="">Finish</b-btn>
+            {% endif %}
+            <!-- <b-row class="mb-2" align-h="center" align-content="center" v-for="row in rows">
+                <b-col class="align-middle" v-for="col in row">
+                  <b-img style="width: 200px; height: auto;" center :src="col.movie.url" v-on:click="onSelectMovie($event, col)" :id="col.movie.idx" :alt="col.movieName" v-b-tooltip.hover :title="col.movieName" />
+                </b-col>
+            </b-row> -->
+        </b-container>
+    </div>
+    <script type="text/javascript">
+        var movies = JSON.parse('{{ movies | tojson | safe}}');
+        console.log(movies);
+
+        window.app = new Vue({
+        el: '#app',
+        delimiters: ['[[',']]'], // Used to replace double { escaping with double [ escaping (to prevent jinja vs vue inference)
+        data: function() {
+          console.log("Called");
+          return {
+            
+          }
+        },
+        computed: {
+        },
+        methods: {
+        },
+        async mounted() {
+          console.log("Mounted was called");
+        }
+      })
+    </script>
+    
+</body>
+</html>
