@@ -9,11 +9,7 @@ flask-sqlalchemy
 bcrypt
 flask-wtf
 pyaml
-Flask-PluginKit
-Flask-Session
-is-safe-url
-IMDbPY
 gunicorn
-tensorflow
-tensorflow-recommenders
+cinemagoer
+Flask-Session
 boto3

@@ -11,8 +11,12 @@ RUN conda update conda --yes \
     && conda create --name app_env python=3.9 \
     && conda install --yes --file requirements.txt
 
+# Some packages are not available in conda
 RUN pip install --upgrade pip
-RUN pip install -r requirements.txt
+RUN pip install Flask-PluginKit
+RUN pip install is-safe-url
+RUN pip install tensorflow
+RUN pip install tensorflow-recommenders
 
 EXPOSE 5555
 

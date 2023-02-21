@@ -1,7 +1,8 @@
 import datetime
 import glob
 import time
-import imdb
+from imdb import Cinemagoer
+
 import pandas as pd
 import numpy as np
 from collections import defaultdict
@@ -163,7 +164,7 @@ class MLDataLoader:
         self.movie_index_to_description = None
         self.tag_counts_per_movie = None
 
-        self.access = imdb.IMDb()
+        self.access = Cinemagoer()
         self.movie_index_to_url = dict()
         self.similarity_matrix = None
 
@@ -184,7 +185,7 @@ class MLDataLoader:
 
     def __setstate__(self, state):
         self.__dict__.update(state)
-        self.access = imdb.IMDb()
+        self.access = Cinemagoer()
 
     # Download all the images
     def download_images(self):
