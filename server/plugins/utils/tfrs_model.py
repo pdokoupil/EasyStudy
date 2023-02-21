@@ -94,7 +94,7 @@ class MovielensRetrievalModel(tfrs.models.Model):
     def _filter_user(self, x, user):
         return x["user_id"] != user
 
-def get_model_25m(unique_user_ids, unique_movie_titles, movies, embedding_dimension = 32, learning_rate = 0.1):
+def get_model_mf(unique_user_ids, unique_movie_titles, movies, embedding_dimension = 32, learning_rate = 0.1):
     user_model = tf.keras.Sequential([
         tf.keras.layers.StringLookup(
         vocabulary=unique_user_ids, mask_token=None),

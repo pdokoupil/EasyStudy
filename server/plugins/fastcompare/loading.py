@@ -26,23 +26,15 @@ def is_data_loader(cls):
 @functools.lru_cache(maxsize=None)
 def load_algorithms():
     algorithms = {}
-    print(f"CWD = {os.getcwd()}")
-    total_start_time = time.perf_counter()
     for mod in pkgutil.walk_packages(plugins.__path__, prefix=plugins.__name__ + ".", onerror=lambda x: print("##########")):
-        start_time = time.perf_counter()
         # if mod.name in sys.modules:
             # continue # Avoid cyclic dependencies
         imported_module = __import__(mod.name, fromlist="dummy")
-        print(f"Importing module {mod.name} took: {time.perf_counter() - start_time}")
-        start_time = time.perf_counter()
         members = inspect.getmembers(imported_module) if "fastcompare.algo" in mod.name else inspect.getmembers(imported_module, inspect.isclass)
         for name, cls in members:
-            print(f"\t{name}")
             if is_algorithm(cls) and cls.name() not in algorithms: # We need unique names of algorithms!
                 algorithms[cls.name()] = cls
-        print(f"Enumeration took: {time.perf_counter() - start_time}")
-    print(f"Full loading took: {time.perf_counter() - total_start_time}")
-    print(f"Loaded algorithms: {algorithms}")
+
     return algorithms
 
 @functools.lru_cache(maxsize=None)

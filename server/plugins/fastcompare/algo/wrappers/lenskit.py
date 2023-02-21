@@ -91,8 +91,7 @@ class UserKNN(LenskitWrapper):
     @classmethod
     def parameters(cls):
         return [
-            Parameter("nnbrs", ParameterType.INT, None, help_key="user_knn_nnbrs_help"),
-            Parameter("feedback", ParameterType.OPTIONS, "implicit", help_key="user_knn_feedback_help", options=["implicit"]),
+            Parameter("nnbrs", ParameterType.INT, 20, help_key="user_knn_nnbrs_help"),
         ]
 
 class ItemKNN(LenskitWrapper):
@@ -106,10 +105,5 @@ class ItemKNN(LenskitWrapper):
     @classmethod
     def parameters(cls):
         return [
-            Parameter("nnbrs", ParameterType.INT, None, help_key="item_knn_nnbrs_help"),
-            Parameter("feedback", ParameterType.OPTIONS, "implicit", help_key="item_knn_feedback_help", options=["implicit"]),
-            Parameter("param_1", ParameterType.BOOL, True, "Some bool parameter"),
-            Parameter("param_2", ParameterType.FLOAT, 3.14, "Some float parameter"),
-            Parameter("param_3", ParameterType.STRING, "Hello world 345", "Some string parameter"),
-            Parameter("param_4", ParameterType.OPTIONS, True, "Some options simulating True/False single choice", options=[True, False])
+            Parameter("nnbrs", ParameterType.INT, 20, help_key="item_knn_nnbrs_help"),
         ]
