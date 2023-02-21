@@ -1,1 +1,1 @@
-docker build -t grs-user-studies_server .
+docker build -t easy-study .
