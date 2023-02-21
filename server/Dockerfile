@@ -12,15 +12,7 @@ RUN conda update conda --yes \
     && conda install --yes --file requirements.txt
 
 RUN pip install --upgrade pip
-RUN pip install Flask-PluginKit
-RUN pip install Flask-Session
-RUN pip install is-safe-url
-RUN pip install IMDbPY
-RUN pip install gunicorn
-RUN pip install tensorflow
-RUN pip install tensorflow-recommenders
-RUN pip install boto3
-
+RUN pip install -r requirements.txt
 
 EXPOSE 5555
 
