@@ -9,9 +9,15 @@ Patrik Dokoupil patrik.dokoupil@matfyz.cuni.cz
 Ladislav Peska ladislav.peska@matfyz.cuni.cz
 
 # Links
+**If you want to try the framework on your own, please use the following links**.
 - [Administration](https://tinyurl.com/EasyStudyAdmin)
 - [Database](https://tinyurl.com/EasyStudyDb)
+
+You can find multiple existing studies there and you can also create new studies as well.<br>
+
+***Access details are in the paper**
+
+Alternatively we have prepared a recording that shows a quick walkthrough of the framework, where we first show the "researcher view" to use Administration in order to create a simple user study, then show participant view (pass through the study itself) and briefly explain where the interactions can be found.
 - [Quick walkthrough recording](https://tinyurl.com/EasyStudyDemo)
 
-*Access details are in the paper
 
