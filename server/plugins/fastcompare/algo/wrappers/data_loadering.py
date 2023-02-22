@@ -48,6 +48,10 @@ class MLDataLoaderWrapper(DataLoaderBase):
         start_time = time.perf_counter()
         self.loader.load()
         print(f"## Loading took: {time.perf_counter() - start_time}")
+        
+        self.loader.movies_df = self.loader.movies_df.rename(columns={"movieId": "item_id"})
+        self.loader.movies_df_indexed = self.loader.movies_df_indexed.rename(columns={"movieId": "item_id"})
+
         self._ratings_df = self.loader.ratings_df.rename(columns={"userId": "user", "movieId": "item_id"})
         self._ratings_df.loc[:, "item"] = self._ratings_df.item_id.map(lambda x: self.loader.movie_id_to_index[x])
         # TODO remove "movie" in column names to "item"
