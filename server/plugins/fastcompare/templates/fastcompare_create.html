@@ -72,7 +72,7 @@
                       </b-col>
                       <b-col>
                         <template v-if="parameter.type == 'int'">
-                          <b-input type="number" step="1" min="1" v-on:change="paramChanged" :state="dataLoadersParameters[dataLoaderIdx][parameter.name].value != ''" v-model.number="dataLoadersParameters[dataLoaderIdx][parameter.name].value" :name="parameter.name"/>
+                          <b-input type="number" step="1" min="1" v-on:change="paramChanged" :state="dataLoadersParameters[dataLoaderIdx][parameter.name].value != '' && dataLoadersParameters[dataLoaderIdx][parameter.name].value >= 1" v-model.number="dataLoadersParameters[dataLoaderIdx][parameter.name].value" :name="parameter.name"/>
                         </template>
                         <template v-if="parameter.type == 'string'">
                           <b-input type="text" v-on:change="paramChanged" :state="dataLoadersParameters[dataLoaderIdx][parameter.name].value != ''" v-model="dataLoadersParameters[dataLoaderIdx][parameter.name].value" :name="parameter.name"/>
@@ -81,7 +81,7 @@
                           <b-form-checkbox v-model="dataLoadersParameters[dataLoaderIdx][parameter.name].value">[[ parameter.help ]]</b-form-checkbox>
                         </template>
                         <template v-if="parameter.type == 'float'">
-                          <b-input type="number" v-on:change="paramChanged" :state="dataLoadersParameters[dataLoaderIdx][parameter.name].value != ''" v-model.number="dataLoadersParameters[dataLoaderIdx][parameter.name].value" :name="parameter.name"/>
+                          <b-input type="number" min="0" v-on:change="paramChanged" :state="dataLoadersParameters[dataLoaderIdx][parameter.name].value != '' && dataLoadersParameters[dataLoaderIdx][parameter.name].value >= 0.0" v-model.number="dataLoadersParameters[dataLoaderIdx][parameter.name].value" :name="parameter.name"/>
                         </template>
                         <template v-if="parameter.type == 'options'">
                           <b-form-select v-on:change="paramChanged" :state="dataLoadersParameters[dataLoaderIdx][parameter.name].value != null" v-model="dataLoadersParameters[dataLoaderIdx][parameter.name].value" :options="dataLoadersParameters[dataLoaderIdx][parameter.name].options" :name="parameter.name" required="True" type=""/>
@@ -124,7 +124,7 @@
                       </b-col>
                       <b-col>
                         <template v-if="parameter.type == 'int'">
-                          <b-input type="number" v-on:change="paramChanged" :state="preferenceElicitationsParameters[elicitationIdx][parameter.name].value != ''" step="1" min="1" v-model.number="preferenceElicitationsParameters[elicitationIdx][parameter.name].value" :name="parameter.name"/>
+                          <b-input type="number" v-on:change="paramChanged" :state="preferenceElicitationsParameters[elicitationIdx][parameter.name].value != '' && preferenceElicitationsParameters[elicitationIdx][parameter.name].value >= 1" step="1" min="1" v-model.number="preferenceElicitationsParameters[elicitationIdx][parameter.name].value" :name="parameter.name"/>
                         </template>
                         <template v-if="parameter.type == 'string'">
                           <b-input type="text" v-on:change="paramChanged" :state="preferenceElicitationsParameters[elicitationIdx][parameter.name].value != ''" v-model="preferenceElicitationsParameters[elicitationIdx][parameter.name].value" :name="parameter.name"/>
@@ -133,7 +133,7 @@
                           <b-form-checkbox v-model="preferenceElicitationsParameters[elicitationIdx][parameter.name].value">[[ parameter.help ]]</b-form-checkbox>
                         </template>
                         <template v-if="parameter.type == 'float'">
-                          <b-input type="number" v-on:change="paramChanged" :state="preferenceElicitationsParameters[elicitationIdx][parameter.name].value != ''" v-model.number="preferenceElicitationsParameters[elicitationIdx][parameter.name].value" :name="parameter.name"/>
+                          <b-input type="number" v-on:change="paramChanged" min="0" :state="preferenceElicitationsParameters[elicitationIdx][parameter.name].value != '' && preferenceElicitationsParameters[elicitationIdx][parameter.name].value >= 0.0" v-model.number="preferenceElicitationsParameters[elicitationIdx][parameter.name].value" :name="parameter.name"/>
                         </template>
                         <template v-if="parameter.type == 'options'">
                           <b-form-select v-on:change="paramChanged" :state="preferenceElicitationsParameters[elicitationIdx][parameter.name].value != null" v-model="preferenceElicitationsParameters[elicitationIdx][parameter.name].value" :options="preferenceElicitationsParameters[elicitationIdx][parameter.name].options" :name="parameter.name" required="True" type=""/>
@@ -156,7 +156,7 @@
               </b-row>
             </b-col>
             <b-col cols="6">
-              <b-input type="number" id="k" name="k" v-model.number="k" :state="k != ''" placeholder="{{please_enter_k}}"/>
+              <b-input type="number" id="k" name="k" step="1" min="1" max="100" v-model.number="k" :state="k != '' && k >= 1 && k <= 100" placeholder="{{please_enter_k}}"/>
             </b-col>
           </b-row>
           <b-row align-h="center" class="mb-3">
@@ -198,7 +198,7 @@
               </b-row>
             </b-col>
             <b-col cols="6">
-              <b-input type="number" step="1" v-model.number="numIterations" :state="numIterations != ''" placeholder="{{please_enter_n_iterations}}"/>
+              <b-input type="number" step="1" min="1" v-model.number="numIterations" :state="numIterations != '' && numIterations >= 1" placeholder="{{please_enter_n_iterations}}"/>
             </b-col>
           </b-row>
           <b-row align-h="center" class="mb-3">
@@ -309,7 +309,7 @@
                       </b-col>
                       <b-col>
                         <template v-if="parameter.type == 'int'">
-                          <b-input type="number" step="1" min="1" v-on:change="paramChanged" :state="selectedAlgorithmsParameters[i - 1][parameter.name].value != ''" v-model.number="selectedAlgorithmsParameters[i - 1][parameter.name].value" :name="parameter.name"/>
+                          <b-input type="number" step="1" min="1" v-on:change="paramChanged" :state="selectedAlgorithmsParameters[i - 1][parameter.name].value != '' && selectedAlgorithmsParameters[i - 1][parameter.name].value >= 1" v-model.number="selectedAlgorithmsParameters[i - 1][parameter.name].value" :name="parameter.name"/>
                         </template>
                         <template v-if="parameter.type == 'string'">
                           <b-input type="text" v-on:change="paramChanged" :state="selectedAlgorithmsParameters[i - 1][parameter.name].value != ''" v-model="selectedAlgorithmsParameters[i - 1][parameter.name].value" :name="parameter.name"/>
@@ -318,7 +318,7 @@
                           <b-form-checkbox v-model="selectedAlgorithmsParameters[i - 1][parameter.name].value">[[ parameter.help ]]</b-form-checkbox>
                         </template>
                         <template v-if="parameter.type == 'float'">
-                          <b-input type="number" v-on:change="paramChanged" :state="selectedAlgorithmsParameters[i - 1][parameter.name].value != ''" v-model.number="selectedAlgorithmsParameters[i - 1][parameter.name].value" :name="parameter.name"/>
+                          <b-input type="number" v-on:change="paramChanged" min="0" :state="selectedAlgorithmsParameters[i - 1][parameter.name].value != '' && selectedAlgorithmsParameters[i - 1][parameter.name].value >= 0.0" v-model.number="selectedAlgorithmsParameters[i - 1][parameter.name].value" :name="parameter.name"/>
                         </template>
                         <template v-if="parameter.type == 'options'">
                           <b-form-select v-on:change="paramChanged" :state="selectedAlgorithmsParameters[i - 1][parameter.name].value != null" v-model="selectedAlgorithmsParameters[i - 1][parameter.name].value" :options="selectedAlgorithmsParameters[i - 1][parameter.name].options" :name="parameter.name" required="True" type=""/>
@@ -458,21 +458,39 @@
               textOverrides["footer"] = tinymce.get("footer").getContent();
               return textOverrides;
             },
+            findParamType(params, pName) {
+              for (let i in params) {
+                if (params[i]["name"] == pName) {
+                  return params[i]["type"];
+                }
+              }
+              return "unknown";
+            },
             allValidated() {
-              console.log(this.dataLoader);
-              console.log(this.preferenceElicitation);
-              console.log(this.numAlgorithms);
-              console.log(this.resultLayout);
-              console.log(this.numIterations);
-              console.log(this.k);
-              let result = this.dataLoader != null && this.preferenceElicitation != null && this.numAlgorithms != null && this.resultLayout != null && this.k != '' && this.numIterations != '';
+              let result = this.dataLoader != null &&
+                this.preferenceElicitation != null &&
+                this.numAlgorithms != null &&
+                this.resultLayout != null &&
+                this.k != '' && this.k >= 1 && this.k <= 100 &&
+                this.numIterations != '' && this.numIterations >= 1;
               if (result) {
                 // Continue validating we have selected all the algorithms
                 for (let i = 0; i < this.numAlgorithms; ++i) {
                   result = result && this.selectedAlgorithms[i] != null;
                   if (result) {
                     for (let j in this.selectedAlgorithmsParameters[i]) {
-                      result = result && this.selectedAlgorithmsParameters[i][j].value != null && this.selectedAlgorithmsParameters[i][j].value != '';
+                      let pVal = this.selectedAlgorithmsParameters[i][j].value;
+                      let algoIdx = this.availableAlgorithmNames.indexOf(this.selectedAlgorithms[i]);
+                      let algoParams = this.availableAlgorithmsData[algoIdx]["parameters"];
+                      result = result && pVal != null && pVal != '';
+                      if (result) {
+                        let pType = this.findParamType(algoParams, j);
+                        if (pType == "int") {
+                          result = pVal >= 1;
+                        } else if (pType == "float") {
+                          result = pVal >= 0.0;
+                        }
+                      }
                     }
                   } else {
                     return false;
@@ -492,11 +510,36 @@
                     displayNames.add(displayedName);
                   }
                   // Validate parameters of preference elicitation and data loader
-                  for (let p in this.dataLoaderParameters) {
-                    result = result && p.value != null && p.value != '';
+                  let elIdx = this.preferenceElicitationNames.indexOf(this.preferenceElicitation);
+                  let elicitationParams = this.preferenceElicitationsParameters[elIdx];
+                  let origParams = this.preferenceElicitationData[elIdx]["parameters"];
+                  for (let p in elicitationParams) {
+                    let pVal = elicitationParams[p].value;
+                    result = result && pVal != null && pVal != '';
+                    if (result) {
+                      let pType = this.findParamType(origParams, p);
+                      if (pType == "int") {
+                        result = pVal >= 1;
+                      } else if (pType == "float") {
+                        result = pVal >= 0.0;
+                      }
+                    }
                   }
-                  for (let p in this.preferenceElicitationParameters) {
-                    result = result && p.value != null && p.value != '';
+
+                  let loaderIdx = this.dataLoaderNames.indexOf(this.dataLoader);
+                  let loaderParams = this.dataLoaderData[loaderIdx]["parameters"];
+                  let dataLoaderParams = this.dataLoadersParameters[loaderIdx];
+                  for (let p in dataLoaderParams) {
+                    let pVal = dataLoaderParams[p].value;
+                    result = result && pVal != null && pVal != '';
+                    if (result) {
+                      let pType = this.findParamType(loaderParams, p);
+                      if (pType == "int") {
+                        result = pVal >= 1;
+                      } else if (pType == "float") {
+                        result = pVal >= 0.0;
+                      }
+                    }
                   }
                 }
               }
