@@ -14,7 +14,8 @@ from PIL import Image
 from io import BytesIO
 import requests
 
-from app import pm
+# from app import pm
+from flask import url_for, has_app_context
 
 # Movie-lens data loader
 
@@ -226,13 +227,13 @@ class MLDataLoader:
             TARGET_WIDTH = 200
             coef = TARGET_WIDTH / width
             new_height = int(height * coef)
-            img = img.resize((TARGET_WIDTH, new_height),Image.ANTIALIAS)
+            img = img.resize((TARGET_WIDTH, new_height),Image.ANTIALIAS).convert('RGB')
             img.save(os.path.join(self.img_dir_path, f'{movie_id}.jpg'), quality=90)
 
             i += 1
 
     def get_image(self, movie_idx):
-        if self.img_dir_path:
+        if self.img_dir_path and has_app_context():
             if movie_idx not in self.movie_index_to_url:
                 # Download it first if it is missing
                 movie_id = self.movie_index_to_id[movie_idx]
@@ -253,14 +254,12 @@ class MLDataLoader:
                     TARGET_WIDTH = 200
                     coef = TARGET_WIDTH / width
                     new_height = int(height * coef)
-                    img = img.resize((TARGET_WIDTH, new_height),Image.ANTIALIAS)
+                    img = img.resize((TARGET_WIDTH, new_height),Image.ANTIALIAS).convert('RGB')
                     img.save(os.path.join(self.img_dir_path, f'{movie_id}.jpg'), quality=90)
 
             # Use local version of images
-            print(f"Norm path = {os.path.normpath(self.img_dir_path)}")
-            suffix = os.path.normpath(self.img_dir_path).split(f"{os.sep}static{os.sep}")[1]
-            p = os.path.normpath(os.path.join(suffix, f'{self.movie_index_to_id[movie_idx]}.jpg'))
-            return pm.emit_assets('utils', p.replace(os.sep, '/'))
+            item_id = self.movie_index_to_id[movie_idx]
+            return url_for('static', filename=f'datasets/ml-latest/img/{item_id}.jpg')
 
         return self.movie_index_to_url[movie_idx]
         #movie_id = self.movie_index_to_id[movie_idx]
@@ -280,45 +279,6 @@ class MLDataLoader:
     # Passing local_movie_images as parameter to prevent cache changes
     # If local_movie_images==True, we will use local files instead of image urls inside img uris
     def load(self):
-
-        
-        # Prepare cache paths
-        # rating_cache_dir = os.path.dirname(self.ratings_path)
-        # ratings_cache = os.path.join(self.ratings_path, os.path.splitext()[0], "_cache.pckl")
-        # rating_matrix_cache = os.path.join(rating_cache_dir, "rm_cache.pckl")
-        # movies_cache = os.path.join(self.ratings_path, os.path.splitext()[0], "_cache.pckl")
-        # tags_cache = os.path.join(self.ratings_path, os.path.splitext()[0], "_cache.pckl")
-        # links_cache = os.path.join(self.ratings_path, os.path.splitext()[0], "_cache.pckl")
-
-        # if use_cache:
-        #     print(f"use_cache is True, trying to check cache first")
-
-        #     cache_paths = [
-        #         ratings_cache,
-        #         rating_matrix_cache,
-        #         movies_cache,
-        #         tags_cache,
-        #         links_cache
-        #     ]
-
-
-        #     # To prevent out-of-sync of the cache, we follow the assumption that either all the cache files
-        #     # are present, or all of them will be recomputed (i.e. just one missing cache file means that everything)
-        #     # will be recomputed
-        #     for cache_path in cache_paths:
-        #         result = os.path.exists(cache_path)
-        #         print(f"Checking existence of cache file: {cache_path}, result: {result}")
-            
-        #         if not result:
-        #             print(f"Some cache files were missing, recompute everything")
-        #             break
-
-        #     self.ratings_df = 
-            
-
-
-        #     return
-        
         #### Data Loading ####
 
         # Load ratings
@@ -362,22 +322,12 @@ class MLDataLoader:
         
         self.user_to_user_index = dict(zip(unique_users, range(num_users)))
 
-        # If rating_matrix_path is not specified, we do not build it at all
-        if self.rating_matrix_path:
-            # Attempt to load cached rating matrix
-            if os.path.exists(self.rating_matrix_path):
-                self.rating_matrix = np.load(self.rating_matrix_path)
-            else:
-                self.rating_matrix = np.zeros(shape=(num_users, num_movies), dtype=np.float32)
-                for row_idx, row in self.ratings_df.iterrows():
-                    # 25 prints per data frame
-                    if row_idx % (self.ratings_df.shape[0] // 25) == 0:
-                        print(row_idx)
-                    self.rating_matrix[self.user_to_user_index[row.userId], self.movie_id_to_index[row.movieId]] = row.rating
-                np.save(self.rating_matrix_path, self.rating_matrix)
-
-            self.similarity_matrix = np.float32(squareform(pdist(self.rating_matrix.T, "cosine")))
-
+        ratings_df_i = self.ratings_df.copy()
+        ratings_df_i.userId = ratings_df_i.userId.map(self.user_to_user_index)
+        ratings_df_i.movieId = ratings_df_i.movieId.map(self.movie_id_to_index)
+        self.rating_matrix = self.ratings_df.pivot(index='userId', columns='movieId', values="rating").fillna(0).values
+        self.similarity_matrix = np.float32(squareform(pdist(self.rating_matrix.T, "cosine")))
+        
         # Maps movie index to text description
         self.movies_df["description"] = self.movies_df.title + ' ' + self.movies_df.genres
         self.movie_index_to_description = dict(zip(self.movies_df.index, self.movies_df.description))
@@ -387,7 +337,7 @@ class MLDataLoader:
 
 
         # First check which images are downloaded so far
-        already_downloaded = os.listdir(self.img_dir_path)
+        already_downloaded = [] if not os.path.exists(self.img_dir_path) else os.listdir(self.img_dir_path)
         self.movie_index_to_url = dict()
         for img_name in already_downloaded:
             movie_id = int(img_name.split(".jpg")[0])

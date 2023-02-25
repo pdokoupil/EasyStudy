@@ -1,35 +1,24 @@
 import glob
 import json
 import os
-import yaml 
 import functools
 
 from flask import request, session
 
 from models import UserStudy
 
+from pathlib import Path
+
 from urllib.parse import urlparse
 
-def load_system_config(file_name="config.yaml"):
-    location = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
-    with open(os.path.join(location, file_name), "r") as f:
-        config = yaml.safe_load(f)
-
-    # Fixup all the paths inside config to be absolute
-    if not os.path.isabs(config["datasets_base_path"]):
-        config["datasets_base_path"] = os.path.join(os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__))), config["datasets_base_path"])
-
-    return config
-
-yaml_config = load_system_config()
-print(f"Yaml config={yaml_config}")
-
+# Get absolute path of the project root
+def get_abs_project_root_path():
+    return Path(__file__).parent.absolute()
 
 
 def gen_url_prefix():
     p = urlparse(request.url, ".")
     return f"{p.scheme}://{p.netloc}"
-    #return f"http://{yaml_config['hostname']}:{yaml_config['port']}"
 
 def load_languages(base_path):
     res = {}

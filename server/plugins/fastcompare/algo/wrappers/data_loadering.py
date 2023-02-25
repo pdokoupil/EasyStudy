@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 import time
 
 import pandas as pd
@@ -7,9 +8,9 @@ import requests
 from plugins.fastcompare.algo.algorithm_base import DataLoaderBase
 from plugins.utils.ml_data_loader import MLDataLoader, RatingLowFilter, MovieFilterByYear, RatingFilterOld, RatingsPerYearFilter, RatingUserFilter, RatedMovieFilter, LinkFilter
 
-from common import load_system_config
+from common import get_abs_project_root_path
 
-from app import pm
+from flask import url_for, has_app_context
 from PIL import Image
 from io import BytesIO
 
@@ -20,7 +21,7 @@ class MLDataLoaderWrapper(DataLoaderBase):
 
     def __init__(self, **kwargs):
 
-        datasets_base_dir = load_system_config()["datasets_base_path"]
+        datasets_base_dir = os.path.join(get_abs_project_root_path(), 'static', 'datasets')
 
         if not os.path.exists(datasets_base_dir):
             assert False, f"Datasets base dir ({datasets_base_dir}) does not exist"
@@ -37,6 +38,8 @@ class MLDataLoaderWrapper(DataLoaderBase):
         tags_path = os.path.join(datasets_base_dir, "ml-latest", "tags.csv")
         links_path = os.path.join(datasets_base_dir, "ml-latest", "links.csv")
         img_dir_path = os.path.join(datasets_base_dir, "ml-latest", "img")
+        # Ensure img dir path exists
+        Path(img_dir_path).mkdir(parents=True, exist_ok=True)
 
         self.loader = MLDataLoader(ratings_path, movies_path, tags_path, links_path,
             [RatingLowFilter(4.0), MovieFilterByYear(1990), RatingFilterOld(2010), RatingsPerYearFilter(50.0), RatingUserFilter(100), RatedMovieFilter(), LinkFilter()],
@@ -101,8 +104,7 @@ class MLDataLoaderWrapper(DataLoaderBase):
 class GoodbooksDataLoader(DataLoaderBase):
 
     def __init__(self, **kwargs):
-
-        datasets_base_dir = load_system_config()["datasets_base_path"]
+        datasets_base_dir = os.path.join(get_abs_project_root_path(), 'static', 'datasets')
 
         if not os.path.exists(datasets_base_dir):
             assert False, f"Datasets base dir ({datasets_base_dir}) does not exist"
@@ -119,8 +121,8 @@ class GoodbooksDataLoader(DataLoaderBase):
         self.tags_path = os.path.join(datasets_base_dir, "goodbooks-10k", "tags.csv")
         self.book_tags_path = os.path.join(datasets_base_dir, "goodbooks-10k", "book_tags.csv")
         self.img_dir_path = os.path.join(datasets_base_dir, "goodbooks-10k", "img")
-
-        
+        # Ensure img dir path exists
+        Path(self.img_dir_path).mkdir(parents=True, exist_ok=True)
 
     def load_data(self):
         #cache_path = os.path.join(basedir, "static", "ml-latest", "data_cache.pckl")
@@ -154,7 +156,7 @@ class GoodbooksDataLoader(DataLoaderBase):
         self.book_index_to_description = dict(zip(self.books_df.index, self.books_df.description))
         
 
-        already_downloaded = os.listdir(self.img_dir_path)
+        already_downloaded = [] if not os.path.exists(self.img_dir_path) else os.listdir(self.img_dir_path)
         self.book_index_to_url = dict()
         for img_name in already_downloaded:
             book_id = int(img_name.split(".jpg")[0])
@@ -184,7 +186,7 @@ class GoodbooksDataLoader(DataLoaderBase):
         return self.get_item_index_image_url(self.get_item_index(item_id))
     
     def get_item_index_image_url(self, item_index):
-        if self.img_dir_path:
+        if self.img_dir_path and has_app_context():
             if item_index not in self.book_index_to_url:
                 # Download it first if it is missing
                 book_id = self.book_index_to_id[item_index]
@@ -204,14 +206,12 @@ class GoodbooksDataLoader(DataLoaderBase):
                     TARGET_WIDTH = 200
                     coef = TARGET_WIDTH / width
                     new_height = int(height * coef)
-                    img = img.resize((TARGET_WIDTH, new_height), Image.ANTIALIAS)
+                    img = img.resize((TARGET_WIDTH, new_height), Image.ANTIALIAS).convert('RGB')
                     img.save(os.path.join(self.img_dir_path, f'{book_id}.jpg'), quality=90)
 
             # Use local version of images
-            print(f"Norm path = {os.path.normpath(self.img_dir_path)}")
-            suffix = os.path.normpath(self.img_dir_path).split(f"{os.sep}static{os.sep}")[1]
-            p = os.path.normpath(os.path.join(suffix, f'{self.book_index_to_id[item_index]}.jpg'))
-            return pm.emit_assets('utils', p.replace(os.sep, '/'))
+            item_id = self.book_index_to_id[item_index]
+            return url_for('static', filename=f'datasets/goodbooks-10k/img/{item_id}.jpg')
 
         return self.book_index_to_url[item_index]
 

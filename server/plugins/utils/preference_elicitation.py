@@ -1,6 +1,7 @@
 # If running from python, do it as python -m preference_elicitation to avoid issues with relative imports !!!!
 
 import os
+from pathlib import Path
 import sys
 sys.path.append(os.path.dirname(os.path.realpath(__file__)))
 
@@ -34,6 +35,8 @@ from mandate_allocation.exactly_proportional_fuzzy_dhondt_2 import exactly_propo
 from mandate_allocation.weighted_average_strategy import weighted_average_strategy
 
 from data_loading import load_ml_dataset, MLDataLoader
+
+from common import get_abs_project_root_path
 
 MOST_RATED_MOVIES_THRESHOLD = 200
 USERS_RATING_RATIO_THRESHOLD = 0.75
@@ -119,7 +122,8 @@ def prepare_tf_model(loader):
 
     unique_user_ids, unique_movie_titles, movies, cached_train, train = prepare_tf_data(loader)
     model = get_model_mf(unique_user_ids, unique_movie_titles, movies)
-    cache_path = os.path.join(basedir, "static", "ml-latest", "tf_weights_cache")
+    #cache_path = os.path.join(Path(__file__).parent.absolute(), 'cache', 'utils', 'ml-latest', 'tf_weights_cache')
+    cache_path = os.path.join(get_abs_project_root_path(), 'cache', 'utils', 'ml-latest', 'tf_weights_cache')
 
     # Try load
     try:
@@ -531,102 +535,3 @@ def search_for_movie(attrib, pattern, tr=None):
     result = [{"movie": movie, "url": url, "movie_idx": str(movie_idx)} for movie, url, movie_idx in zip(found_movies.title.values, res_url, movie_indices)]
     return result
 
-
-if __name__ == "__main__":
-    loader = load_ml_dataset()
-
-
-    items = np.arange(loader.rating_matrix.shape[1])
-    distance_matrix = 1.0 - loader.similarity_matrix
-    print(f"Rating matrix min={loader.rating_matrix.min()}, max={loader.rating_matrix.max()}, avg={loader.rating_matrix.mean()}")
-    
-    users_viewed_item = loader.rating_matrix.astype(bool).sum(axis=0)
-    print(f"Total entries = {users_viewed_item.sum()} should equal dataframe size: {loader.ratings_df.shape}")
-    extended_rating_matrix = loader.rating_matrix.copy() # TODO prepare extended rating matrix
-    # Normalize to [0, 1] to match the scale of base recommender
-    extended_rating_matrix = (extended_rating_matrix - extended_rating_matrix.min()) / (extended_rating_matrix.max() - extended_rating_matrix.min())
-    extended_rating_matrix_mask_inv = (1 - extended_rating_matrix.astype(bool)) # Invert the matrix to get inversed mask -> 1 means that item was not seen
-
-    ratings_df = loader.ratings_df.rename(columns={"movieId": "item", "userId": "user"})
-
-    # Variant 1, works fine
-    # algo = als.ImplicitMF(100, iterations=50)
-    # algo = Recommender.adapt(algo)
-    # algo.fit(ratings_df)
-    # start_time = time.perf_counter()
-    # item_ids = ratings_df.item.unique()
-    # for user_id in ratings_df.user.unique():
-    #     user_idx = loader.user_to_user_index[user_id]
-    #     res = algo.predict_for_user(user_id, item_ids)
-    #     res = ((res - res.min()) / (res.max() - res.min())) * 5.0
-    #     for item_id, rating in res.iteritems():
-    #         item_idx = loader.movie_id_to_index[item_id]
-    #         if extended_rating_matrix[user_idx, item_idx] == 0.0:
-    #             extended_rating_matrix[user_idx, item_idx] = rating
-    # print(f"Took: {time.perf_counter() - start_time}")
-
-
-    # Variant 2 - to be aligned with what is implemented elsewhere in the system
-    # where TF Recommenders lib is used
-    algo, train = prepare_tf_model(loader) # Prepare tfrecommender
-    loader, items, distance_matrix, users_viewed_item = prepare_wrapper_once()
-    
-
-    # Build this temporary mapping to improve performance
-    movie_name_to_index = {}
-    for mov_id, row in loader.movies_df_indexed.iterrows():
-        movie_name_to_index[row.title] = loader.movie_id_to_index[mov_id]
-
-    def get_top_k(movie_names):
-        # Optimized implementation
-        return [movie_name_to_index[y] for y in movie_names]
-
-    if os.path.exists("./extended_rating_matrix.npy"):
-        extended_rating_matrix = np.load("./extended_rating_matrix.npy")
-    else:
-        print(f"### Number of zero entries in RM: {extended_rating_matrix[extended_rating_matrix == 0].size}")
-        print(f"Extended rating matrix statistics: {extended_rating_matrix.min()}, {extended_rating_matrix.max()}")
-        n_users = extended_rating_matrix.shape[0]
-        print(f"### Total number of users: {n_users}")
-        start_time = time.perf_counter()
-        for i, user_id in enumerate(loader.ratings_df.userId.astype(str).unique()):
-            user_idx = loader.user_to_user_index[int(user_id)]
-
-            scores, x = algo.predict_all_unseen(user_id, [], n_items=items.size) #model.predict_for_user(new_user, ratings2, k=2000)
-            scores, x = tf.squeeze(scores).numpy(), tf.squeeze(x).numpy()
-            scores = (scores - scores.min()) / (scores.max() - scores.min()) # TODO think about this, do we need this? Maybe use different normalization?
-            top_k = get_top_k(x)
-            extended_rating_matrix[user_idx, :] = extended_rating_matrix_mask_inv[user_idx] * scores # Update only unseen entries
-            
-            if i % 100 == 0:
-                print(f"Processed user {i+1}/{n_users} in {time.perf_counter() - start_time}")
-        
-        print(f"### Number of zero entries in RM AFTER: {extended_rating_matrix[extended_rating_matrix == 0].size}")
-        np.save("./extended_rating_matrix.npy", extended_rating_matrix)
-
-    if not os.path.exists("./supports.npy"):
-        k = 10
-        normalization_factory = standardization
-        cache_dir = "./tmp_cache_dir"
-
-        mandate_allocation = weighted_average_strategy(np.array([0.5, 0.25, 0.25]), -1e6)
-        unseen_items_mask = np.ones(extended_rating_matrix.shape, dtype=np.bool8)
-        discount_sequences = [[1.0] * k, [1.0] * k, [1.0] * k]
-
-
-        wrapper = RLPropWrapper(items, extended_rating_matrix, distance_matrix, users_viewed_item, normalization_factory, mandate_allocation, unseen_items_mask, cache_dir, discount_sequences)
-        wrapper.init()
-
-        from rlprop_wrapper import get_supports
-        users_partial_lists = np.full((extended_rating_matrix.shape[0], k), -1, dtype=np.int32)
-        supports = get_supports(users_partial_lists, items, extended_rating_matrix, distance_matrix, users_viewed_item, k=1) # Calculate it over empty array/partial list
-        print(f"Supports shape: {supports.shape}")
-        np.save("./supports.npy", supports)
-    else:
-        supports = np.load("./supports.npy")
-    
-    
-    x = QuantileTransformer()
-    x.fit(supports.reshape(supports.shape[0], -1).T) # Flatten last two dimensions and reshape so that objectives act as features
-    with open("./cdf_full_support.pckl", "wb") as f:
-        pickle.dump(x, f)

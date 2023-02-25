@@ -43,9 +43,12 @@ class AlgorithmBase(ABC):
     # Data should be specified when algorithm is constructed, not passed to fit
     # the reason is that some models have structure dependent on the underlying data (e.g. string lookups in tensorflow etc.)
     # so it makes sense to expect fitting is done at same data as construction
+    # This method should perform initial training on the dataset
     def fit():
         pass
 
+    # Performs prediction for new, previously unknown user, by simulating his history using a list of selected items.
+    # It should return list of item indices of the k recommended items. Note, that none of the filter_out_items can be present in the result
     @abstractmethod
     def predict(selected_items, filter_out_items, k):
         pass
@@ -56,6 +59,8 @@ class AlgorithmBase(ABC):
     def name():
         pass
 
+    # Return list of parameters (see ParameterType type) that will be set by the user when creating the user study and passed to the
+    # Algorithm's constructor
     @classmethod
     @abstractmethod
     def parameters():
@@ -96,12 +101,14 @@ class PreferenceElicitationBase(ABC):
     def get_initial_data(movie_indices_to_ignore=[]):
         pass
 
-    # Names have to be unique!
+    # Names have to be unique! Will be displayed to the users when creating user study from fastcompare plugin
     @classmethod
     @abstractmethod
     def name():
         pass
-
+    
+    # Return list of parameters (see ParameterType type) that will be set by the user when creating the user study and passed to the
+    # Preference elicitation's constructor
     @classmethod
     @abstractmethod
     def parameters():
@@ -131,59 +138,74 @@ class PreferenceElicitationBase(ABC):
 # Base classes must take **kwargs in __init__
 # there should be user, item columns in the ratings_df
 # there should also be title column in the items_df
+# Item id is possibily non-zero based id, while item_index is strictly zero based
 class DataLoaderBase(ABC):
     _my_id = "60169475d436925316ff7a2b03b52253" # MD5 hash of "DataLoaderBase"
 
+    # Load the data, here you can perform long running stuff
     @abstractmethod
     def load_data():
         pass
 
     # Returns dataframe with the interactions/ratings (be aware that implicit feedback is now considered)
-    # There should be "user" and "item" columns in the dataframe
+    # There should be "user", "item", and "item_id" (zero-based) columns in the dataframe
     @property
     @abstractmethod
     def ratings_df():
         pass
 
+    # Returns dataframe with information about items. Should have item_id, and title columns
     @property
     @abstractmethod
     def items_df():
         pass
 
+    # Same as items_df but using item as an index
     @property
     @abstractmethod
     def items_df_indexed():
         pass
 
+    # Return image url for the given item id
+    # Either remote URL (http://) (could be slow)
+    # Or local, already processed via flask's url_for (if you place images into server/static/datasets/x/img/*.jpg)
     @abstractmethod
     def get_item_id_image_url(item_id):
         pass
 
+    # Same as above, but for given item index instead of item id
     @abstractmethod    
     def get_item_index_image_url(item_index):
         pass
 
+    # Map item id to item index
     @abstractmethod
     def get_item_index(item_id):
         pass
 
+    # Map item index to item id
     @abstractmethod
     def get_item_id(item_index):
         pass
 
+    # Return textual description for the given item index (e.g. title or title concatenated with genres, etc.)
     @abstractmethod
     def get_item_index_description(item_index):
         pass
 
+    # Return textual description for the given item id
     @abstractmethod
     def get_item_id_description(item_id):
         pass
     
+    # Names have to be unique! Return data loader name that will be displayed to the user when creating user study using fastcompare plugin
     @classmethod
     @abstractmethod
     def name():
         pass
 
+    # Return list of parameters (see ParameterType type) that will be set by the user when creating the user study and passed to the
+    # Data loader's constructor
     @classmethod
     @abstractmethod
     def parameters():

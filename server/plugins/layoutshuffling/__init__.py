@@ -5,7 +5,8 @@ import os
 from flask import Blueprint, request, redirect, url_for, render_template, session
 from sklearn.preprocessing import QuantileTransformer
 
-from plugins.utils.preference_elicitation import recommend_2_3, rlprop, weighted_average, result_layout_variants, get_objective_importance
+from plugins.utils.preference_elicitation import recommend_2_3, rlprop, weighted_average, result_layout_variants, get_objective_importance, prepare_tf_model
+from plugins.utils.data_loading import load_ml_dataset
 from plugins.utils.interaction_logging import log_interaction, study_ended
 
 from models import Interaction, Participation, UserStudy
@@ -668,26 +669,38 @@ def send_feedback():
     session["orig_permutation"] = algo_order # Backup, read-only
     return redirect(url_for("layoutshuffling.compare_algorithms"))
 
-# def limit_handler():
-#     """I am running in before_request"""
-#     ip = request.headers.get('X-Real-Ip', request.remote_addr)
-#     if request.endpoint == "index" and ip == "127.0.0.1":
-#         resp = make_response(redirect(url_for("layoutshuffling.limit")))
-#         resp.is_return = True
-#         return resp
+from multiprocessing import Process
+from sqlalchemy import create_engine
+from sqlalchemy.orm import Session
+
+def long_initialization(guid):
+    # Activate the user study once the initialization is done
+    # We have to use SQLAlchemy directly because we are outside of the Flask context (since we are running on a daemon thread)
+    engine = create_engine('sqlite:///instance/db.sqlite')
+    session = Session(engine)
+    q = session.query(UserStudy).filter(UserStudy.guid == guid).first()
+    
+    # Do a single call to load_ml_dataset and prepare_tf_data to force cache population
+    loader = load_ml_dataset()
+    prepare_tf_model(loader)
+    
+    q.initialized = True
+    q.active = True
+    session.commit()
+    session.expunge_all()
+    session.close()
 
 @bp.route("/initialize", methods=["GET"])
 def initialize():
-    # No special initialization is needed for this plugin, just activate the user study and go back immediately
     guid = request.args.get("guid")
-    user_study = UserStudy.query.filter(UserStudy.guid == guid).first()
-    user_study.initialized = True
-    user_study.active = True
-    db.session.commit()
+    heavy_process = Process(
+        target=long_initialization,
+        daemon=True,
+        args=(guid, )
+    )
+    heavy_process.start()
     return redirect(request.args.get("continuation_url"))
 
-# https://flask-pluginkit.rtfd.vip/en/latest/quickstart.html
-# https://github.com/staugur/Flask-PluginKit/blob/master/docs/tutorial/hep.rst
 def register():
     return {
         "bep": dict(blueprint=bp, prefix=None),
