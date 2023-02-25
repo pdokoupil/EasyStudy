@@ -72,7 +72,7 @@ window.app = new Vue({
     },
     methods: {
         async handlePrefixSearch(movieName) {
-            let foundMovies = await fetch("/utils/movie-search?attrib=movie&pattern="+movieName).then(resp => resp.json());
+            let foundMovies = await fetch(search_item_url + "?attrib=movie&pattern="+movieName).then(resp => resp.json());
             return foundMovies;
         },
         prepareTable(data) {

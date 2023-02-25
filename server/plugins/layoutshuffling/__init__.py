@@ -72,7 +72,13 @@ def join():
 # Callback once user has joined we forward to preference elicitation
 @bp.route("/on-joined", methods=["GET", "POST"])
 def on_joined():
-    return redirect(url_for("utils.preference_elicitation", continuation_url=url_for("layoutshuffling.send_feedback"), consuming_plugin="layoutshuffling"))
+    return redirect(url_for("utils.preference_elicitation",
+            continuation_url=url_for("layoutshuffling.send_feedback"),
+            consuming_plugin="layoutshuffling",
+            initial_data_url=url_for('utils.get_initial_data'),
+            search_item_url=url_for('utils.movie_search')
+        )
+    )
 
 @bp.route("/compare-algorithms", methods=["GET"])
 def compare_algorithms():

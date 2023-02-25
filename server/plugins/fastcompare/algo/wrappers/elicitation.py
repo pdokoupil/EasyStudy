@@ -19,7 +19,7 @@ class MultiObjectiveSamplingFromBucketsElicitationWrapper(PreferenceElicitationB
     def fit(self):
         if "rating" not in self.ratings_df:
             self.ratings_df.loc[:, "rating"] = 1
-        rating_matrix = self.ratings_df.pivot(index='user', columns='item', values="rating").fillna(0)
+        rating_matrix = self.ratings_df.pivot(index='user', columns='item', values="rating").fillna(0).values
         similarity_matrix = np.float32(squareform(pdist(rating_matrix.T, "cosine")))
         self.elicitation = MultiObjectiveSamplingFromBucketsElicitation(rating_matrix, similarity_matrix, *self.args, **self.kwargs)
 

@@ -12,7 +12,7 @@ import sys
 import numpy as np
 [sys.path.append(i) for i in ['.', '..']]
 [sys.path.append(i) for i in ['../.', '../..', '../../.']]
-from plugins.utils.data_loading import load_ml_dataset
+
 from plugins.utils.preference_elicitation import load_data, enrich_results
 from plugins.fastcompare.loading import load_algorithms, load_preference_elicitations, load_data_loaders
 from plugins.utils.interaction_logging import log_interaction, study_ended
@@ -206,9 +206,42 @@ def on_joined():
         "utils.preference_elicitation",
         continuation_url=url_for(f"{__plugin_name__}.send_feedback"),
         consuming_plugin=__plugin_name__,
-        initial_data_url=url_for(f"{__plugin_name__}.get_initial_data")
+        initial_data_url=url_for(f"{__plugin_name__}.get_initial_data"),
+        search_item_url=url_for(f'{__plugin_name__}.item_search')
     ))
 
+def search_for_item(pattern, tr=None):
+    conf = load_user_study_config(session["user_study_id"])
+    
+    ## TODO get_loader helper
+    loader_factory = load_data_loaders()[conf["selected_data_loader"]]
+    loader = loader_factory(**filter_params(conf["data_loader_parameters"], loader_factory))
+    load_data_loader(loader, session["user_study_guid"], loader_factory.name())
+
+    # If we have a translate function
+    if tr:
+        found_items = loader.items_df[loader.items_df.item_id.astype(str).map(tr).str.contains(pattern, case=False)]
+    else:
+        found_items = loader.items_df[loader.items_df.title.str.contains(pattern, case=False)]
+    
+    item_indices = [loader.get_item_index(item_id) for item_id in found_items.item_id.values]
+    return enrich_results(item_indices, loader)
+
+@bp.route("/item-search", methods=["GET"])
+def item_search():
+    print('caalled')
+    pattern = request.args.get("pattern")
+    if not pattern:
+        return make_response("", 404)
+    
+    lang = get_lang()
+    if lang == "en":
+        tr = None
+    else:
+        tr = get_tr(languages, lang)
+    res = search_for_item(pattern, tr)
+
+    return jsonify(res)
 
 def prepare_recommendations(loader, conf, recommendations, selected_movies, filter_out_movies, k):
     algorithm_factories = load_algorithms()
@@ -606,8 +639,6 @@ def finish_user_study():
     iteration_ended(session["iteration"], session["selected_movie_indices"], session["selected_variants"], session["nothing"], session["cmp"], session["a_r"])
     return redirect(url_for("utils.finish"))
 
-# https://flask-pluginkit.rtfd.vip/en/latest/quickstart.html
-# https://github.com/staugur/Flask-PluginKit/blob/master/docs/tutorial/hep.rst
 def register():
     return {
         "bep": dict(blueprint=bp, prefix=None),

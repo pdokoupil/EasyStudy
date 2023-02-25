@@ -154,6 +154,11 @@ def join():
 @bp.route("/preference-elicitation", methods=["GET", "POST"])
 @multi_lang # TODO remove? and keep only in layoutshuffling
 def preference_elicitation():
+
+    assert 'continuation_url' in request.args, 'Continuation url must be provided by the consumer'
+    assert 'initial_data_url' in request.args, 'Initial data url must be provided by the consumer'
+    assert 'search_item_url' in request.args, 'Search item url must be provided by the consumer'
+
     config = load_user_study_config(flask.session["user_study_id"])
     
     impl = config["selected_preference_elicitation"] if "selected_preference_elicitation" in config else ""
@@ -181,8 +186,9 @@ def preference_elicitation():
     params["hint_lead"] = tr("elicitation_hint_lead")
     params["hint"] = tr("elicitation_hint")
     params["title"] = tr("elicitation_title")
-    params["continuation_url"] = request.args.get("continuation_url")
-    params["initial_data_url"] = request.args.get("initial_data_url") or url_for("utils.get_initial_data")
+    params["continuation_url"] = request.args.get("continuation_url") # Continuation url must be specified
+    params["initial_data_url"] = request.args.get("initial_data_url")
+    params["search_item_url"] = request.args.get("search_item_url")
 
     # Handle textual overrides
     params["elicitation_hint_override"] = None
@@ -418,16 +424,6 @@ def movie_search():
 
     return flask.jsonify(res)
 
-# def limit_handler():
-#     """I am running in before_request"""
-#     ip = request.headers.get('X-Real-Ip', request.remote_addr)
-#     if request.endpoint == "index" and ip == "127.0.0.1":
-#         resp = make_response(redirect(url_for("layoutshuffling.limit")))
-#         resp.is_return = True
-#         return resp
-
-# https://flask-pluginkit.rtfd.vip/en/latest/quickstart.html
-# https://github.com/staugur/Flask-PluginKit/blob/master/docs/tutorial/hep.rst
 def register():
     return {
         "bep": dict(blueprint=bp, prefix=None),
