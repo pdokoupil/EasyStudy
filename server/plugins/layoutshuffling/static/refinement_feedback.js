@@ -229,8 +229,10 @@ window.app = new Vue({
             let sum = this.newRelevance + this.newDiversity + this.newNovelty;
 
             this.newWeights = `${this.newRelevance/sum},${this.newDiversity/sum},${this.newNovelty/sum}`;
-            
-            event.target.submit();
+            //this.$forceUpdate();
+            this.$nextTick(() => {
+                event.target.submit(); 
+            });
         },
     },
     async mounted() {
