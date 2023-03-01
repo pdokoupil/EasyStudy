@@ -9,20 +9,20 @@
         {% if version == "1" %}
         <b-row align-h="center">
             <b-col sm="3">
-                <b-form method="GET" action="{{ url_for('layoutshuffling.refine_results') }}">
+                <b-form method="GET" action="{{ refine_results_url }}">
                     <b-row>
                         <label for="range-1">Relevance: [[ relevance ]]</label>
-                        <b-form-input id="range-1" type="range" :formatter="onRelevanceChange" v-model="relevance" min="0" max="100"></b-form-input>
+                        <b-form-input id="range-1" type="range" :formatter="onRelevanceChange" v-model.number="relevance" min="0" max="100"></b-form-input>
                         <!-- <div class="mt-2">Value: [[ relevance ]]</div> -->
                     </b-row>
                     <b-row class="mt-3">
                         <label for="range-2">Diversity: [[ diversity ]]</label>
-                        <b-form-input id="range-2" type="range" v-model="diversity" :formatter="onDiversityChange" value="50" min="0" max="100"></b-form-input>
+                        <b-form-input id="range-2" type="range" v-model.number="diversity" :formatter="onDiversityChange" value="50" min="0" max="100"></b-form-input>
                         <!-- <div class="mt-2">Value: [[ diversity ]]</div> -->
                     </b-row>
                     <b-row class="mt-3">
                         <label for="range-3">Novelty: [[ novelty ]]</label>
-                        <b-form-input id="range-3" type="range" v-model="novelty" :formatter="onNoveltyChange" min="0" max="100"></b-form-input>
+                        <b-form-input id="range-3" type="range" v-model.number="novelty" :formatter="onNoveltyChange" min="0" max="100"></b-form-input>
                         <!-- <div class="mt-2">Value: [[ novelty ]]</div> -->
                     </b-row>
                     <b-row class="mt-3 mb-3">
@@ -36,7 +36,7 @@
         {% elif version == "2" %}
         <b-row align-h="center">
             <b-col sm="3">
-                <b-form method="GET" action="{{ url_for('layoutshuffling.refine_results') }}">
+                <b-form method="GET" action="{{ refine_results_url }}">
                     <b-row>
                         <b-col>
                             <b-form-group>
@@ -117,8 +117,8 @@
         {% elif version == "3" %}
         <b-row align-h="center">
             <b-col cols="6">
-                <b-form method="GET" @submit="onSubmit" action="{{ url_for('layoutshuffling.refine_results') }}">
-                    <input type="hidden" hidden="true" :value="newWeights" name="new_weights"/>
+                <b-form method="GET" @submit="onSubmit" action="{{ refine_results_url }}">
+                    <input type="hidden" hidden="true" v-model="newWeights" name="new_weights"/>
                     <b-row>
                         <label for="range-1">
                             Would you like to make the algorithm pay more/less attention to <strong>relevance</strong>?
