@@ -72,7 +72,6 @@ def plugin_name():
         "plugin_name": __plugin_name__
     }
 
-# We received feedback from compare_algorithms.html
 @bp.route("/algorithm-feedback")
 def algorithm_feedback():
     # TODO do whatever with the passed parameters and set session variable
@@ -132,9 +131,9 @@ def refinement_feedback():
     version = request.args.get("version") or session["refinement_layout"] #"1"
     return render_template("refinement_feedback.html", iteration=session["iteration"], version=version,
         metrics={
-            "relevance": session["weights"][0],
-            "diversity": session["weights"][1],
-            "novelty": session["weights"][2]
+            "relevance": round(session["weights"][0], 2),
+            "diversity": round(session["weights"][1], 2),
+            "novelty": round(session["weights"][2], 2)
         },
         refine_results_url=request.args.get("refine_results_url")
     )
@@ -153,6 +152,34 @@ def prepare_recommendations(weights, recommendations, selected_movies, filter_ou
         else:
             assert False
         recommendations[algorithm_displayed_name] = [recommended_items]
+
+@bp.route("/final-questionare")
+@multi_lang
+def final_questionare():
+    params = {
+        "iteration": session["iteration"],
+        "continuation_url": url_for(f'{__plugin_name__}.finish_user_study')
+    }
+
+    tr = get_tr(languages, get_lang())
+    params["contacts"] = tr("footer_contacts")
+    params["contact"] = tr("footer_contact")
+    params["charles_university"] = tr("footer_charles_university")
+    params["cagliari_university"] = tr("footer_cagliari_university")
+    params["t1"] = tr("footer_t1")
+    params["t2"] = tr("footer_t2")
+    params["title"] = tr("final_title")
+    params["header"] = tr("final_header")
+    params["finish"] = tr("final_finish")
+    params["hint"] = tr("final_hint")
+
+    
+
+    return render_template("final_questionare.html", **params)
+
+@bp.route("/finish-user-study")
+def finish_user_study():
+    return "OK"
 
 @bp.route("/refine-results")
 def refine_results():
@@ -198,11 +225,11 @@ def refine_results():
     session["permutation"] = permutation
 
     iteration_ended(session["iteration"], session["selected_movie_indices"], session["selected_variants"], session["nothing"], session["cmp"], session["a_r"])
-    return redirect(url_for(f"{__plugin_name__}.compare_algorithms"))
+    return redirect(url_for(f"{__plugin_name__}.compare_and_refine"))
 
 
-@bp.route("/compare-algorithms", methods=["GET"])
-def compare_algorithms():
+@bp.route("/compare-and-refine", methods=["GET"])
+def compare_and_refine():
     
     if session["iteration"] == 1:
         elicitation_ended(session["elicitation_movies"], session["elicitation_selected_movies"])    
@@ -276,7 +303,7 @@ def compare_algorithms():
     params["algorithm_how_compare"] = tr("compare_algorithm_how_compare")
 
 
-    return render_template("compare_algorithms.html", **params)
+    return render_template("compare_and_refine.html", **params)
 
 # Receives arbitrary feedback (typically from preference elicitation) and generates recommendation
 @bp.route("/send-feedback", methods=["GET"])
@@ -339,7 +366,7 @@ def send_feedback():
     session["orig_permutation"] = p
 
     print(f"Recommendations={recommendations}")
-    return redirect(url_for("multiobjective.compare_algorithms"))
+    return redirect(url_for("multiobjective.compare_and_refine"))
 
 
 
