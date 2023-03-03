@@ -27,155 +27,141 @@ window.app = new Vue({
             newWeights: "",
             newRelevance: 0,
             newDiversity: 0,
-            newNovelty: 0
+            newNovelty: 0,
+            middleRelevance: 0.5,
+            middleDiversity: 0.5,
+            middleNovelty: 0.5
         }
     },
     computed: {
     },
     methods: {
+        clipAndRound(x) {
+            let result = Number(x.toFixed(2));
+            if (result < 0) {
+                return 0.0;
+            } else if (result > 1) {
+                return 1.0;
+            }
+            return result;
+        },
         onRelevanceChange(newRel) {
             var newRelevance = parseFloat(newRel);
-            var relevance = parseFloat(this.relevance);
-            var diversity = parseFloat(this.diversity);
-            var novelty = parseFloat(this.novelty);
-            var othersAccum = diversity + novelty;
+            var othersAccum = this.diversity + this.novelty;
 
             if (othersAccum == 0) {
-                return newRel;
+                return this.clipAndRound(newRelevance);
             }
 
-            var diversityShare = diversity / othersAccum;
-            var noveltyShare = novelty / othersAccum;
+            var diversityShare = this.diversity / othersAccum;
+            var noveltyShare = this.novelty / othersAccum;
 
             if (newRelevance > this.relevance) {
                 // Handle increase
-                let diff = newRelevance - relevance;
+                let diff = newRelevance - this.relevance;
                 
-                diversity -= diversityShare * diff;
-                novelty -= noveltyShare * diff;
+                this.diversity -= diversityShare * diff;
+                this.novelty -= noveltyShare * diff;
 
-                let totalAccum = newRelevance + diversity + novelty;
-                diversity = (diversity / totalAccum) * 100;
-                novelty = (novelty / totalAccum) * 100;
+                let totalAccum = newRelevance + this.diversity + this.novelty;
+                this.diversity = this.clipAndRound(this.diversity / totalAccum);
+                this.novelty = this.clipAndRound(this.novelty / totalAccum);
 
-                this.diversity = diversity.toFixed(1);
-                this.novelty = novelty.toFixed(1);
-
-                return ((newRelevance / totalAccum) * 100).toFixed(1); //this.relevance + diff;
-            } else if (relevance < this.relevance) {
+                return this.clipAndRound(newRelevance / totalAccum); //this.relevance + diff;
+            } else if (newRelevance < this.relevance) {
                 // Handle decrease
-                let diff = relevance - newRelevance;
+                let diff = this.relevance - newRelevance;
                 
-                diversity += diversityShare * diff;
-                novelty += noveltyShare * diff;
+                this.diversity += diversityShare * diff;
+                this.novelty += noveltyShare * diff;
 
-                let totalAccum = newRelevance + diversity + novelty;
-                diversity = (diversity / totalAccum) * 100;
-                novelty = (novelty / totalAccum) * 100;
+                let totalAccum = newRelevance + this.diversity + this.novelty;
+                this.diversity = this.clipAndRound(this.diversity / totalAccum);
+                this.novelty = this.clipAndRound(this.novelty / totalAccum);
 
-                this.diversity = diversity.toFixed(1);
-                this.novelty = novelty.toFixed(1);
 
-                return ((newRelevance / totalAccum) * 100).toFixed(1); //this.relevance + diff;
+                return this.clipAndRound(newRelevance / totalAccum); //this.relevance + diff;
             }
 
-            return newRel;
+            return this.clipAndRound(newRelevance);
         },
         onDiversityChange(newDiv) {
             var newDiversity = parseFloat(newDiv);
-            var diversity = parseFloat(this.diversity);
-            var relevance = parseFloat(this.relevance);
-            var novelty = parseFloat(this.novelty);
-            var othersAccum = relevance + novelty;
+            var othersAccum = this.relevance + this.novelty;
 
             if (othersAccum == 0) {
-                return newDiv;
+                return this.clipAndRound(newDiversity);
             }
 
-            var relevanceShare = relevance / othersAccum;
-            var noveltyShare = novelty / othersAccum;
+            var relevanceShare = this.relevance / othersAccum;
+            var noveltyShare = this.novelty / othersAccum;
 
             if (newDiversity > this.diversity) {
                 // Handle increase
-                let diff = newDiversity - diversity;
+                let diff = newDiversity - this.diversity;
                 
-                relevance -= relevanceShare * diff;
-                novelty -= noveltyShare * diff;
+                this.relevance -= relevanceShare * diff;
+                this.novelty -= noveltyShare * diff;
 
-                let totalAccum = newDiversity + relevance + novelty;
-                relevance = (relevance / totalAccum) * 100;
-                novelty = (novelty / totalAccum) * 100;
+                let totalAccum = newDiversity + this.relevance + this.novelty;
+                this.relevance = this.clipAndRound(this.relevance / totalAccum);
+                this.novelty = this.clipAndRound(this.novelty / totalAccum);
 
-                this.relevance = relevance.toFixed(1);
-                this.novelty = novelty.toFixed(1);
-
-                return ((newDiversity / totalAccum) * 100).toFixed(1);
+                return this.clipAndRound(newDiversity / totalAccum);
             } else if (newDiversity < this.diversity) {
                 // Handle decrease
-                let diff = diversity - newDiversity;
+                let diff = this.diversity - newDiversity;
                 
-                relevance += relevanceShare * diff;
-                novelty += noveltyShare * diff;
+                this.relevance += relevanceShare * diff;
+                this.novelty += noveltyShare * diff;
 
-                let totalAccum = newDiversity + relevance + novelty;
-                relevance = (relevance / totalAccum) * 100;
-                novelty = (novelty / totalAccum) * 100;
+                let totalAccum = newDiversity + this.relevance + this.novelty;
+                this.relevance = this.clipAndRound(this.relevance / totalAccum);
+                this.novelty = this.clipAndRound(this.novelty / totalAccum);
 
-                this.relevance = relevance.toFixed(1);
-                this.novelty = novelty.toFixed(1);
-
-                return ((newDiversity / totalAccum) * 100).toFixed(1); 
+                return this.clipAndRound(newDiversity / totalAccum);
             }
 
-            return newDiv;
+            return this.clipAndRound(newDiversity);
         },
         onNoveltyChange(newNov) {
             var newNovelty = parseFloat(newNov);
-            var novelty = parseFloat(this.novelty);
-            var relevance = parseFloat(this.relevance);
-            var diversity = parseFloat(this.diversity);
-            var othersAccum = relevance + diversity;
+            var othersAccum = this.relevance + this.diversity;
 
             if (othersAccum == 0) {
-                return newNov;
+                return this.clipAndRound(newNovelty);
             }
 
-            var relevanceShare = relevance / othersAccum;
-            var diversityShare = diversity / othersAccum;
+            var relevanceShare = this.relevance / othersAccum;
+            var diversityShare = this.diversity / othersAccum;
 
             if (newNovelty > this.novelty) {
                 // Handle increase
-                let diff = newNovelty - novelty;
+                let diff = newNovelty - this.novelty;
                 
-                relevance -= relevanceShare * diff;
-                diversity -= diversityShare * diff;
+                this.relevance -= relevanceShare * diff;
+                this.diversity -= diversityShare * diff;
 
-                let totalAccum = newNovelty + relevance + diversity;
-                relevance = (relevance / totalAccum) * 100;
-                diversity = (diversity / totalAccum) * 100;
+                let totalAccum = newNovelty + this.relevance + this.diversity;
+                this.relevance = this.clipAndRound(this.relevance / totalAccum);
+                this.diversity = this.clipAndRound(this.diversity / totalAccum);
 
-                this.relevance = relevance.toFixed(1);
-                this.diversity = diversity.toFixed(1);
-
-                return ((newNovelty / totalAccum) * 100).toFixed(1);
+                return this.clipAndRound(newNovelty / totalAccum);
             } else if (newNovelty < this.novelty) {
                 // Handle decrease
-                let diff = novelty - newNovelty;
+                let diff = this.novelty - newNovelty;
                 
-                relevance += relevanceShare * diff;
-                diversity += diversityShare * diff;
+                this.relevance += relevanceShare * diff;
+                this.diversity += diversityShare * diff;
 
-                let totalAccum = newNovelty + relevance + diversity;
-                relevance = (relevance / totalAccum) * 100;
-                diversity = (diversity / totalAccum) * 100;
+                let totalAccum = newNovelty + this.relevance + this.diversity;
+                this.relevance = this.clipAndRound(this.relevance / totalAccum);
+                this.diversity = this.clipAndRound(this.diversity / totalAccum);
 
-                this.relevance = relevance.toFixed(1);
-                this.diversity = diversity.toFixed(1);
-
-                return ((newNovelty / totalAccum) * 100).toFixed(1); 
+                return this.clipAndRound(newNovelty / totalAccum);
             }
 
-            return newNov;
+            return this.clipAndRound(newNovelty);
         },
         onRelevanceDeltaChange(newVal) {
             reportOnInput("/utils/on-input", csrfToken, "range", {
@@ -229,6 +215,8 @@ window.app = new Vue({
             let sum = this.newRelevance + this.newDiversity + this.newNovelty;
 
             this.newWeights = `${this.newRelevance/sum},${this.newDiversity/sum},${this.newNovelty/sum}`;
+            console.log("New weights are: " + this.newWeights);
+            return;
             //this.$forceUpdate();
             this.$nextTick(() => {
                 event.target.submit(); 
