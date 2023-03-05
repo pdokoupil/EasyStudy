@@ -239,7 +239,7 @@ def compare_and_refine():
     movies = {}
 
     p = session["permutation"][0]
-    
+    refinement_algorithms = []
     for i, (algorithm, algorithm_displayed_name) in enumerate(displyed_name_mapping.items()):
         if session["movies"][algorithm_displayed_name][-1]:
             # Only non-empty makes it to the results
@@ -252,6 +252,7 @@ def compare_and_refine():
                 "name": algorithm_displayed_name,
                 "order": p[algorithm_displayed_name]
             }
+            refinement_algorithms.append(int(algorithm != "relevance_based"))
 
     result_layout = "column-single"
 
@@ -261,7 +262,7 @@ def compare_and_refine():
     for algo_name, movie_lists in session["movies"].items():
         shown_movie_indices[algo_name] = [[int(x["movie_idx"]) for x in movie_list] for movie_list in movie_lists]
         
-    session["refinement_layout"] = "3"
+    session["refinement_layout"] = request.args.get("version") or "3"
 
     iteration_started(session["iteration"], movies, algorithm_assignment, result_layout, shown_movie_indices)
 
@@ -278,6 +279,13 @@ def compare_and_refine():
         "result_layout": result_layout,
         "MIN_ITERATION_TO_CANCEL": len(session["permutation"]),
         "consuming_plugin": __plugin_name__,
+        "refinement_layout": session['refinement_layout'],
+        "metrics" : {
+            "relevance": round(session["weights"][0], 2),
+            "diversity": round(session["weights"][1], 2),
+            "novelty": round(session["weights"][2], 2)
+        },
+        "refinement_algorithms": refinement_algorithms
     }
    
     params["contacts"] = tr("footer_contacts")
@@ -301,7 +309,6 @@ def compare_and_refine():
     params["next"] = tr("next")
     params["finish"] = tr("compare_finish")
     params["algorithm_how_compare"] = tr("compare_algorithm_how_compare")
-
 
     return render_template("compare_and_refine.html", **params)
 
