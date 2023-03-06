@@ -124,19 +124,73 @@ def algorithm_feedback():
     y.append(selected_variants)
     session["selected_variants"] = y
 
-    return redirect(url_for("multiobjective.refinement_feedback", refine_results_url=url_for("multiobjective.refine_results")))
+    #return redirect(url_for("multiobjective.refinement_feedback", refine_results_url=url_for("multiobjective.refine_results")))
+    #return redirect(url_for("multiobjective.compare_and_refine"))
 
-@bp.route("/refinement-feedback")
-def refinement_feedback():
-    version = request.args.get("version") or session["refinement_layout"] #"1"
-    return render_template("refinement_feedback.html", iteration=session["iteration"], version=version,
-        metrics={
-            "relevance": round(session["weights"][0], 2),
-            "diversity": round(session["weights"][1], 2),
-            "novelty": round(session["weights"][2], 2)
-        },
-        refine_results_url=request.args.get("refine_results_url")
-    )
+    # Second part taken from refine-results
+    # Get new weights
+    new_weights = request.args.get("new_weights").split(";") # Get new weights for each algorithm
+    transformed_weights = []
+    for i, weights in enumerate(new_weights):
+        if weights:
+            transformed_weights.append([float(x) for x in weights.split(",")])
+        else:
+            transformed_weights.append("")
+    #new_weights = [float(x) if x else '' for y in new_weights for x in y.split(",")]
+    new_weights = transformed_weights
+    new_weights = [x for x in new_weights if x][0]
+    print(new_weights, type(new_weights), type(new_weights[0]))
+    session["weights"] = new_weights # Take first non-empty weights TODO fix and set weights to each algorithm separately
+
+    # Increase iteration
+    session["iteration"] += 1
+    ### And generate new recommendations ###
+    recommendations = session["movies"]
+
+    lengths = []
+    for x in displyed_name_mapping.values():
+        recommendations[x].append([])
+        lengths.append(len(recommendations[x]))
+
+    assert len(set(lengths)), "All algorithms should share the number of iterations"
+    n_iterations = lengths[0] # Since all have same number of iteration, pick the first one
+
+    mov_indices = []
+    for i in range(n_iterations):
+        indices = set()
+        for algo_displayed_name in displyed_name_mapping.values():
+            indices.update([int(y["movie_idx"]) for y in recommendations[algo_displayed_name][i]])
+        mov_indices.append(list(indices))
+
+    
+    filter_out_movies = session["elicitation_selected_movies"] + sum(mov_indices[:HIDE_LAST_K], [])
+    selected_movies = session["elicitation_selected_movies"] + sum(session["selected_movie_indices"], [])
+    
+    prepare_recommendations(np.array(new_weights), recommendations, selected_movies, filter_out_movies, k=session["rec_k"])
+
+    session["movies"] = recommendations
+    ### End generation ###
+
+
+    # And shift the permutation
+    permutation = session["permutation"]
+    permutation = permutation[1:] + permutation[:1] # Move first item to the end
+    session["permutation"] = permutation
+
+    iteration_ended(session["iteration"], session["selected_movie_indices"], session["selected_variants"], session["nothing"], session["cmp"], session["a_r"])
+    return redirect(url_for("multiobjective.compare_and_refine"))
+
+# @bp.route("/refinement-feedback")
+# def refinement_feedback():
+#     version = request.args.get("version") or session["refinement_layout"] #"1"
+#     return render_template("refinement_feedback.html", iteration=session["iteration"], version=version,
+#         metrics={
+#             "relevance": round(session["weights"][0], 2),
+#             "diversity": round(session["weights"][1], 2),
+#             "novelty": round(session["weights"][2], 2)
+#         },
+#         refine_results_url=request.args.get("refine_results_url")
+#     )
 
 def prepare_recommendations(weights, recommendations, selected_movies, filter_out_movies, k):
     # Order of insertion should be preserved
@@ -181,51 +235,51 @@ def final_questionare():
 def finish_user_study():
     return "OK"
 
-@bp.route("/refine-results")
-def refine_results():
+# @bp.route("/refine-results")
+# def refine_results():
     
-    # Get new weights
-    new_weights = request.args.get("new_weights")
-    new_weights = [float(x) for x in new_weights.split(",")]
-    session["weights"] = new_weights
+#     # Get new weights
+#     new_weights = request.args.get("new_weights")
+#     new_weights = [float(x) for x in new_weights.split(",")]
+#     session["weights"] = new_weights
 
-    # Increase iteration
-    session["iteration"] += 1
-    ### And generate new recommendations ###
-    recommendations = session["movies"]
+#     # Increase iteration
+#     session["iteration"] += 1
+#     ### And generate new recommendations ###
+#     recommendations = session["movies"]
 
-    lengths = []
-    for x in displyed_name_mapping.values():
-        recommendations[x].append([])
-        lengths.append(len(recommendations[x]))
+#     lengths = []
+#     for x in displyed_name_mapping.values():
+#         recommendations[x].append([])
+#         lengths.append(len(recommendations[x]))
 
-    assert len(set(lengths)), "All algorithms should share the number of iterations"
-    n_iterations = lengths[0] # Since all have same number of iteration, pick the first one
+#     assert len(set(lengths)), "All algorithms should share the number of iterations"
+#     n_iterations = lengths[0] # Since all have same number of iteration, pick the first one
 
-    mov_indices = []
-    for i in range(n_iterations):
-        indices = set()
-        for algo_displayed_name in displyed_name_mapping.values():
-            indices.update([int(y["movie_idx"]) for y in recommendations[algo_displayed_name][i]])
-        mov_indices.append(list(indices))
+#     mov_indices = []
+#     for i in range(n_iterations):
+#         indices = set()
+#         for algo_displayed_name in displyed_name_mapping.values():
+#             indices.update([int(y["movie_idx"]) for y in recommendations[algo_displayed_name][i]])
+#         mov_indices.append(list(indices))
 
     
-    filter_out_movies = session["elicitation_selected_movies"] + sum(mov_indices[:HIDE_LAST_K], [])
-    selected_movies = session["elicitation_selected_movies"] + sum(session["selected_movie_indices"], [])
+#     filter_out_movies = session["elicitation_selected_movies"] + sum(mov_indices[:HIDE_LAST_K], [])
+#     selected_movies = session["elicitation_selected_movies"] + sum(session["selected_movie_indices"], [])
     
-    prepare_recommendations(np.array(new_weights), recommendations, selected_movies, filter_out_movies, k=session["rec_k"])
+#     prepare_recommendations(np.array(new_weights), recommendations, selected_movies, filter_out_movies, k=session["rec_k"])
 
-    session["movies"] = recommendations
-    ### End generation ###
+#     session["movies"] = recommendations
+#     ### End generation ###
 
 
-    # And shift the permutation
-    permutation = session["permutation"]
-    permutation = permutation[1:] + permutation[:1] # Move first item to the end
-    session["permutation"] = permutation
+#     # And shift the permutation
+#     permutation = session["permutation"]
+#     permutation = permutation[1:] + permutation[:1] # Move first item to the end
+#     session["permutation"] = permutation
 
-    iteration_ended(session["iteration"], session["selected_movie_indices"], session["selected_variants"], session["nothing"], session["cmp"], session["a_r"])
-    return redirect(url_for(f"{__plugin_name__}.compare_and_refine"))
+#     iteration_ended(session["iteration"], session["selected_movie_indices"], session["selected_variants"], session["nothing"], session["cmp"], session["a_r"])
+#     return redirect(url_for(f"{__plugin_name__}.compare_and_refine"))
 
 
 @bp.route("/compare-and-refine", methods=["GET"])
