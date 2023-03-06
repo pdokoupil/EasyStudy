@@ -392,32 +392,41 @@ window.app = new Vue({
             return newVal;
         },
         onSubmit(event) {
+            this.busy = true;
+
             event.preventDefault();
             
             const MAX_SHARE = 0.8; // We can increase at most by this share of the remaining and decrease atmost by this share of current value
             
-            let relDelta = parseFloat(this.relevanceDelta);
-            let relOfMaxShare = 0.25 * relDelta; 
+            let weights = [];
+            for (let i in this.refinementAlgorithms) {
+                if (this.refinementAlgorithms[i] == 0) {
+                    weights.push('');
+                } else {
+                    let relDelta = parseFloat(this.relevanceDelta[i]);
+                    let relOfMaxShare = 0.25 * relDelta; 
 
-            let divDelta = parseFloat(this.diversityDelta);
-            let divOfMaxShare = 0.25 * divDelta;
+                    let divDelta = parseFloat(this.diversityDelta[i]);
+                    let divOfMaxShare = 0.25 * divDelta;
 
-            let novDelta = parseFloat(this.noveltyDelta);
-            let novOfMaxShare = 0.25 * novDelta;
+                    let novDelta = parseFloat(this.noveltyDelta[i]);
+                    let novOfMaxShare = 0.25 * novDelta;
 
-            let baseRel = relDelta > 0 ? ((1.0 - defaultRelevance) * MAX_SHARE) : defaultRelevance * MAX_SHARE;
-            let baseDiv = divDelta > 0 ? ((1.0 - defaultDiversity) * MAX_SHARE) : defaultDiversity * MAX_SHARE;
-            let baseNov = novDelta > 0 ? ((1.0 - defaultNovelty) * MAX_SHARE) : defaultNovelty * MAX_SHARE;
+                    let baseRel = relDelta > 0 ? ((1.0 - defaultRelevance) * MAX_SHARE) : defaultRelevance * MAX_SHARE;
+                    let baseDiv = divDelta > 0 ? ((1.0 - defaultDiversity) * MAX_SHARE) : defaultDiversity * MAX_SHARE;
+                    let baseNov = novDelta > 0 ? ((1.0 - defaultNovelty) * MAX_SHARE) : defaultNovelty * MAX_SHARE;
 
-            this.newRelevance = defaultRelevance + relOfMaxShare * baseRel;
-            this.newDiversity = defaultDiversity + divOfMaxShare * baseDiv;
-            this.newNovelty = defaultNovelty + novOfMaxShare * baseNov;
+                    this.newRelevance[i] = defaultRelevance + relOfMaxShare * baseRel;
+                    this.newDiversity[i] = defaultDiversity + divOfMaxShare * baseDiv;
+                    this.newNovelty[i] = defaultNovelty + novOfMaxShare * baseNov;
 
-            let sum = this.newRelevance + this.newDiversity + this.newNovelty;
+                    let sum = this.newRelevance[i] + this.newDiversity[i] + this.newNovelty[i];
 
-            this.newWeights = `${this.newRelevance/sum},${this.newDiversity/sum},${this.newNovelty/sum}`;
-            console.log("New weights are: " + this.newWeights);
-            return;
+                    this.newWeights[i] = `${this.newRelevance[i]/sum},${this.newDiversity[i]/sum},${this.newNovelty[i]/sum}`;
+                    console.log("New weights are: " + this.newWeights[i]);
+                }
+            }
+            this.newWeights = this.newWeights.join(";");
             //this.$forceUpdate();
             this.$nextTick(() => {
                 event.target.submit(); 

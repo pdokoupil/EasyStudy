@@ -491,7 +491,8 @@
             </b-col>
             <b-col center class="align-middle">
                 {% if iteration < MIN_ITERATION_TO_CANCEL %}
-                <b-form @submit="busy = true" method="GET" action="{{ url_for(consuming_plugin + '.algorithm_feedback') }}">
+                <b-form @submit="onSubmit" method="GET" action="{{ url_for(consuming_plugin + '.algorithm_feedback') }}">
+                    <input type="hidden" hidden="true" v-model="newWeights" name="new_weights"/>
                     <input type="hidden" hidden="true" :value="selectedMovieIndices" name="selected_movies"/>
                     <input type="hidden" hidden="true" :value="selectedMovieVariants" name="selected_movie_variants"/>
                     <input v-for="i in variantsResults.length" type="hidden" hidden="true" :key="i" :value="algorithmRatings[i - 1]" :name="'ar_'.concat(i)"/>
@@ -509,7 +510,8 @@
                     </b-overlay>
                 </b-form>
                 {% else %}
-                <b-form @submit="busy = true" method="GET" action="{{ url_for(consuming_plugin + '.finish_user_study') }}">
+                <b-form @submit="onSubmit" method="GET" action="{{ url_for(consuming_plugin + '.finish_user_study') }}">
+                    <input type="hidden" hidden="true" v-model="newWeights" name="new_weights"/>
                     <b-overlay
                     :show="busy"
                     rounded
