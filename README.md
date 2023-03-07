@@ -29,6 +29,11 @@ To run the container, you may use the [`start_server.sh`](./server/start_server.
 
 To start user studies (from *fastcompare*) successfully, you have to provide the datasets that are provided by *fastcompare* and any other datasets that you plan to support in your newly designed plugins/*fastcompare* data loader extensions. There is a small limitation, that images or files in Flask has to be in the *static* directory. It can be *static* directory inside one of the plugins or of the whole Flask app, and we decided to use the latter, so all images have to be put into [static/datasets/X/img](./server/static/datasets/X) where `X` denotes dataset name ({'ml-latest', 'goodbooks-10k'}). Note that although this may seem a bit restricting, in the end, it is not, because you can always put just symlinks there, that will point to arbitrary directory in your system. The exact images that were used during Demonstration are available in [static/datasets/ml-latest/ml_latest_img.zip](./server/static/datasets/ml-latest/ml_latest_img.zip) and [static/datasets/goodbooks-10k/goodbooks_img.zip](./server/static/datasets/goodbooks-10k/goodbooks_img.zip) and should be extracted into [static/datasets/ml-latest/img](./server/static/datasets/ml-latest/img) and [static/datasets/goodbooks-10k/img](./server/static/datasets/goodbooks-10k/img) respectively.
 
+Datasets itself (csv files) can be downloaded from official links:
+[ml-latest](https://files.grouplens.org/datasets/movielens/ml-latest.zip),
+[goodbooks-10k](https://github.com/zygmuntz/goodbooks-10k/archive/refs/heads/master.zip)
+and the csv files should be extracted to [static/datasets/ml-latest/*.csv](./server/static/datasets/ml-latest/) and [static/datasets/goodbooks-10k/*.csv](./server/static/datasets/goodbooks-10k/) respectively.
+
 Alternatively you can run the server without the docker container, by just relying on Flask and using `flask --debug run` or `flask run` from the [server](./server/) directory. However, in that case, you have to ensure to have all the dependencies installed on your system (you can try to mimick what the [`Dockerfile`](./server/Dockerfile) does with dependencies). Running the serveer this way is especially useful during development of new functionality.
 
 
