@@ -300,7 +300,7 @@ def enrich_results(top_k, loader):
     
     return [{"movie": movie, "url": url, "movie_idx": str(movie_idx), "movie_id": movie_id, "genres": genres} for movie, url, movie_idx, movie_id, genres in zip(top_k_description, top_k_url, top_k, top_k_ids, top_k_genres)]
 
-def prepare_wrapper(selected_movies, model, mandate_allocation_factory, obj_weights, filter_out_movies = [], k=10):
+def prepare_wrapper(selected_movies, model, mandate_allocation_factory, obj_weights, filter_out_movies = [], k=10, norm_f=standardization):
     loader, items, distance_matrix, users_viewed_item, movie_title_to_idx = prepare_wrapper_once()
 
     max_user = loader.ratings_df.userId.max()
@@ -326,7 +326,7 @@ def prepare_wrapper(selected_movies, model, mandate_allocation_factory, obj_weig
     rating_vector = np.expand_dims(rating_vector, axis=0) # Convert it to 1xN rating matrix
     extended_rating_matrix = rating_vector #loader.rating_matrix[:1] #rating_vector
 
-    normalization_factory = cdf
+    normalization_factory = norm_f
     cache_dir = None #"."
 
     mandate_allocation = mandate_allocation_factory(obj_weights, -1e6)
@@ -340,12 +340,12 @@ def prepare_wrapper(selected_movies, model, mandate_allocation_factory, obj_weig
     n_users = loader.rating_matrix.shape[0] # Calculate number of users on the full rating matrix not just on the single user vector
     return loader, RLPropWrapper(items, extended_rating_matrix, distance_matrix, users_viewed_item, normalization_factory, mandate_allocation, unseen_items_mask, cache_dir, discount_sequences, n_users)
 
-def rlprop(selected_movies, model, weights, filter_out_movies = [], k=10):
+def rlprop(selected_movies, model, weights, filter_out_movies = [], k=10, norm_f=standardization):
     obj_weights = weights
     obj_weights /= obj_weights.sum()
     
 
-    loader, wrapper = prepare_wrapper(selected_movies, model, exactly_proportional_fuzzy_dhondt_2, obj_weights, filter_out_movies, k)
+    loader, wrapper = prepare_wrapper(selected_movies, model, exactly_proportional_fuzzy_dhondt_2, obj_weights, filter_out_movies, k, norm_f)
     wrapper.init()
     x = wrapper(k)
 
@@ -361,11 +361,11 @@ def get_objective_importance(selected_movie_indices, shown_movies):
         "novelty": importances[2]
     }
 
-def weighted_average(selected_movies, model, weights, filter_out_movies = [], k=10):
+def weighted_average(selected_movies, model, weights, filter_out_movies = [], k=10, norm_f=standardization):
     obj_weights = weights
     obj_weights /= obj_weights.sum()
     
-    loader, wrapper = prepare_wrapper(selected_movies, model, weighted_average_strategy, obj_weights, filter_out_movies, k)
+    loader, wrapper = prepare_wrapper(selected_movies, model, weighted_average_strategy, obj_weights, filter_out_movies, k, norm_f)
     wrapper.init()
     x = wrapper(k)
 
