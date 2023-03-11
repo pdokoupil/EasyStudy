@@ -1,0 +1,90 @@
+{% include 'header.html' %}
+    <!-- Our application root element -->
+    <div id="app">
+      <b-container align-h="center" fluid>
+        <b-jumbotron header-level="4" header="Compare" lead="Compare different visualizations of the data.">
+            <p>
+                TODO describe what the user is supposed to do. Iteration {{iteration}}/{{n_iterations}}
+            </p>
+        </b-jumbotron>
+      </b-container>
+      <b-row align-h="center" class="mt-3 mb-3">
+        <b-col class="text-center">
+            <h2>Input</h2>
+        </b-col>
+      </b-row>
+      <b-row align-h="center">
+        <b-col align-h="center" class="text-center">
+            <b-img src="{{emit_assets('visualrepresentation', filename='img/red.png')}}"/>
+        </b-col>
+      </b-row>
+      <b-row align-h="center" class="mt-5 mb-5">
+        <b-col class="text-center">
+            <h2>
+                Different visualizations
+            </h2>
+        </b-col>
+      </b-row>
+      <b-row>
+        <b-col align-h="center" class="text-center">
+            <b-img id="visualization0" @click="onSelectVisualization($event, 0)" src="{{emit_assets('visualrepresentation', filename='img/green.png')}}"/>
+        </b-col>
+        <b-col align-h="center" class="text-center">
+            <b-img id="visualization1" @click="onSelectVisualization($event, 1)" src="{{emit_assets('visualrepresentation', filename='img/blue.png')}}"/>
+        </b-col>
+        <b-col align-h="center" class="text-center">
+            <b-img id="visualization2" @click="onSelectVisualization($event, 2)" src="{{emit_assets('visualrepresentation', filename='img/orange.png')}}"/>
+        </b-col>
+      </b-row>
+      <b-row align-h="center" class="mt-5">
+        <b-col cols="2">
+            {% if iteration < MIN_ITERATIONS_TO_CANCEL %}
+            <b-form action="{{ continuation_url }}" method="GET">
+                <input type="hidden" hidden="true" :value="selectedVisualization" name="selected_visualization"/>
+                <b-btn type="submit" variant="primary" block>Continue</b-btn>
+            </b-form>
+            {% else %}
+            <b-form action="{{ continuation_url }}" method="GET">
+                <input type="hidden" hidden="true" :value="selectedVisualization" name="selected_visualization"/>
+                <b-btn type="submit" variant="success" block>Finish</b-btn>
+            </b-form>
+            {% endif %}
+        </b-col>
+      </b-row>
+    </div>
+
+    <script src="{{url_for('static', filename='interaction_reporting.js')}}"></script>
+
+    <!-- Start running your app -->
+    <script>
+      var csrfToken = "{{csrf_token()}}";
+      window.app = new Vue({
+        el: '#app',
+        delimiters: ['[[',']]'], // Used to replace double { escaping with double [ escaping (to prevent jinja vs vue inference)
+        data: function() {
+            return {
+                selectedVisualization: -1
+            }
+        },
+        methods: {
+            onSelectVisualization(event, visualizationIndex) {
+                console.log("Selected visualization");
+                let oldVisualization = this.selectedVisualization;
+                if (visualizationIndex != this.selectedVisualization) {
+                    event.srcElement.classList.add("selected");
+                    if (this.selectedVisualization >= 0) {
+                        document.getElementById("visualization" + this.selectedVisualization).classList.remove("selected");
+                    }
+                }
+                this.selectedVisualization = visualizationIndex;
+                //reportSelectedItem(`/utils/selected-item`, csrfToken, item, this.selected, ()=>{ return {"variant": variant}; });
+                reportOnInput("/utils/on-input", csrfToken, "visualization", {
+                    "variant": visualizationIndex,
+                    "old_variant": oldVisualization
+                    //"variant_name": this.variantNames[visualizationIndex],
+                });
+            }
+        }
+      })
+    </script>
+{% include 'footer.html' %}

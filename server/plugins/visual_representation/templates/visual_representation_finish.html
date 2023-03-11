@@ -1,0 +1,43 @@
+{% include 'header.html' %}
+    <!-- Our application root element -->
+    <div id="app">
+      <b-container align-h="center" fluid>
+        <b-jumbotron header-level="4" header="Thank you!" lead="Finished user study text">
+            TODO some extra text
+        </b-jumbotron>
+        {% if prolific_pid is defined and prolific_pid is not none %}
+        <b-row align-h="center">
+            <b-col class="text-center" align-h="center" cols="6">
+                <p>{{auto_redirect}}.</p>
+                <b-btn @click="prolificRedirect" variant="success" type="submit">Finish and go back to prolific</b-btn>
+            </b-col>
+        </b-row>
+        {% endif %}
+      </b-container>
+    </div>
+
+    <!-- Start running your app -->
+    {% if prolific_pid is defined and prolific_pid is not none %}
+    <script>
+        console.log("Redirecting in 15 seconds");
+        window.setTimeout(function (){
+            window.location = "{{prolific_url}}";
+        }, 15000);
+    </script>
+    {% endif %}
+    <script>
+      window.app = new Vue({
+        el: '#app',
+        delimiters: ['[[',']]'], // Used to replace double { escaping with double [ escaping (to prevent jinja vs vue inference)
+        data: function() {
+            return {
+            }
+        },
+        methods: {
+          prolificRedirect() {
+            window.location = "{{prolific_url}}";
+          }
+        }
+      })
+    </script>
+{% include 'footer.html' %}
