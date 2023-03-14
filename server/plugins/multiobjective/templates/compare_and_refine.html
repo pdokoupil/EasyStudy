@@ -166,7 +166,7 @@
 
         <!-- Refinement starts here -->
         <b-row v-if="showRefinement" align-h="center">
-            <b-col sm="3" class="ml-3 mr-3" v-for="i in refinementAlgorithms.length">
+            <b-col class="ml-3 mr-3" v-for="i in refinementAlgorithms.length">
                 {% if refinement_layout == "1" %}
                 <b-form method="GET" action="{{ refine_results_url }}">
                     <b-row>
@@ -198,8 +198,8 @@
                                 <b-form-radio-group
                                 id="radio-group-1"
                                 required="True"
-                                :state="relevanceValue != null"
-                                v-model="relevanceValue"
+                                :state="relevanceValue[i - 1] != null"
+                                v-model="relevanceValue[i - 1]"
                                 :disabled="!refinementAlgorithms[i - 1]"
                                 >
                                 <b-form-radio value="first">Strongly disagree</b-form-radio>
@@ -222,8 +222,8 @@
                                 <b-form-radio-group
                                 id="radio-group-2"
                                 required="True"
-                                :state="diversityValue != null"
-                                v-model="diversityValue"
+                                :state="diversityValue[i - 1] != null"
+                                v-model="diversityValue[i - 1]"
                                 :disabled="!refinementAlgorithms[i - 1]"
                                 >
                                 <b-form-radio value="first">Strongly disagree</b-form-radio>
@@ -246,8 +246,8 @@
                                 <b-form-radio-group
                                 id="radio-group-3"
                                 required="True"
-                                :state="noveltyValue != null"
-                                v-model="noveltyValue"
+                                :state="noveltyValue[i - 1] != null"
+                                v-model="noveltyValue[i - 1]"
                                 :disabled="!refinementAlgorithms[i - 1]"
                                 >
                                 <b-form-radio value="first">Strongly disagree</b-form-radio>
@@ -269,7 +269,7 @@
                             <b-icon id="relevance-help" icon="question-circle-fill" variant="primary"></b-icon>
                             <b-tooltip target="relevance-help" triggers="hover">TODO</b-tooltip>
                         </label>
-                        <b-form-input id="range-1" :formatter="onRelevanceDeltaChange" type="range" v-model="relevanceDelta" min="-4" max="4" :disabled="!refinementAlgorithms[i - 1]"></b-form-input>
+                        <b-form-input id="range-1" :formatter="onRelevanceDeltaChange" type="range" v-model="relevanceDelta[i - 1]" min="-4" max="4" :disabled="!refinementAlgorithms[i - 1]"></b-form-input>
                         
                         <!-- <div class="mt-2">Value: [[ relevance ]]</div> -->
                     </b-row>
@@ -278,7 +278,7 @@
                             <div>No attention</div>
                         </b-col>
                         <b-col class="text-center" align-h="center">
-                            <div>[[ deltaDescription[parseInt(relevanceDelta) + 4] ]]</div>
+                            <div>[[ deltaDescription[parseInt(relevanceDelta[i - 1]) + 4] ]]</div>
                         </b-col>
                         <b-col class="text-right" align-h="end">
                             <div>Full attention</div>
@@ -290,7 +290,7 @@
                             <b-icon id="diverse-help" icon="question-circle-fill" variant="primary"></b-icon>
                             <b-tooltip target="diverse-help" triggers="hover">TODO</b-tooltip>
                         </label>
-                        <b-form-input id="range-2" :formatter="onDiversityDeltaChange" type="range" v-model="diversityDelta" min="-4" max="4" :disabled="!refinementAlgorithms[i - 1]"></b-form-input>
+                        <b-form-input id="range-2" :formatter="onDiversityDeltaChange" type="range" v-model="diversityDelta[i - 1]" min="-4" max="4" :disabled="!refinementAlgorithms[i - 1]"></b-form-input>
                         <!-- <div class="mt-2">Value: [[ diversity ]]</div> -->
                     </b-row>
                     <b-row>
@@ -298,7 +298,7 @@
                             <div>No attention</div>
                         </b-col>
                         <b-col class="text-center" align-h="center">
-                            <div>[[ deltaDescription[parseInt(diversityDelta) + 4] ]]</div>
+                            <div>[[ deltaDescription[parseInt(diversityDelta[i - 1]) + 4] ]]</div>
                         </b-col>
                         <b-col class="text-right" align-h="end">
                             <div>Full attention</div>
@@ -310,7 +310,7 @@
                             <b-icon id="novelty-help" icon="question-circle-fill" variant="primary"></b-icon>
                             <b-tooltip target="novelty-help" triggers="hover">TODO</b-tooltip>
                         </label>
-                        <b-form-input id="range-3" :formatter="onNoveltyDeltaChange" type="range" v-model="noveltyDelta" min="-4" max="4" :disabled="!refinementAlgorithms[i - 1]"></b-form-input>
+                        <b-form-input id="range-3" :formatter="onNoveltyDeltaChange" type="range" v-model="noveltyDelta[i - 1]" min="-4" max="4" :disabled="!refinementAlgorithms[i - 1]"></b-form-input>
                         <!-- <div class="mt-2">Value: [[ novelty ]]</div> -->
                     </b-row>
                     <b-row>
@@ -318,7 +318,7 @@
                             <div>No attention</div>
                         </b-col>
                         <b-col class="text-center" align-h="center">
-                            <div>[[ deltaDescription[parseInt(noveltyDelta) + 4] ]]</div>
+                            <div>[[ deltaDescription[parseInt(noveltyDelta[i - 1]) + 4] ]]</div>
                         </b-col>
                         <b-col class="text-right" align-h="end">
                             <div>Full attention</div>
@@ -338,8 +338,8 @@
                                 <b-form-radio-group
                                 id="radio-group-1"
                                 required="True"
-                                :state="relevanceValue != null"
-                                v-model="relevanceValue"
+                                :state="relevanceValue[i - 1] != null"
+                                v-model="relevanceValue[i - 1]"
                                 :disabled="!refinementAlgorithms[i - 1]"
                                 >
                                 <b-form-radio value="first">Less</b-form-radio>
@@ -362,8 +362,8 @@
                                 <b-form-radio-group
                                 id="radio-group-2"
                                 required="True"
-                                :state="diversityValue != null"
-                                v-model="diversityValue"
+                                :state="diversityValue[i - 1] != null"
+                                v-model="diversityValue[i - 1]"
                                 :disabled="!refinementAlgorithms[i - 1]"
                                 >
                                 <b-form-radio value="first">Less</b-form-radio>
@@ -386,8 +386,8 @@
                                 <b-form-radio-group
                                 id="radio-group-3"
                                 required="True"
-                                :state="noveltyValue != null"
-                                v-model="noveltyValue"
+                                :state="noveltyValue[i - 1] != null"
+                                v-model="noveltyValue[i - 1]"
                                 :disabled="!refinementAlgorithms[i - 1]"
                                 >
                                 <b-form-radio value="first">Less</b-form-radio>
@@ -403,18 +403,18 @@
                 {% elif refinement_layout == "5" %}
                 <b-form method="GET" action="{{ refine_results_url }}">
                     <b-row>
-                        <label for="range-1">Relevance: [[ middleRelevance ]]</label>
-                        <b-form-input id="range-1" type="range" v-model="middleRelevance" value="0.5" min="0" step="0.01" max="1" :disabled="!refinementAlgorithms[i - 1]"></b-form-input>
+                        <label for="range-1">Relevance: [[ middleRelevance.at(i - 1) ]]</label>
+                        <b-form-input id="range-1" type="range" v-model="middleRelevance[i - 1]" value="0.5" min="0" step="0.01" max="1" :disabled="!refinementAlgorithms[i - 1]"></b-form-input>
                         <!-- <div class="mt-2">Value: [[ relevance ]]</div> -->
                     </b-row>
                     <b-row class="mt-3">
-                        <label for="range-2">Diversity: [[ middleDiversity ]]</label>
-                        <b-form-input id="range-2" type="range" v-model="middleDiversity" value="0.5" min="0" step="0.01" max="1" :disabled="!refinementAlgorithms[i - 1]"></b-form-input>
+                        <label for="range-2">Diversity: [[ middleDiversity.at(i - 1) ]]</label>
+                        <b-form-input id="range-2" type="range" v-model="middleDiversity[i - 1]" value="0.5" min="0" step="0.01" max="1" :disabled="!refinementAlgorithms[i - 1]"></b-form-input>
                         <!-- <div class="mt-2">Value: [[ diversity ]]</div> -->
                     </b-row>
                     <b-row class="mt-3">
-                        <label for="range-3">Novelty: [[ middleNovelty ]]</label>
-                        <b-form-input id="range-3" type="range" v-model="middleNovelty" value="0.5" min="0" step="0.01" max="1" :disabled="!refinementAlgorithms[i - 1]"></b-form-input>
+                        <label for="range-3">Novelty: [[ middleNovelty.at(i - 1) ]]</label>
+                        <b-form-input id="range-3" type="range" v-model="middleNovelty[i - 1]" value="0.5" min="0" step="0.01" max="1" :disabled="!refinementAlgorithms[i - 1]"></b-form-input>
                         <!-- <div class="mt-2">Value: [[ novelty ]]</div> -->
                     </b-row>
                 </b-form>
@@ -426,18 +426,18 @@
                 </script>
                 <b-form method="GET" action="{{ refine_results_url }}">
                     <b-row>
-                        <label for="range-1">Relevance: [[ relevance ]]</label>
-                        <b-form-input id="range-1" type="range" :formatter="onRelevanceChange" v-model.number="relevance" step="0.01" min="0" max="1" :disabled="!refinementAlgorithms[i - 1]"></b-form-input>
+                        <label for="range-1">Relevance: [[ relevance.at(i - 1) ]]</label>
+                        <b-form-input id="range-1" type="range" :formatter="onRelevanceChange" v-model.number="relevance[i - 1]" step="0.01" min="0" max="1" :disabled="!refinementAlgorithms[i - 1]"></b-form-input>
                         <!-- <div class="mt-2">Value: [[ relevance ]]</div> -->
                     </b-row>
                     <b-row class="mt-3">
-                        <label for="range-2">Diversity: [[ diversity ]]</label>
-                        <b-form-input id="range-2" type="range" v-model.number="diversity" :formatter="onDiversityChange" step="0.01" min="0" max="1" :disabled="!refinementAlgorithms[i - 1]"></b-form-input>
+                        <label for="range-2">Diversity: [[ diversity.at(i - 1) ]]</label>
+                        <b-form-input id="range-2" type="range" v-model.number="diversity[i - 1]" :formatter="onDiversityChange" step="0.01" min="0" max="1" :disabled="!refinementAlgorithms[i - 1]"></b-form-input>
                         <!-- <div class="mt-2">Value: [[ diversity ]]</div> -->
                     </b-row>
                     <b-row class="mt-3">
-                        <label for="range-3">Novelty: [[ novelty ]]</label>
-                        <b-form-input id="range-3" type="range" v-model.number="novelty" :formatter="onNoveltyChange" min="0" step="0.01" max="1" :disabled="!refinementAlgorithms[i - 1]"></b-form-input>
+                        <label for="range-3">Novelty: [[ novelty.at(i - 1) ]]</label>
+                        <b-form-input id="range-3" type="range" v-model.number="novelty[i - 1]" :formatter="onNoveltyChange" min="0" step="0.01" max="1" :disabled="!refinementAlgorithms[i - 1]"></b-form-input>
                         <!-- <div class="mt-2">Value: [[ novelty ]]</div> -->
                     </b-row>
                 </b-form>

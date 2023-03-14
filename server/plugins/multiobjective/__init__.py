@@ -293,7 +293,7 @@ def compare_and_refine():
     movies = {}
 
     p = session["permutation"][0]
-    refinement_algorithms = []
+    refinement_algorithms = [-1 for _ in displyed_name_mapping]
     for i, (algorithm, algorithm_displayed_name) in enumerate(displyed_name_mapping.items()):
         if session["movies"][algorithm_displayed_name][-1]:
             # Only non-empty makes it to the results
@@ -306,7 +306,7 @@ def compare_and_refine():
                 "name": algorithm_displayed_name,
                 "order": p[algorithm_displayed_name]
             }
-            refinement_algorithms.append(int(algorithm != "relevance_based"))
+            refinement_algorithms[p[algorithm_displayed_name]] = int(algorithm != "relevance_based")
 
     result_layout = "column-single"
 
