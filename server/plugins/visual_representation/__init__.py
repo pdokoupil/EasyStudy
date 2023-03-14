@@ -21,7 +21,7 @@ __description__ = "Comparing different visual representations of data"
 
 bp = Blueprint(__plugin_name__, __plugin_name__, url_prefix=f"/{__plugin_name__}")
 
-MIN_ITERATIONS = 3
+MIN_ITERATIONS = 5
 N_ITERATIONS = 100
 
 # Uncomment this endpoint to make plugin visible in the administration
