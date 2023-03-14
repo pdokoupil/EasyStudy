@@ -4,7 +4,7 @@
       <b-container align-h="center" fluid>
         <b-jumbotron header-level="4" header="Compare" lead="Compare different visualizations of the data.">
             <p>
-                TODO describe what the user is supposed to do. Iteration {{iteration}}/{{n_iterations}}
+                TODO describe what the user is supposed to do. Iteration {{iteration}}/{{MIN_ITERATIONS_TO_CANCEL}}
             </p>
         </b-jumbotron>
       </b-container>
@@ -41,12 +41,12 @@
             {% if iteration < MIN_ITERATIONS_TO_CANCEL %}
             <b-form action="{{ continuation_url }}" method="GET">
                 <input type="hidden" hidden="true" :value="selectedVisualization" name="selected_visualization"/>
-                <b-btn type="submit" variant="primary" block>Continue</b-btn>
+                <b-btn type="submit" variant="primary" block :disabled="selectedVisualization < 0">Continue</b-btn>
             </b-form>
             {% else %}
             <b-form action="{{ continuation_url }}" method="GET">
                 <input type="hidden" hidden="true" :value="selectedVisualization" name="selected_visualization"/>
-                <b-btn type="submit" variant="success" block>Finish</b-btn>
+                <b-btn type="submit" variant="success" block :disabled="selectedVisualization < 0">Finish</b-btn>
             </b-form>
             {% endif %}
         </b-col>
