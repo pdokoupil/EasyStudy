@@ -162,10 +162,10 @@ def algorithm_feedback():
             indices.update([int(y["movie_idx"]) for y in recommendations[algo_displayed_name][i]])
         mov_indices.append(list(indices))
 
-    
+
     filter_out_movies = session["elicitation_selected_movies"] + sum(mov_indices[:HIDE_LAST_K], [])
     selected_movies = session["elicitation_selected_movies"] + sum(session["selected_movie_indices"], [])
-    
+
     prepare_recommendations(np.array(new_weights), recommendations, selected_movies, filter_out_movies, k=session["rec_k"])
 
     session["movies"] = recommendations
@@ -205,7 +205,7 @@ def prepare_recommendations(weights, recommendations, selected_movies, filter_ou
             recommended_items = weighted_average(selected_movies, model, weights, filter_out_movies, k=k)
         else:
             assert False
-        recommendations[algorithm_displayed_name] = [recommended_items]
+        recommendations[algorithm_displayed_name][-1] = recommended_items
 
 @bp.route("/final-questionare")
 @multi_lang
