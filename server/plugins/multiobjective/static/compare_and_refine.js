@@ -282,6 +282,47 @@ window.app = new Vue({
 
             return this.clipAndRound(newRelevance);
         },
+        onRelevanceChange2(newRel, event) { // This version works that if one objective is increasing, other two are decreasing proportionally
+            let idx = event.target.dataset.idx;
+            console.log("CALLED REL ###");
+            let newRelevance = parseFloat(newRel);
+            let othersAccum = this.diversity[idx] + this.novelty[idx];
+
+            if (othersAccum == 0) {
+                //return this.clipAndRound(newRelevance);
+                this.novelty[idx] = 0.001;
+                this.diversity[idx] = 0.001;
+                othersAccum = this.novelty[idx] + this.diversity[idx];
+            }
+
+            let diversityShare = this.diversity[idx] / othersAccum;
+            let noveltyShare = this.novelty[idx] / othersAccum;
+            
+            if (newRelevance > this.relevance[idx]) {
+                let diff = newRelevance - this.relevance[idx];
+                let newDiv = this.diversity[idx] - diversityShare * diff;
+                let newNov = this.novelty[idx] - noveltyShare * diff;
+
+                let totalAccum = newRelevance + newDiv + newNov;
+
+                this.diversity[idx] = parseFloat(newDiv / totalAccum);
+                this.novelty[idx] = parseFloat(newNov / totalAccum);
+                this.relevance[idx] = parseFloat(newRelevance / totalAccum);
+                return parseFloat(newRel / totalAccum);
+            } else if (newRelevance < this.relevance[idx]) {
+                let diff = this.relevance[idx] - newRelevance;
+                let newDiv = this.diversity[idx] + diversityShare * diff;
+                let newNov = this.novelty[idx] + noveltyShare * diff;
+
+                let totalAccum = newRelevance + newDiv + newNov;
+
+                this.diversity[idx] = parseFloat(newDiv / totalAccum);
+                this.novelty[idx] = parseFloat(newNov / totalAccum);
+                this.relevance[idx] = parseFloat(newRelevance / totalAccum);
+                return parseFloat(newRel / totalAccum);
+            }
+            return parseFloat(newRel);
+        },
         onDiversityChange(newDiv, event) {
             let idx = event.target.dataset.idx;
 
@@ -323,6 +364,47 @@ window.app = new Vue({
 
             return this.clipAndRound(newDiversity);
         },
+        onDiversityChange2(newDiv, event) {
+            let idx = event.target.dataset.idx;
+
+            let newDiversity = parseFloat(newDiv);
+            let othersAccum = this.relevance[idx] + this.novelty[idx];
+
+            if (othersAccum == 0) {
+                //return this.clipAndRound(newDiversity);
+                this.relevance[idx] = 0.001;
+                this.novelty[idx] = 0.001;
+                othersAccum = this.relevance[idx] + this.novelty[idx];
+            }
+
+            let relevanceShare = this.relevance[idx] / othersAccum;
+            let noveltyShare = this.novelty[idx] / othersAccum;
+            
+            if (newDiversity > this.diversity[idx]) {
+                let diff = newDiversity - this.diversity[idx];
+                let newRel = this.relevance[idx] - relevanceShare * diff;
+                let newNov = this.novelty[idx] - noveltyShare * diff;
+
+                let totalAccum = newDiversity + newRel + newNov;
+
+                this.relevance[idx] = parseFloat(newRel / totalAccum);
+                this.novelty[idx] = parseFloat(newNov / totalAccum);
+                this.diversity[idx] = parseFloat(newDiversity / totalAccum);
+                return parseFloat(newDiv / totalAccum);
+            } else if (newDiversity < this.diversity[idx]) {
+                let diff = this.diversity[idx] - newDiversity;
+                let newRel = this.relevance[idx] + relevanceShare * diff;
+                let newNov = this.novelty[idx] + noveltyShare * diff;
+
+                let totalAccum = newDiversity + newRel + newNov;
+
+                this.relevance[idx] = parseFloat(newRel / totalAccum);
+                this.novelty[idx] = parseFloat(newNov / totalAccum);
+                this.diversity[idx] = parseFloat(newDiversity / totalAccum);
+                return parseFloat(newDiv / totalAccum);
+            }
+            return parseFloat(newDiv);
+        },
         onNoveltyChange(newNov, event) {
             let idx = event.target.dataset.idx;
 
@@ -363,6 +445,47 @@ window.app = new Vue({
             }
 
             return this.clipAndRound(newNovelty);
+        },
+        onNoveltyChange2(newNov, event) {
+            let idx = event.target.dataset.idx;
+
+            let newNovelty = parseFloat(newNov);
+            let othersAccum = this.relevance[idx] + this.diversity[idx];
+
+            if (othersAccum == 0) {
+                this.relevance[idx] = 0.001;
+                this.diversity[idx] = 0.001;
+                othersAccum = this.relevance[idx] + this.diversity[idx];
+                //return this.clipAndRound(newNovelty);
+            }
+
+            let relevanceShare = this.relevance[idx] / othersAccum;
+            let diversityShare = this.diversity[idx] / othersAccum;
+            
+            if (newNovelty > this.novelty[idx]) {
+                let diff = newNovelty - this.novelty[idx];
+                let newRel = this.relevance[idx] - relevanceShare * diff;
+                let newDiv = this.diversity[idx] - diversityShare * diff;
+
+                let totalAccum = newNovelty + newRel + newDiv;
+
+                this.relevance[idx] = parseFloat(newRel / totalAccum);
+                this.novelty[idx] = parseFloat(newNovelty / totalAccum);
+                this.diversity[idx] = parseFloat(newDiv / totalAccum);
+                return parseFloat(newNov / totalAccum);
+            } else if (newNovelty < this.novelty[idx]) {
+                let diff = this.novelty[idx] - newNovelty;
+                let newRel = this.relevance[idx] + relevanceShare * diff;
+                let newDiv = this.diversity[idx] + diversityShare * diff;
+
+                let totalAccum = newNovelty + newRel + newDiv;
+
+                this.relevance[idx] = parseFloat(newRel / totalAccum);
+                this.novelty[idx] = parseFloat(newNovelty / totalAccum);
+                this.diversity[idx] = parseFloat(newDiv / totalAccum);
+                return parseFloat(newNov / totalAccum);
+            }
+            return parseFloat(newNov);
         },
         onRelevanceDeltaChange(newVal) {
             reportOnInput("/utils/on-input", csrfToken, "range", {
@@ -456,6 +579,14 @@ window.app = new Vue({
             }
             this.budget[idx] = this.budget[idx] - 1;
             this.$forceUpdate();
+        },
+        showAndScroll() {
+            this.showRefinement = true;
+            this.$nextTick(() => {
+                window.setTimeout(function(){
+                    window.scrollTo(0, document.body.scrollHeight);
+                }, 250);
+            });
         }
     },
     async mounted() {
