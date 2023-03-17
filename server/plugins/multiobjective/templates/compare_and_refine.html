@@ -148,342 +148,379 @@
             </b-form-group>
         </b-row>
         
-        <b-row class="mt-4 mb-4">
+        <!-- <b-row class="mt-4 mb-4">
             <b-col center class="align-middle"></b-col>
             <b-col center class="align-middle">
                 <b-btn block variant="primary" v-on:click="onClickContinue" :disabled="showRefinement || !allValidated">Continue</b-btn>
             </b-col>
             <b-col center class="align-middle"></b-col>
         </b-row>
-        
+         -->
         <!-- Horizontal separator between results and refinement -->
-        <b-row v-if="showRefinement" class="mt-1 mb-1">
-            <b-container fluid>
-                <div style="height: 10px; background-color: green;"></div>
-            </b-container>
-        </b-row>
-
-
-        <!-- Refinement starts here -->
-        <b-row v-if="showRefinement" align-h="center">
-            <b-col class="ml-3 mr-3" v-for="i in refinementAlgorithms.length">
-                {% if refinement_layout == "1" %}
-                <b-form method="GET" action="{{ refine_results_url }}">
-                    <b-row>
-                        <label for="range-1">Relevance: [[ relevance[i - 1] ]]</label>
-                        <b-form-input :data-idx="i - 1" id="range-1" type="range" :formatter="onRelevanceChange" v-model.number="relevance[i - 1]" step="0.01" min="0" max="1" :disabled="!refinementAlgorithms[i - 1]"></b-form-input>
-                        <!-- <div class="mt-2">Value: [[ relevance ]]</div> -->
-                    </b-row>
-                    <b-row class="mt-3">
-                        <label for="range-2">Diversity: [[ diversity[i - 1] ]]</label>
-                        <b-form-input :data-idx="i - 1" id="range-2" type="range" v-model.number="diversity[i - 1]" :formatter="onDiversityChange" step="0.01" min="0" max="1" :disabled="!refinementAlgorithms[i - 1]"></b-form-input>
-                        <!-- <div class="mt-2">Value: [[ diversity ]]</div> -->
-                    </b-row>
-                    <b-row class="mt-3">
-                        <label for="range-3">Novelty: [[ novelty[i - 1] ]]</label>
-                        <b-form-input :data-idx="i - 1" id="range-3" type="range" v-model.number="novelty[i - 1]" :formatter="onNoveltyChange" min="0" step="0.01" max="1" :disabled="!refinementAlgorithms[i - 1]"></b-form-input>
-                        <!-- <div class="mt-2">Value: [[ novelty ]]</div> -->
-                    </b-row>
-                </b-form>
-                {% elif refinement_layout == "2" %}
-                <b-form method="GET" action="{{ refine_results_url }}">
-                    <b-row>
-                        <b-col>
-                            <b-form-group>
-                                <label>
-                                    Results were <strong>relevant</strong>
-                                </label>
-                                <b-icon id="relevance-help" icon="question-circle-fill" variant="primary"></b-icon>
-                                <b-tooltip target="relevance-help" triggers="hover">TODO</b-tooltip>
-                                <b-form-radio-group
-                                id="radio-group-1"
-                                required="True"
-                                :state="relevanceValue[i - 1] != null"
-                                v-model="relevanceValue[i - 1]"
-                                :disabled="!refinementAlgorithms[i - 1]"
-                                >
-                                <b-form-radio value="first">Strongly disagree</b-form-radio>
-                                <b-form-radio value="second">Disagree</b-form-radio>
-                                <b-form-radio value="third">Neutral</b-form-radio>
-                                <b-form-radio value="fourth">Agree</b-form-radio>
-                                <b-form-radio value="fifth">Strongly agree</b-form-radio>
-                                </b-form-radio-group>
-                            </b-form-group>
-                        </b-col>
-                    </b-row>
-                    <b-row class="mt-3">
-                        <b-col>
-                            <b-form-group>
-                                <label>
-                                    Results were <strong>diverse</strong>
-                                </label>
-                                <b-icon id="diverse-help" icon="question-circle-fill" variant="primary"></b-icon>
-                                <b-tooltip target="diverse-help" triggers="hover">TODO</b-tooltip>
-                                <b-form-radio-group
-                                id="radio-group-2"
-                                required="True"
-                                :state="diversityValue[i - 1] != null"
-                                v-model="diversityValue[i - 1]"
-                                :disabled="!refinementAlgorithms[i - 1]"
-                                >
-                                <b-form-radio value="first">Strongly disagree</b-form-radio>
-                                <b-form-radio value="second">Disagree</b-form-radio>
-                                <b-form-radio value="third">Neutral</b-form-radio>
-                                <b-form-radio value="fourth">Agree</b-form-radio>
-                                <b-form-radio value="fifth">Strongly agree</b-form-radio>
-                                </b-form-radio-group>
-                            </b-form-group>
-                        </b-col>
-                    </b-row>
-                    <b-row class="mt-3">
-                        <b-col>
-                            <b-form-group>
-                                <label>
-                                    Results were <strong>novel</strong>
-                                </label>
-                                <b-icon id="novelty-help" icon="question-circle-fill" variant="primary"></b-icon>
-                                <b-tooltip target="novelty-help" triggers="hover">TODO</b-tooltip>
-                                <b-form-radio-group
-                                id="radio-group-3"
-                                required="True"
-                                :state="noveltyValue[i - 1] != null"
-                                v-model="noveltyValue[i - 1]"
-                                :disabled="!refinementAlgorithms[i - 1]"
-                                >
-                                <b-form-radio value="first">Strongly disagree</b-form-radio>
-                                <b-form-radio value="second">Disagree</b-form-radio>
-                                <b-form-radio value="third">Neutral</b-form-radio>
-                                <b-form-radio value="fourth">Agree</b-form-radio>
-                                <b-form-radio value="fifth">Strongly agree</b-form-radio>
-                                </b-form-radio-group>
-                            </b-form-group>
-                        </b-col>
-                    </b-row>
-                </b-form>
-                {% elif refinement_layout == "3" %}
-                <b-form method="GET" @submit="onSubmit" action="{{ refine_results_url }}">
-                    <input type="hidden" hidden="true" v-model="newWeights" name="new_weights"/>
-                    <b-row>
-                        <label for="range-1">
-                            Would you like to make the algorithm pay more/less attention to <strong>relevance</strong>?
-                            <b-icon id="relevance-help" icon="question-circle-fill" variant="primary"></b-icon>
-                            <b-tooltip target="relevance-help" triggers="hover">TODO</b-tooltip>
-                        </label>
-                        <b-form-input id="range-1" :formatter="onRelevanceDeltaChange" type="range" v-model="relevanceDelta[i - 1]" min="-4" max="4" :disabled="!refinementAlgorithms[i - 1]"></b-form-input>
-                        
-                        <!-- <div class="mt-2">Value: [[ relevance ]]</div> -->
-                    </b-row>
-                    <b-row>
-                        <b-col class="text-left" align-h="start">
-                            <div>No attention</div>
-                        </b-col>
-                        <b-col class="text-center" align-h="center">
-                            <div>[[ deltaDescription[parseInt(relevanceDelta[i - 1]) + 4] ]]</div>
-                        </b-col>
-                        <b-col class="text-right" align-h="end">
-                            <div>Full attention</div>
-                        </b-col>
-                    </b-row>
-                    <b-row class="mt-3">
-                        <label for="range-2">
-                            Would you like to make the algorithm pay more/less attention to <strong>diversity</strong>?
-                            <b-icon id="diverse-help" icon="question-circle-fill" variant="primary"></b-icon>
-                            <b-tooltip target="diverse-help" triggers="hover">TODO</b-tooltip>
-                        </label>
-                        <b-form-input id="range-2" :formatter="onDiversityDeltaChange" type="range" v-model="diversityDelta[i - 1]" min="-4" max="4" :disabled="!refinementAlgorithms[i - 1]"></b-form-input>
-                        <!-- <div class="mt-2">Value: [[ diversity ]]</div> -->
-                    </b-row>
-                    <b-row>
-                        <b-col class="text-left" align-h="start">
-                            <div>No attention</div>
-                        </b-col>
-                        <b-col class="text-center" align-h="center">
-                            <div>[[ deltaDescription[parseInt(diversityDelta[i - 1]) + 4] ]]</div>
-                        </b-col>
-                        <b-col class="text-right" align-h="end">
-                            <div>Full attention</div>
-                        </b-col>
-                    </b-row>
-                    <b-row class="mt-3">
-                        <label for="range-3">
-                            Would you like to make the algorithm pay more/less attention to <strong>novelty</strong>?
-                            <b-icon id="novelty-help" icon="question-circle-fill" variant="primary"></b-icon>
-                            <b-tooltip target="novelty-help" triggers="hover">TODO</b-tooltip>
-                        </label>
-                        <b-form-input id="range-3" :formatter="onNoveltyDeltaChange" type="range" v-model="noveltyDelta[i - 1]" min="-4" max="4" :disabled="!refinementAlgorithms[i - 1]"></b-form-input>
-                        <!-- <div class="mt-2">Value: [[ novelty ]]</div> -->
-                    </b-row>
-                    <b-row>
-                        <b-col class="text-left" align-h="start">
-                            <div>No attention</div>
-                        </b-col>
-                        <b-col class="text-center" align-h="center">
-                            <div>[[ deltaDescription[parseInt(noveltyDelta[i - 1]) + 4] ]]</div>
-                        </b-col>
-                        <b-col class="text-right" align-h="end">
-                            <div>Full attention</div>
-                        </b-col>
-                    </b-row>
-                </b-form>
-                {% elif refinement_layout == "4" %}
-                <b-form method="GET" action="{{ refine_results_url }}">
-                    <b-row>
-                        <b-col>
-                            <b-form-group>
-                                <label>
-                                    Relevance
-                                </label>
-                                <b-icon id="relevance-help" icon="question-circle-fill" variant="primary"></b-icon>
-                                <b-tooltip target="relevance-help" triggers="hover">TODO</b-tooltip>
-                                <b-form-radio-group
-                                id="radio-group-1"
-                                required="True"
-                                :state="relevanceValue[i - 1] != null"
-                                v-model="relevanceValue[i - 1]"
-                                :disabled="!refinementAlgorithms[i - 1]"
-                                >
-                                <b-form-radio value="first">Less</b-form-radio>
-                                <b-form-radio value="second">Slightly less</b-form-radio>
-                                <b-form-radio value="third">Same</b-form-radio>
-                                <b-form-radio value="fourth">More</b-form-radio>
-                                <b-form-radio value="fifth">Slightly more</b-form-radio>
-                                </b-form-radio-group>
-                            </b-form-group>
-                        </b-col>
-                    </b-row>
-                    <b-row class="mt-3">
-                        <b-col>
-                            <b-form-group>
-                                <label>
-                                    Diversity
-                                </label>
-                                <b-icon id="diverse-help" icon="question-circle-fill" variant="primary"></b-icon>
-                                <b-tooltip target="diverse-help" triggers="hover">TODO</b-tooltip>
-                                <b-form-radio-group
-                                id="radio-group-2"
-                                required="True"
-                                :state="diversityValue[i - 1] != null"
-                                v-model="diversityValue[i - 1]"
-                                :disabled="!refinementAlgorithms[i - 1]"
-                                >
-                                <b-form-radio value="first">Less</b-form-radio>
-                                <b-form-radio value="second">Slightly less</b-form-radio>
-                                <b-form-radio value="third">Same</b-form-radio>
-                                <b-form-radio value="fourth">More</b-form-radio>
-                                <b-form-radio value="fifth">Slightly more</b-form-radio>
-                                </b-form-radio-group>
-                            </b-form-group>
-                        </b-col>
-                    </b-row>
-                    <b-row class="mt-3">
-                        <b-col>
-                            <b-form-group>
-                                <label>
-                                    Novelty
-                                </label>
-                                <b-icon id="novelty-help" icon="question-circle-fill" variant="primary"></b-icon>
-                                <b-tooltip target="novelty-help" triggers="hover">TODO</b-tooltip>
-                                <b-form-radio-group
-                                id="radio-group-3"
-                                required="True"
-                                :state="noveltyValue[i - 1] != null"
-                                v-model="noveltyValue[i - 1]"
-                                :disabled="!refinementAlgorithms[i - 1]"
-                                >
-                                <b-form-radio value="first">Less</b-form-radio>
-                                <b-form-radio value="second">Slightly less</b-form-radio>
-                                <b-form-radio value="third">Same</b-form-radio>
-                                <b-form-radio value="fourth">More</b-form-radio>
-                                <b-form-radio value="fifth">Slightly more</b-form-radio>
-                                </b-form-radio-group>
-                            </b-form-group>
-                        </b-col>
-                    </b-row>
-                </b-form>
-                {% elif refinement_layout == "5" %}
-                <b-form method="GET" action="{{ refine_results_url }}">
-                    <b-row>
-                        <label for="range-1">Relevance: [[ middleRelevance.at(i - 1) ]]</label>
-                        <b-form-input id="range-1" type="range" v-model="middleRelevance[i - 1]" value="0.5" min="0" step="0.01" max="1" :disabled="!refinementAlgorithms[i - 1]"></b-form-input>
-                        <!-- <div class="mt-2">Value: [[ relevance ]]</div> -->
-                    </b-row>
-                    <b-row class="mt-3">
-                        <label for="range-2">Diversity: [[ middleDiversity.at(i - 1) ]]</label>
-                        <b-form-input id="range-2" type="range" v-model="middleDiversity[i - 1]" value="0.5" min="0" step="0.01" max="1" :disabled="!refinementAlgorithms[i - 1]"></b-form-input>
-                        <!-- <div class="mt-2">Value: [[ diversity ]]</div> -->
-                    </b-row>
-                    <b-row class="mt-3">
-                        <label for="range-3">Novelty: [[ middleNovelty.at(i - 1) ]]</label>
-                        <b-form-input id="range-3" type="range" v-model="middleNovelty[i - 1]" value="0.5" min="0" step="0.01" max="1" :disabled="!refinementAlgorithms[i - 1]"></b-form-input>
-                        <!-- <div class="mt-2">Value: [[ novelty ]]</div> -->
-                    </b-row>
-                </b-form>
-                {% elif refinement_layout == "6" %}
-                <script>
-                    var defaultRelevance = 0.5;
-                    var defaultDiversity = 0.5;
-                    var defaultNovelty = 0.5;
-                </script>
-                <b-form method="GET" action="{{ refine_results_url }}">
-                    <b-row>
-                        <label for="range-1">Relevance: [[ relevance.at(i - 1) ]]</label>
-                        <b-form-input id="range-1" type="range" :formatter="onRelevanceChange" v-model.number="relevance[i - 1]" step="0.01" min="0" max="1" :disabled="!refinementAlgorithms[i - 1]"></b-form-input>
-                        <!-- <div class="mt-2">Value: [[ relevance ]]</div> -->
-                    </b-row>
-                    <b-row class="mt-3">
-                        <label for="range-2">Diversity: [[ diversity.at(i - 1) ]]</label>
-                        <b-form-input id="range-2" type="range" v-model.number="diversity[i - 1]" :formatter="onDiversityChange" step="0.01" min="0" max="1" :disabled="!refinementAlgorithms[i - 1]"></b-form-input>
-                        <!-- <div class="mt-2">Value: [[ diversity ]]</div> -->
-                    </b-row>
-                    <b-row class="mt-3">
-                        <label for="range-3">Novelty: [[ novelty.at(i - 1) ]]</label>
-                        <b-form-input id="range-3" type="range" v-model.number="novelty[i - 1]" :formatter="onNoveltyChange" min="0" step="0.01" max="1" :disabled="!refinementAlgorithms[i - 1]"></b-form-input>
-                        <!-- <div class="mt-2">Value: [[ novelty ]]</div> -->
-                    </b-row>
-                </b-form>
-                {% elif refinement_layout == "7" %}
-                <b-form method="GET" action="{{ refine_results_url }}">
-                    <b-row align-h="center" class="mb-5 mt-5 text-center">
-                        <strong>Remaining budget: [[budget.at(i - 1)]]</strong>
-                    </b-row>
-                    <b-row>
-                        <b-col class="text-left">
-                            <b-button class="btnFit" @click="decrease(i - 1, 'relevance')" :disabled="!refinementAlgorithms[i - 1] || boughtRelevance[i - 1] <= 0">-</b-button>
-                        </b-col>
-                        <b-col class="text-center">
-                            R=[[boughtRelevance.at(i - 1)]]
-                        </b-col>
-                        <b-col class="text-right">
-                            <b-button class="btnFit" @click="increase(i - 1, 'relevance')" :disabled="!refinementAlgorithms[i - 1] || budget[i - 1] <= 0">+</b-button>
-                        </b-col>
-                    </b-row>
-                    <b-row class="mt-3">
-                        <b-col class="text-left">
-                            <b-button class="btnFit" @click="decrease(i - 1, 'diversity')" :disabled="!refinementAlgorithms[i - 1] || boughtDiversity[i - 1] <= 0">-</b-button>
-                        </b-col>
-                        <b-col class="text-center">
-                            D=[[boughtDiversity.at(i - 1)]]
-                        </b-col>
-                        <b-col class="text-right">
-                            <b-button class="btnFit" @click="increase(i - 1, 'diversity')" :disabled="!refinementAlgorithms[i - 1] || budget[i - 1] <= 0">+</b-button>
-                        </b-col>
-                    </b-row>
-                    <b-row class="mt-3">
-                        <b-col class="text-left">
-                            <b-button class="btnFit" @click="decrease(i - 1, 'novelty')" :disabled="!refinementAlgorithms[i - 1] || boughtNovelty[i - 1] <= 0">-</b-button>
-                        </b-col>
-                        <b-col class="text-center">
-                            N=[[boughtNovelty.at(i - 1)]]
-                        </b-col>
-                        <b-col class="text-right">
-                            <b-button class="btnFit" @click="increase(i - 1, 'novelty')" :disabled="!refinementAlgorithms[i - 1] || budget[i - 1] <= 0">+</b-button>
-                        </b-col>
-                    </b-row>
-                </b-form>
-                {% endif %}
+        <b-row class="mt-4 mb-4">
+            <b-col center class="align-middle"></b-col>
+            <b-col center class="align-middle text-center">
+                <b-button
+                    @click="showAndScroll"
+                    :disabled="showRefinement || !allValidated"
+                    block
+                    variant="primary"
+                    :class="showRefinement ? null : 'collapsed'"
+                    :aria-expanded="showRefinement ? 'true' : 'false'"
+                    aria-controls="collapse-1">Continue</b-button>
             </b-col>
+            <b-col center class="align-middle"></b-col>
         </b-row>
-        <!-- Refinement ends here -->
+        
+        <b-collapse id="collapse-1" v-model="showRefinement" class="mt-2">
+            <b-card>
+                <!-- <b-row class="mt-3 mb-3">
+                    <b-container fluid>
+                        <div style="height: 10px; background-color: green;"></div>
+                    </b-container>
+                </b-row> -->
+                <!-- Refinement starts here -->
+                <b-row align-h="center">
+                    <b-col class="ml-3 mr-3" v-for="i in refinementAlgorithms.length">
+                        {% if refinement_layout == "0" %}
+                        <b-form method="GET" action="{{ refine_results_url }}">
+                            <b-row>
+                                <label for="range-1">Relevance: [[ relevance[i - 1].toFixed(1) ]]</label>
+                                <b-form-input :data-idx="i - 1" id="range-1" type="range" v-model.number="relevance[i - 1]" :formatter="onRelevanceChange2" step="0.01" min="0" max="1" :disabled="!refinementAlgorithms[i - 1]"></b-form-input>
+                                <!-- <div class="mt-2">Value: [[ relevance ]]</div> -->
+                            </b-row>
+                            <b-row class="mt-3">
+                                <label for="range-2">Diversity: [[ diversity[i - 1].toFixed(1) ]]</label>
+                                <b-form-input :data-idx="i - 1" id="range-2" type="range" v-model.number="diversity[i - 1]" :formatter="onDiversityChange2" step="0.01" min="0" max="1" :disabled="!refinementAlgorithms[i - 1]"></b-form-input>
+                                <!-- <div class="mt-2">Value: [[ diversity ]]</div> -->
+                            </b-row>
+                            <b-row class="mt-3">
+                                <label for="range-3">Novelty: [[ novelty[i - 1].toFixed(1) ]]</label>
+                                <b-form-input :data-idx="i - 1" id="range-3" type="range" v-model.number="novelty[i - 1]" :formatter="onNoveltyChange2" min="0" step="0.01" max="1" :disabled="!refinementAlgorithms[i - 1]"></b-form-input>
+                                <!-- <div class="mt-2">Value: [[ novelty ]]</div> -->
+                            </b-row>
+                        </b-form>
+                        {% elif refinement_layout == "1" %}
+                        <b-form method="GET" action="{{ refine_results_url }}">
+                            <b-row>
+                                <label for="range-1">Relevance: [[ relevance[i - 1] ]]</label>
+                                <b-form-input :data-idx="i - 1" id="range-1" type="range" :formatter="onRelevanceChange" v-model.number="relevance[i - 1]" step="0.01" min="0" max="1" :disabled="!refinementAlgorithms[i - 1]"></b-form-input>
+                                <!-- <div class="mt-2">Value: [[ relevance ]]</div> -->
+                            </b-row>
+                            <b-row class="mt-3">
+                                <label for="range-2">Diversity: [[ diversity[i - 1] ]]</label>
+                                <b-form-input :data-idx="i - 1" id="range-2" type="range" v-model.number="diversity[i - 1]" :formatter="onDiversityChange" step="0.01" min="0" max="1" :disabled="!refinementAlgorithms[i - 1]"></b-form-input>
+                                <!-- <div class="mt-2">Value: [[ diversity ]]</div> -->
+                            </b-row>
+                            <b-row class="mt-3">
+                                <label for="range-3">Novelty: [[ novelty[i - 1] ]]</label>
+                                <b-form-input :data-idx="i - 1" id="range-3" type="range" v-model.number="novelty[i - 1]" :formatter="onNoveltyChange" min="0" step="0.01" max="1" :disabled="!refinementAlgorithms[i - 1]"></b-form-input>
+                                <!-- <div class="mt-2">Value: [[ novelty ]]</div> -->
+                            </b-row>
+                        </b-form>
+                        {% elif refinement_layout == "2" %}
+                        <b-form method="GET" action="{{ refine_results_url }}">
+                            <b-row>
+                                <b-col>
+                                    <b-form-group>
+                                        <label>
+                                            Results were <strong>relevant</strong>
+                                        </label>
+                                        <b-icon id="relevance-help" icon="question-circle-fill" variant="primary"></b-icon>
+                                        <b-tooltip target="relevance-help" triggers="hover">TODO</b-tooltip>
+                                        <b-form-radio-group
+                                        id="radio-group-1"
+                                        required="True"
+                                        :state="relevanceValue[i - 1] != null"
+                                        v-model="relevanceValue[i - 1]"
+                                        :disabled="!refinementAlgorithms[i - 1]"
+                                        >
+                                        <b-form-radio value="first">Strongly disagree</b-form-radio>
+                                        <b-form-radio value="second">Disagree</b-form-radio>
+                                        <b-form-radio value="third">Neutral</b-form-radio>
+                                        <b-form-radio value="fourth">Agree</b-form-radio>
+                                        <b-form-radio value="fifth">Strongly agree</b-form-radio>
+                                        </b-form-radio-group>
+                                    </b-form-group>
+                                </b-col>
+                            </b-row>
+                            <b-row class="mt-3">
+                                <b-col>
+                                    <b-form-group>
+                                        <label>
+                                            Results were <strong>diverse</strong>
+                                        </label>
+                                        <b-icon id="diverse-help" icon="question-circle-fill" variant="primary"></b-icon>
+                                        <b-tooltip target="diverse-help" triggers="hover">TODO</b-tooltip>
+                                        <b-form-radio-group
+                                        id="radio-group-2"
+                                        required="True"
+                                        :state="diversityValue[i - 1] != null"
+                                        v-model="diversityValue[i - 1]"
+                                        :disabled="!refinementAlgorithms[i - 1]"
+                                        >
+                                        <b-form-radio value="first">Strongly disagree</b-form-radio>
+                                        <b-form-radio value="second">Disagree</b-form-radio>
+                                        <b-form-radio value="third">Neutral</b-form-radio>
+                                        <b-form-radio value="fourth">Agree</b-form-radio>
+                                        <b-form-radio value="fifth">Strongly agree</b-form-radio>
+                                        </b-form-radio-group>
+                                    </b-form-group>
+                                </b-col>
+                            </b-row>
+                            <b-row class="mt-3">
+                                <b-col>
+                                    <b-form-group>
+                                        <label>
+                                            Results were <strong>novel</strong>
+                                        </label>
+                                        <b-icon id="novelty-help" icon="question-circle-fill" variant="primary"></b-icon>
+                                        <b-tooltip target="novelty-help" triggers="hover">TODO</b-tooltip>
+                                        <b-form-radio-group
+                                        id="radio-group-3"
+                                        required="True"
+                                        :state="noveltyValue[i - 1] != null"
+                                        v-model="noveltyValue[i - 1]"
+                                        :disabled="!refinementAlgorithms[i - 1]"
+                                        >
+                                        <b-form-radio value="first">Strongly disagree</b-form-radio>
+                                        <b-form-radio value="second">Disagree</b-form-radio>
+                                        <b-form-radio value="third">Neutral</b-form-radio>
+                                        <b-form-radio value="fourth">Agree</b-form-radio>
+                                        <b-form-radio value="fifth">Strongly agree</b-form-radio>
+                                        </b-form-radio-group>
+                                    </b-form-group>
+                                </b-col>
+                            </b-row>
+                        </b-form>
+                        {% elif refinement_layout == "3" %}
+                        <b-form method="GET" @submit="onSubmit" action="{{ refine_results_url }}">
+                            <input type="hidden" hidden="true" v-model="newWeights" name="new_weights"/>
+                            <b-row>
+                                <label for="range-1">
+                                    Would you like to make the algorithm pay more/less attention to <strong>relevance</strong>?
+                                    <b-icon id="relevance-help" icon="question-circle-fill" variant="primary"></b-icon>
+                                    <b-tooltip target="relevance-help" triggers="hover">TODO</b-tooltip>
+                                </label>
+                                <b-form-input id="range-1" :formatter="onRelevanceDeltaChange" type="range" v-model="relevanceDelta[i - 1]" min="-4" max="4" :disabled="!refinementAlgorithms[i - 1]"></b-form-input>
+                                
+                                <!-- <div class="mt-2">Value: [[ relevance ]]</div> -->
+                            </b-row>
+                            <b-row>
+                                <b-col class="text-left" align-h="start">
+                                    <div>No attention</div>
+                                </b-col>
+                                <b-col class="text-center" align-h="center">
+                                    <div>[[ deltaDescription[parseInt(relevanceDelta[i - 1]) + 4] ]]</div>
+                                </b-col>
+                                <b-col class="text-right" align-h="end">
+                                    <div>Full attention</div>
+                                </b-col>
+                            </b-row>
+                            <b-row class="mt-3">
+                                <label for="range-2">
+                                    Would you like to make the algorithm pay more/less attention to <strong>diversity</strong>?
+                                    <b-icon id="diverse-help" icon="question-circle-fill" variant="primary"></b-icon>
+                                    <b-tooltip target="diverse-help" triggers="hover">TODO</b-tooltip>
+                                </label>
+                                <b-form-input id="range-2" :formatter="onDiversityDeltaChange" type="range" v-model="diversityDelta[i - 1]" min="-4" max="4" :disabled="!refinementAlgorithms[i - 1]"></b-form-input>
+                                <!-- <div class="mt-2">Value: [[ diversity ]]</div> -->
+                            </b-row>
+                            <b-row>
+                                <b-col class="text-left" align-h="start">
+                                    <div>No attention</div>
+                                </b-col>
+                                <b-col class="text-center" align-h="center">
+                                    <div>[[ deltaDescription[parseInt(diversityDelta[i - 1]) + 4] ]]</div>
+                                </b-col>
+                                <b-col class="text-right" align-h="end">
+                                    <div>Full attention</div>
+                                </b-col>
+                            </b-row>
+                            <b-row class="mt-3">
+                                <label for="range-3">
+                                    Would you like to make the algorithm pay more/less attention to <strong>novelty</strong>?
+                                    <b-icon id="novelty-help" icon="question-circle-fill" variant="primary"></b-icon>
+                                    <b-tooltip target="novelty-help" triggers="hover">TODO</b-tooltip>
+                                </label>
+                                <b-form-input id="range-3" :formatter="onNoveltyDeltaChange" type="range" v-model="noveltyDelta[i - 1]" min="-4" max="4" :disabled="!refinementAlgorithms[i - 1]"></b-form-input>
+                                <!-- <div class="mt-2">Value: [[ novelty ]]</div> -->
+                            </b-row>
+                            <b-row>
+                                <b-col class="text-left" align-h="start">
+                                    <div>No attention</div>
+                                </b-col>
+                                <b-col class="text-center" align-h="center">
+                                    <div>[[ deltaDescription[parseInt(noveltyDelta[i - 1]) + 4] ]]</div>
+                                </b-col>
+                                <b-col class="text-right" align-h="end">
+                                    <div>Full attention</div>
+                                </b-col>
+                            </b-row>
+                        </b-form>
+                        {% elif refinement_layout == "4" %}
+                        <b-form method="GET" action="{{ refine_results_url }}">
+                            <b-row>
+                                <b-col>
+                                    <b-form-group>
+                                        <label>
+                                            Relevance
+                                        </label>
+                                        <b-icon id="relevance-help" icon="question-circle-fill" variant="primary"></b-icon>
+                                        <b-tooltip target="relevance-help" triggers="hover">TODO</b-tooltip>
+                                        <b-form-radio-group
+                                        id="radio-group-1"
+                                        required="True"
+                                        :state="relevanceValue[i - 1] != null"
+                                        v-model="relevanceValue[i - 1]"
+                                        :disabled="!refinementAlgorithms[i - 1]"
+                                        >
+                                        <b-form-radio value="first">Less</b-form-radio>
+                                        <b-form-radio value="second">Slightly less</b-form-radio>
+                                        <b-form-radio value="third">Same</b-form-radio>
+                                        <b-form-radio value="fourth">More</b-form-radio>
+                                        <b-form-radio value="fifth">Slightly more</b-form-radio>
+                                        </b-form-radio-group>
+                                    </b-form-group>
+                                </b-col>
+                            </b-row>
+                            <b-row class="mt-3">
+                                <b-col>
+                                    <b-form-group>
+                                        <label>
+                                            Diversity
+                                        </label>
+                                        <b-icon id="diverse-help" icon="question-circle-fill" variant="primary"></b-icon>
+                                        <b-tooltip target="diverse-help" triggers="hover">TODO</b-tooltip>
+                                        <b-form-radio-group
+                                        id="radio-group-2"
+                                        required="True"
+                                        :state="diversityValue[i - 1] != null"
+                                        v-model="diversityValue[i - 1]"
+                                        :disabled="!refinementAlgorithms[i - 1]"
+                                        >
+                                        <b-form-radio value="first">Less</b-form-radio>
+                                        <b-form-radio value="second">Slightly less</b-form-radio>
+                                        <b-form-radio value="third">Same</b-form-radio>
+                                        <b-form-radio value="fourth">More</b-form-radio>
+                                        <b-form-radio value="fifth">Slightly more</b-form-radio>
+                                        </b-form-radio-group>
+                                    </b-form-group>
+                                </b-col>
+                            </b-row>
+                            <b-row class="mt-3">
+                                <b-col>
+                                    <b-form-group>
+                                        <label>
+                                            Novelty
+                                        </label>
+                                        <b-icon id="novelty-help" icon="question-circle-fill" variant="primary"></b-icon>
+                                        <b-tooltip target="novelty-help" triggers="hover">TODO</b-tooltip>
+                                        <b-form-radio-group
+                                        id="radio-group-3"
+                                        required="True"
+                                        :state="noveltyValue[i - 1] != null"
+                                        v-model="noveltyValue[i - 1]"
+                                        :disabled="!refinementAlgorithms[i - 1]"
+                                        >
+                                        <b-form-radio value="first">Less</b-form-radio>
+                                        <b-form-radio value="second">Slightly less</b-form-radio>
+                                        <b-form-radio value="third">Same</b-form-radio>
+                                        <b-form-radio value="fourth">More</b-form-radio>
+                                        <b-form-radio value="fifth">Slightly more</b-form-radio>
+                                        </b-form-radio-group>
+                                    </b-form-group>
+                                </b-col>
+                            </b-row>
+                        </b-form>
+                        {% elif refinement_layout == "5" %}
+                        <b-form method="GET" action="{{ refine_results_url }}">
+                            <b-row>
+                                <label for="range-1">Relevance: [[ middleRelevance.at(i - 1) ]]</label>
+                                <b-form-input id="range-1" type="range" v-model="middleRelevance[i - 1]" value="0.5" min="0" step="0.01" max="1" :disabled="!refinementAlgorithms[i - 1]"></b-form-input>
+                                <!-- <div class="mt-2">Value: [[ relevance ]]</div> -->
+                            </b-row>
+                            <b-row class="mt-3">
+                                <label for="range-2">Diversity: [[ middleDiversity.at(i - 1) ]]</label>
+                                <b-form-input id="range-2" type="range" v-model="middleDiversity[i - 1]" value="0.5" min="0" step="0.01" max="1" :disabled="!refinementAlgorithms[i - 1]"></b-form-input>
+                                <!-- <div class="mt-2">Value: [[ diversity ]]</div> -->
+                            </b-row>
+                            <b-row class="mt-3">
+                                <label for="range-3">Novelty: [[ middleNovelty.at(i - 1) ]]</label>
+                                <b-form-input id="range-3" type="range" v-model="middleNovelty[i - 1]" value="0.5" min="0" step="0.01" max="1" :disabled="!refinementAlgorithms[i - 1]"></b-form-input>
+                                <!-- <div class="mt-2">Value: [[ novelty ]]</div> -->
+                            </b-row>
+                        </b-form>
+                        {% elif refinement_layout == "6" %}
+                        <script>
+                            var defaultRelevance = 0.5;
+                            var defaultDiversity = 0.5;
+                            var defaultNovelty = 0.5;
+                        </script>
+                        <b-form method="GET" action="{{ refine_results_url }}">
+                            <b-row>
+                                <label for="range-1">Relevance: [[ relevance.at(i - 1) ]]</label>
+                                <b-form-input id="range-1" type="range" :formatter="onRelevanceChange" v-model.number="relevance[i - 1]" step="0.01" min="0" max="1" :disabled="!refinementAlgorithms[i - 1]"></b-form-input>
+                                <!-- <div class="mt-2">Value: [[ relevance ]]</div> -->
+                            </b-row>
+                            <b-row class="mt-3">
+                                <label for="range-2">Diversity: [[ diversity.at(i - 1) ]]</label>
+                                <b-form-input id="range-2" type="range" v-model.number="diversity[i - 1]" :formatter="onDiversityChange" step="0.01" min="0" max="1" :disabled="!refinementAlgorithms[i - 1]"></b-form-input>
+                                <!-- <div class="mt-2">Value: [[ diversity ]]</div> -->
+                            </b-row>
+                            <b-row class="mt-3">
+                                <label for="range-3">Novelty: [[ novelty.at(i - 1) ]]</label>
+                                <b-form-input id="range-3" type="range" v-model.number="novelty[i - 1]" :formatter="onNoveltyChange" min="0" step="0.01" max="1" :disabled="!refinementAlgorithms[i - 1]"></b-form-input>
+                                <!-- <div class="mt-2">Value: [[ novelty ]]</div> -->
+                            </b-row>
+                        </b-form>
+                        {% elif refinement_layout == "7" %}
+                        <b-form method="GET" action="{{ refine_results_url }}">
+                            <b-row align-h="center" class="mb-5 mt-5 text-center">
+                                <strong>Remaining budget: [[budget.at(i - 1)]]</strong>
+                            </b-row>
+                            <b-row>
+                                <b-col class="text-left">
+                                    <b-button class="btnFit" @click="decrease(i - 1, 'relevance')" :disabled="!refinementAlgorithms[i - 1] || boughtRelevance[i - 1] <= 0">-</b-button>
+                                </b-col>
+                                <b-col class="text-center">
+                                    R=[[boughtRelevance.at(i - 1)]]
+                                </b-col>
+                                <b-col class="text-right">
+                                    <b-button class="btnFit" @click="increase(i - 1, 'relevance')" :disabled="!refinementAlgorithms[i - 1] || budget[i - 1] <= 0">+</b-button>
+                                </b-col>
+                            </b-row>
+                            <b-row class="mt-3">
+                                <b-col class="text-left">
+                                    <b-button class="btnFit" @click="decrease(i - 1, 'diversity')" :disabled="!refinementAlgorithms[i - 1] || boughtDiversity[i - 1] <= 0">-</b-button>
+                                </b-col>
+                                <b-col class="text-center">
+                                    D=[[boughtDiversity.at(i - 1)]]
+                                </b-col>
+                                <b-col class="text-right">
+                                    <b-button class="btnFit" @click="increase(i - 1, 'diversity')" :disabled="!refinementAlgorithms[i - 1] || budget[i - 1] <= 0">+</b-button>
+                                </b-col>
+                            </b-row>
+                            <b-row class="mt-3">
+                                <b-col class="text-left">
+                                    <b-button class="btnFit" @click="decrease(i - 1, 'novelty')" :disabled="!refinementAlgorithms[i - 1] || boughtNovelty[i - 1] <= 0">-</b-button>
+                                </b-col>
+                                <b-col class="text-center">
+                                    N=[[boughtNovelty.at(i - 1)]]
+                                </b-col>
+                                <b-col class="text-right">
+                                    <b-button class="btnFit" @click="increase(i - 1, 'novelty')" :disabled="!refinementAlgorithms[i - 1] || budget[i - 1] <= 0">+</b-button>
+                                </b-col>
+                            </b-row>
+                        </b-form>
+                        {% endif %}
+                    </b-col>
+                </b-row>
+                <!-- Refinement ends here -->
+            </b-card>
+        </b-collapse>
+
+        
 
         <b-row class="mt-4" v-if="showRefinement">
             <b-col center class="align-middle">
@@ -506,7 +543,7 @@
                     spinner-variant="primary"
                     block
                     >
-                        <b-button name="next_compare" type="submit" block variant="primary" center>{{next}}</b-button>
+                        <b-button name="next_compare" id="btn_next" type="submit" block variant="primary" center>{{next}}</b-button>
                     </b-overlay>
                 </b-form>
                 {% else %}
@@ -520,7 +557,7 @@
                     spinner-variant="primary"
                     class="d-inline-block"
                     >
-                        <b-btn name="finish_compare" block type="submit" variant="success" center>{{finish}}</b-btn>
+                        <b-btn name="finish_compare" id="btn_next" block type="submit" variant="success" center>{{finish}}</b-btn>
                     </b-overlay>
                 </b-form>
                 {% endif %}
