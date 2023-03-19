@@ -57,11 +57,12 @@ window.app = new Vue({
         boughtDiversity = [];
         boughtNovelty = [];
         budget = [];
-        for (let i in refinementAlgorithms) {
-            console.log("Calling");
-            relevance.push(defaultRelevance);
-            diversity.push(defaultDiversity);
-            novelty.push(defaultNovelty);
+        let algoNames = Object.keys(movies);
+        for (let i in algoNames) { // Iterate over refinement algorithms
+            const algoName = variantNames[i];
+            relevance.push(defaultRelevance[algoName]);
+            diversity.push(defaultDiversity[algoName]);
+            novelty.push(defaultNovelty[algoName]);
             relevanceValue.push(null);
             diversityValue.push(null);
             noveltyValue.push(null);
@@ -75,9 +76,9 @@ window.app = new Vue({
             middleRelevance.push(0.5);
             middleDiversity.push(0.5);
             middleNovelty.push(0.5);
-            boughtRelevance.push(Math.round(defaultRelevance * 10));
-            boughtDiversity.push(Math.round(defaultDiversity * 10));
-            boughtNovelty.push(Math.round(defaultNovelty * 10));
+            boughtRelevance.push(Math.round(defaultRelevance[algoName] * 10));
+            boughtDiversity.push(Math.round(defaultDiversity[algoName] * 10));
+            boughtNovelty.push(Math.round(defaultNovelty[algoName] * 10));
             budget.push(5);
         }
 
@@ -526,27 +527,28 @@ window.app = new Vue({
                 if (this.refinementAlgorithms[i] == 0) {
                     weights.push('');
                 } else {
-                    let relDelta = parseFloat(this.relevanceDelta[i]);
-                    let relOfMaxShare = 0.25 * relDelta; 
+                    // let relDelta = parseFloat(this.relevanceDelta[i]);
+                    // let relOfMaxShare = 0.25 * relDelta; 
 
-                    let divDelta = parseFloat(this.diversityDelta[i]);
-                    let divOfMaxShare = 0.25 * divDelta;
+                    // let divDelta = parseFloat(this.diversityDelta[i]);
+                    // let divOfMaxShare = 0.25 * divDelta;
 
-                    let novDelta = parseFloat(this.noveltyDelta[i]);
-                    let novOfMaxShare = 0.25 * novDelta;
+                    // let novDelta = parseFloat(this.noveltyDelta[i]);
+                    // let novOfMaxShare = 0.25 * novDelta;
 
-                    let baseRel = relDelta > 0 ? ((1.0 - defaultRelevance) * MAX_SHARE) : defaultRelevance * MAX_SHARE;
-                    let baseDiv = divDelta > 0 ? ((1.0 - defaultDiversity) * MAX_SHARE) : defaultDiversity * MAX_SHARE;
-                    let baseNov = novDelta > 0 ? ((1.0 - defaultNovelty) * MAX_SHARE) : defaultNovelty * MAX_SHARE;
+                    // let baseRel = relDelta > 0 ? ((1.0 - defaultRelevance) * MAX_SHARE) : defaultRelevance * MAX_SHARE;
+                    // let baseDiv = divDelta > 0 ? ((1.0 - defaultDiversity) * MAX_SHARE) : defaultDiversity * MAX_SHARE;
+                    // let baseNov = novDelta > 0 ? ((1.0 - defaultNovelty) * MAX_SHARE) : defaultNovelty * MAX_SHARE;
 
-                    this.newRelevance[i] = defaultRelevance + relOfMaxShare * baseRel;
-                    this.newDiversity[i] = defaultDiversity + divOfMaxShare * baseDiv;
-                    this.newNovelty[i] = defaultNovelty + novOfMaxShare * baseNov;
+                    // this.newRelevance[i] = defaultRelevance + relOfMaxShare * baseRel;
+                    // this.newDiversity[i] = defaultDiversity + divOfMaxShare * baseDiv;
+                    // this.newNovelty[i] = defaultNovelty + novOfMaxShare * baseNov;
 
-                    let sum = this.newRelevance[i] + this.newDiversity[i] + this.newNovelty[i];
+                    // let sum = this.newRelevance[i] + this.newDiversity[i] + this.newNovelty[i];
 
-                    this.newWeights[i] = `${this.newRelevance[i]/sum},${this.newDiversity[i]/sum},${this.newNovelty[i]/sum}`;
-                    console.log("New weights are: " + this.newWeights[i]);
+                    // this.newWeights[i] = `${this.newRelevance[i]/sum},${this.newDiversity[i]/sum},${this.newNovelty[i]/sum}`;
+                    // console.log("New weights are: " + this.newWeights[i]);
+                    this.newWeights[i] = `${this.relevance[i]},${this.diversity[i]},${this.novelty[i]}`;
                 }
             }
             this.newWeights = this.newWeights.join(";");
@@ -585,7 +587,7 @@ window.app = new Vue({
             this.$nextTick(() => {
                 window.setTimeout(function(){
                     window.scrollTo(0, document.body.scrollHeight);
-                }, 250);
+                }, 150);
             });
         }
     },

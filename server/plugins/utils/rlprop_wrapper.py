@@ -7,10 +7,10 @@ from support.rating_based_relevance_support import rating_based_relevance_suppor
 from support.intra_list_diversity_support import intra_list_diversity_support
 from support.popularity_complement_support import popularity_complement_support
 
-def get_supports(users_partial_lists, items, extended_rating_matrix, distance_matrix, users_viewed_item, k):
+def get_supports(users_partial_lists, items, extended_rating_matrix, distance_matrix, users_viewed_item, k, n_users):
     rel_supps = rating_based_relevance_support(extended_rating_matrix)
     div_supps = intra_list_diversity_support(users_partial_lists, items, distance_matrix, k)
-    nov_supps = popularity_complement_support(users_viewed_item, num_users=users_partial_lists.shape[0])
+    nov_supps = popularity_complement_support(users_viewed_item, num_users=n_users)[:users_partial_lists.shape[0]]
     return np.stack([rel_supps, div_supps, nov_supps])
 
 class RLPropWrapper:
@@ -86,15 +86,18 @@ class RLPropWrapper:
 
     def init(self):
         self.normalizations = self._prepare_normalization()
-    def __call__(self, k, shuffle=True):
+    def __call__(self, k, shuffle=False, return_support=False):
         # Assume recommending for a single user
         users_partial_lists = np.full((self.extended_rating_matrix.shape[0], k), -1, dtype=np.int32)
+
+        assert self.extended_rating_matrix.shape[0] == 1, "Single user is expected by this simplified implementation"
+        final_supports = np.zeros(shape=(3, 1, k), dtype=np.float32) # 3 objectives, 1 user, k items
 
         # Masking already recommended users and SEEN items
         mask = self.unseen_items_mask.copy()
         for i in range(k):
             # Calculate support values
-            supports = get_supports(users_partial_lists, self.items, self.extended_rating_matrix, self.distance_matrix, self.users_viewed_item, k=i+1)
+            supports = get_supports(users_partial_lists, self.items, self.extended_rating_matrix, self.distance_matrix, self.users_viewed_item, k=i+1, n_users=self.n_users)
             
             # Normalize the supports
             assert supports.shape[0] == 3, "expecting 3 objectives, if updated, update code below"
@@ -109,7 +112,17 @@ class RLPropWrapper:
             # Get the per-user top-k recommendations
             users_partial_lists[:, i] = self.mandate_allocation(mask, supports)
 
+            final_supports[:, :, i:i+1] = np.take_along_axis(supports, users_partial_lists[np.newaxis, :, i:i+1], axis=2)
+
         if shuffle:
             np.random.shuffle(users_partial_lists.T)
+
+        if return_support:
+            support = {
+                "relevance": final_supports[0].astype(float),
+                "diversity": final_supports[1].astype(float),
+                "novelty": final_supports[2].astype(float)
+            }
+            return users_partial_lists, support 
 
         return users_partial_lists
