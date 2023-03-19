@@ -135,17 +135,22 @@ def algorithm_feedback():
         if weights:
             transformed_weights.append([float(x) for x in weights.split(",")])
         else:
-            transformed_weights.append("")
+            transformed_weights.append([])
     #new_weights = [float(x) if x else '' for y in new_weights for x in y.split(",")]
     new_weights = transformed_weights
-    new_weights = [x for x in new_weights if x][0]
-    print(new_weights, type(new_weights), type(new_weights[0]))
-    session["weights"] = new_weights # Take first non-empty weights TODO fix and set weights to each algorithm separately
+    ordered_weights = {}
+    for algo_name, idx in order.items():
+        ordered_weights[algo_name] = new_weights[idx]
+    old_weights = session["weights"]
+    ordered_weights[displyed_name_mapping["relevance_based"]] = old_weights[displyed_name_mapping["relevance_based"]]
+    print(f"Ordered weights after fixup = {ordered_weights}")
+    session["weights"] = ordered_weights # Take first non-empty weights TODO fix and set weights to each algorithm separately
 
     # Increase iteration
     session["iteration"] += 1
     ### And generate new recommendations ###
     recommendations = session["movies"]
+    initial_weights_recommendation = session["initial_weights_recommendation"]
 
     lengths = []
     for x in displyed_name_mapping.values():
@@ -166,9 +171,10 @@ def algorithm_feedback():
     filter_out_movies = session["elicitation_selected_movies"] + sum(mov_indices[:HIDE_LAST_K], [])
     selected_movies = session["elicitation_selected_movies"] + sum(session["selected_movie_indices"], [])
 
-    prepare_recommendations(np.array(new_weights), recommendations, selected_movies, filter_out_movies, k=session["rec_k"])
+    prepare_recommendations(ordered_weights, recommendations, initial_weights_recommendation, selected_movies, filter_out_movies, k=session["rec_k"])
 
     session["movies"] = recommendations
+    session["initial_weights_recommendation"] = initial_weights_recommendation
     ### End generation ###
 
 
@@ -177,7 +183,11 @@ def algorithm_feedback():
     permutation = permutation[1:] + permutation[:1] # Move first item to the end
     session["permutation"] = permutation
 
-    iteration_ended(session["iteration"], session["selected_movie_indices"], session["selected_variants"], session["nothing"], session["cmp"], session["a_r"])
+    iteration_ended(
+        session["iteration"], session["selected_movie_indices"], session["selected_variants"],
+        session["nothing"], session["cmp"], session["a_r"],
+        old_weights = old_weights, new_weights = session["weights"]
+    )
     return redirect(url_for("multiobjective.compare_and_refine"))
 
 # @bp.route("/refinement-feedback")
@@ -192,20 +202,24 @@ def algorithm_feedback():
 #         refine_results_url=request.args.get("refine_results_url")
 #     )
 
-def prepare_recommendations(weights, recommendations, selected_movies, filter_out_movies, k):
+def prepare_recommendations(weights, recommendations, initial_weights_recommendation, selected_movies, filter_out_movies, k):
     # Order of insertion should be preserved
     print(f"Called Prepare recommendations")
     recommended_items, model = recommend_2_3(selected_movies, filter_out_movies, return_model=True, k=k)
+    initial_weights_recommended_items = recommended_items
     for algorithm, algorithm_displayed_name in displyed_name_mapping.items():
         if algorithm == "relevance_based":
             pass
         elif algorithm == "rlprop":
-            recommended_items = rlprop(selected_movies, model, weights, filter_out_movies, k=k)
+            recommended_items = rlprop(selected_movies, model, np.array(weights[algorithm_displayed_name]), filter_out_movies, k=k, include_support=True)
+            initial_weights_recommended_items = rlprop(selected_movies, model, np.array(weights[displyed_name_mapping["relevance_based"]]), filter_out_movies, k=k, include_support=True)
         elif algorithm == "weighted_average":
-            recommended_items = weighted_average(selected_movies, model, weights, filter_out_movies, k=k)
+            recommended_items = weighted_average(selected_movies, model, np.array(weights[algorithm_displayed_name]), filter_out_movies, k=k, include_support=True)
+            initial_weights_recommended_items = weighted_average(selected_movies, model, np.array(weights[displyed_name_mapping["relevance_based"]]), filter_out_movies, k=k, include_support=True)
         else:
             assert False
         recommendations[algorithm_displayed_name][-1] = recommended_items
+        initial_weights_recommendation[algorithm_displayed_name][-1] = initial_weights_recommended_items
 
 @bp.route("/final-questionare")
 @multi_lang
@@ -285,8 +299,8 @@ def finish_user_study():
 @bp.route("/compare-and-refine", methods=["GET"])
 def compare_and_refine():
     
-    if session["iteration"] == 1:
-        elicitation_ended(session["elicitation_movies"], session["elicitation_selected_movies"])    
+    # if session["iteration"] == 1:
+    #     elicitation_ended(session["elicitation_movies"], session["elicitation_selected_movies"])    
 
     conf = load_user_study_config(session["user_study_id"])
     algorithm_assignment = {}
@@ -316,9 +330,13 @@ def compare_and_refine():
     for algo_name, movie_lists in session["movies"].items():
         shown_movie_indices[algo_name] = [[int(x["movie_idx"]) for x in movie_list] for movie_list in movie_lists]
         
-    session["refinement_layout"] = request.args.get("version") or "3"
+    session["refinement_layout"] = request.args.get("version") or "0"
 
-    iteration_started(session["iteration"], movies, algorithm_assignment, result_layout, shown_movie_indices)
+    iteration_started(
+        session["iteration"], movies, algorithm_assignment,
+        result_layout, shown_movie_indices, weights = session["weights"],
+        initial_weights_recommendation=session["initial_weights_recommendation"]
+    )
 
     tr = get_tr(languages, get_lang())
     for d in movies.values():
@@ -335,9 +353,9 @@ def compare_and_refine():
         "consuming_plugin": __plugin_name__,
         "refinement_layout": session['refinement_layout'],
         "metrics" : {
-            "relevance": round(session["weights"][0], 2),
-            "diversity": round(session["weights"][1], 2),
-            "novelty": round(session["weights"][2], 2)
+            "relevance": {algo_name: round(weights[0], 2) for algo_name, weights in session["weights"].items()},
+            "diversity": {algo_name: round(weights[1], 2) for algo_name, weights in session["weights"].items()},
+            "novelty": {algo_name: round(weights[2], 2) for algo_name, weights in session["weights"].items()}
         },
         "refinement_algorithms": refinement_algorithms
     }
@@ -363,6 +381,9 @@ def compare_and_refine():
     params["next"] = tr("next")
     params["finish"] = tr("compare_finish")
     params["algorithm_how_compare"] = tr("compare_algorithm_how_compare")
+    params["relevance_explanation"] = tr("refine_relevance_explanation")
+    params["diversity_explanation"] = tr("refine_diversity_explanation")
+    params["novelty_explanation"] = tr("refine_novelty_explanation")
 
     return render_template("compare_and_refine.html", **params)
 
@@ -380,9 +401,14 @@ def send_feedback():
     selected_movies = [int(m) for m in selected_movies]
 
     # Calculate weights based on selection and shown movies during preference elicitation
-    weights = calculate_weight_estimate(selected_movies, session["elicitation_movies"])
+    weights, supports = calculate_weight_estimate(selected_movies, session["elicitation_movies"], return_supports=True)
     weights /= weights.sum()
-    session["weights"] = weights.tolist()
+    weights = weights.tolist()
+    weights = {
+        algo_displayed_name: weights for algo_displayed_name in displyed_name_mapping.values()
+    }
+    session["weights"] = weights
+    print(f"Weights initialized to {weights}")
 
     algorithms = list(displyed_name_mapping.values())
     # Add default entries so that even the non-chosen algorithm has an empty entry
@@ -390,15 +416,19 @@ def send_feedback():
     recommendations = {
         algo: [[]] for algo in algorithms
     }
+    initial_weights_recommendation = {
+        algo: [[]] for algo in algorithms
+    }
     
     # We filter out everything the user has selected during preference elicitation.
     # However, we allow future recommendation of SHOWN, NOT SELECTED (during elicitation, not comparison) altough these are quite rare
     filter_out_movies = selected_movies
 
-    prepare_recommendations(weights, recommendations, selected_movies, filter_out_movies, k)
+    prepare_recommendations(weights, recommendations, initial_weights_recommendation, selected_movies, filter_out_movies, k)
 
     
     session["movies"] = recommendations
+    session["initial_weights_recommendation"] = initial_weights_recommendation
     session["iteration"] = 1
     session["elicitation_selected_movies"] = selected_movies
     session["selected_movie_indices"] = [] #dict() # For each iteration, we can store selected movies
@@ -427,6 +457,9 @@ def send_feedback():
     session["orig_permutation"] = p
 
     print(f"Recommendations={recommendations}")
+    
+    elicitation_ended(session["elicitation_movies"], session["elicitation_selected_movies"], supports={key: np.round(value.astype(float), 4).tolist() for key, value in supports.items()})    
+
     return redirect(url_for("multiobjective.compare_and_refine"))
 
 

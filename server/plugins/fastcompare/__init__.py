@@ -324,14 +324,15 @@ def send_feedback():
     session["orig_permutation"] = p
     return redirect(url_for(f"{__plugin_name__}.compare_algorithms"))
 
-def elicitation_ended(elicitation_movies, elicitation_selected_movies):
+def elicitation_ended(elicitation_movies, elicitation_selected_movies, **kwargs):
     data = {
         "elicitation_movies": elicitation_movies,
         "elicitation_selected_movies": elicitation_selected_movies
     }
+    data.update(**kwargs)
     log_interaction(session["participation_id"], "elicitation-ended", **data)
 
-def iteration_started(iteration, movies, algorithm_assignment, result_layout, shown_movie_indices):
+def iteration_started(iteration, movies, algorithm_assignment, result_layout, shown_movie_indices, **kwargs):
     data = {
         "iteration": iteration,
         "movies": movies,
@@ -339,9 +340,10 @@ def iteration_started(iteration, movies, algorithm_assignment, result_layout, sh
         "result_layout": result_layout,
         "shown": shown_movie_indices
     }
+    data.update(**kwargs)
     log_interaction(session["participation_id"], "iteration-started", **data)
 
-def iteration_ended(iteration, selected, selected_variants, dont_like_anything, algorithm_comparison, ordered_ratings):
+def iteration_ended(iteration, selected, selected_variants, dont_like_anything, algorithm_comparison, ordered_ratings, **kwargs):
     data = {
         "iteration": iteration,
         "selected": selected,
@@ -350,6 +352,7 @@ def iteration_ended(iteration, selected, selected_variants, dont_like_anything, 
         "algorithm_comparison": algorithm_comparison,
         "ratings": ordered_ratings
     }
+    data.update(**kwargs)
     log_interaction(session["participation_id"], "iteration-ended", **data)
 
 @bp.route("/compare-algorithms", methods=["GET"])

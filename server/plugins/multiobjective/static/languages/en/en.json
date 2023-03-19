@@ -60,5 +60,8 @@
     "finish_to_nov": "to the novelty of recommendations",
     "finish_relevance_explanation": "Relevance describes how the recommendations correspond to your preferences that we estimated during first step of this user study. It does not consider other aspects of the recommendation, e.g. diversity. That means that recommendation only consider relevance of the movies may consists of popular, very similar movies, e.g. all Harry Potter movies.",
     "finish_diversity_explanation": "Diversity describes how diverse/different are the movies that you have selected.",
-    "finish_novelty_explanation": "Novelty describes how new or unusual (not many users watched them) are the movies you have selected."
+    "finish_novelty_explanation": "Novelty describes how new or unusual (not many users watched them) are the movies you have selected.",
+    "refine_relevance_explanation": "By increasing relevance, algorithms will pay more attention to the movies that you have selected during preference elicitation and past iterations.",
+    "refine_diversity_explanation": "By increasing diversity, algorithms will produce more diverse recommendations. This means there will be more variety in some aspect, e.g. different movie genres.",
+    "refine_novelty_explanation": "By increasing novelty, algorithms will pay more attention to movies that are novel, meaning they are less frequently watched by the users and are less well-known."
 }

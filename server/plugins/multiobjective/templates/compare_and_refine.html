@@ -184,17 +184,23 @@
                     <b-col class="ml-3 mr-3" v-for="i in refinementAlgorithms.length">
                         {% if refinement_layout == "0" %}
                         <b-form method="GET" action="{{ refine_results_url }}">
-                            <b-row>
+                            <b-row align-v="center">
+                                <b-icon class="mr-1 h3" :id="'relevance-help'+i" icon="question-circle-fill" variant="primary"></b-icon>
+                                <b-tooltip :target="'relevance-help'+i" triggers="hover">{{relevance_explanation}}</b-tooltip>
                                 <label for="range-1">Relevance: [[ relevance[i - 1].toFixed(1) ]]</label>
                                 <b-form-input :data-idx="i - 1" id="range-1" type="range" v-model.number="relevance[i - 1]" :formatter="onRelevanceChange2" step="0.01" min="0" max="1" :disabled="!refinementAlgorithms[i - 1]"></b-form-input>
                                 <!-- <div class="mt-2">Value: [[ relevance ]]</div> -->
                             </b-row>
-                            <b-row class="mt-3">
+                            <b-row align-v="center" class="mt-3">
+                                <b-icon class="mr-1 h3" :id="'diversity-help'+i" icon="question-circle-fill" variant="primary"></b-icon>
+                                <b-tooltip :target="'diversity-help'+i" triggers="hover">{{diversity_explanation}}</b-tooltip>
                                 <label for="range-2">Diversity: [[ diversity[i - 1].toFixed(1) ]]</label>
                                 <b-form-input :data-idx="i - 1" id="range-2" type="range" v-model.number="diversity[i - 1]" :formatter="onDiversityChange2" step="0.01" min="0" max="1" :disabled="!refinementAlgorithms[i - 1]"></b-form-input>
                                 <!-- <div class="mt-2">Value: [[ diversity ]]</div> -->
                             </b-row>
-                            <b-row class="mt-3">
+                            <b-row align-v="center" class="mt-3">
+                                <b-icon class="mr-1 h3" :id="'novelty-help'+i" icon="question-circle-fill" variant="primary"></b-icon>
+                                <b-tooltip :target="'novelty-help'+i" triggers="hover">{{novelty_explanation}}</b-tooltip>
                                 <label for="range-3">Novelty: [[ novelty[i - 1].toFixed(1) ]]</label>
                                 <b-form-input :data-idx="i - 1" id="range-3" type="range" v-model.number="novelty[i - 1]" :formatter="onNoveltyChange2" min="0" step="0.01" max="1" :disabled="!refinementAlgorithms[i - 1]"></b-form-input>
                                 <!-- <div class="mt-2">Value: [[ novelty ]]</div> -->
@@ -202,17 +208,23 @@
                         </b-form>
                         {% elif refinement_layout == "1" %}
                         <b-form method="GET" action="{{ refine_results_url }}">
-                            <b-row>
+                            <b-row align-v="center">
+                                <b-icon class="mr-1 h3" :id="'relevance-help'+i" icon="question-circle-fill" variant="primary"></b-icon>
+                                <b-tooltip :target="'relevance-help'+i" triggers="hover">{{relevance_explanation}}</b-tooltip>
                                 <label for="range-1">Relevance: [[ relevance[i - 1] ]]</label>
                                 <b-form-input :data-idx="i - 1" id="range-1" type="range" :formatter="onRelevanceChange" v-model.number="relevance[i - 1]" step="0.01" min="0" max="1" :disabled="!refinementAlgorithms[i - 1]"></b-form-input>
                                 <!-- <div class="mt-2">Value: [[ relevance ]]</div> -->
                             </b-row>
-                            <b-row class="mt-3">
+                            <b-row align-v="center" class="mt-3">
+                                <b-icon class="mr-1 h3" :id="'diversity-help'+i" icon="question-circle-fill" variant="primary"></b-icon>
+                                <b-tooltip :target="'diversity-help'+i" triggers="hover">{{diversity_explanation}}</b-tooltip>
                                 <label for="range-2">Diversity: [[ diversity[i - 1] ]]</label>
                                 <b-form-input :data-idx="i - 1" id="range-2" type="range" v-model.number="diversity[i - 1]" :formatter="onDiversityChange" step="0.01" min="0" max="1" :disabled="!refinementAlgorithms[i - 1]"></b-form-input>
                                 <!-- <div class="mt-2">Value: [[ diversity ]]</div> -->
                             </b-row>
-                            <b-row class="mt-3">
+                            <b-row align-v="center" class="mt-3">
+                                <b-icon class="mr-1 h3" :id="'novelty-help'+i" icon="question-circle-fill" variant="primary"></b-icon>
+                                <b-tooltip :target="'novelty-help'+i" triggers="hover">{{novelty_explanation}}</b-tooltip>
                                 <label for="range-3">Novelty: [[ novelty[i - 1] ]]</label>
                                 <b-form-input :data-idx="i - 1" id="range-3" type="range" v-model.number="novelty[i - 1]" :formatter="onNoveltyChange" min="0" step="0.01" max="1" :disabled="!refinementAlgorithms[i - 1]"></b-form-input>
                                 <!-- <div class="mt-2">Value: [[ novelty ]]</div> -->
@@ -607,11 +619,11 @@
     }
 
     if (defaultRelevance == undefined) {
-        var defaultRelevance = parseFloat({{ metrics['relevance'] }});
-        var defaultDiversity = parseFloat({{ metrics['diversity'] }});
-        var defaultNovelty = parseFloat({{ metrics['novelty'] }});
+        var defaultRelevance = JSON.parse('{{ metrics["relevance"] | tojson | safe }}');;
+        var defaultDiversity = JSON.parse('{{ metrics["diversity"] | tojson | safe }}');
+        var defaultNovelty = JSON.parse('{{ metrics["novelty"] | tojson | safe }}');
     }
-    
+
     var refinementLayout = "{{version}}";
 
     var refinementAlgorithms = JSON.parse("{{refinement_algorithms | tojson | safe}}");
