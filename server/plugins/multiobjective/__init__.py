@@ -21,7 +21,7 @@ from plugins.fastcompare import elicitation_ended, iteration_started, iteration_
 
 languages = load_languages(os.path.dirname(__file__))
 
-N_ITERATIONS = 10
+N_ITERATIONS = 8 # 8 iterations
 HIDE_LAST_K = 100000
 
 # Implementation of this function can differ among plugins
@@ -85,9 +85,16 @@ def algorithm_feedback():
     selected_variants = selected_variants.split(",") if selected_variants else []
     selected_variants = [int(x) for x in selected_variants]
 
+    order = session["permutation"][0]
+
     algorithm_ratings = []
-    for i in range(len(displyed_name_mapping)):
+    for i in range(len(order)): # Skip algorithms with order being < 0
         algorithm_ratings.append(int(request.args.get(f"ar_{i + 1}")))
+
+    not_shown_algorithm = [x for x in displyed_name_mapping.values() if x not in order]
+    assert len(not_shown_algorithm) == 1, f"{not_shown_algorithm}"
+    not_shown_algorithm = not_shown_algorithm[0]
+    print(f"Hidden algorithm is: {not_shown_algorithm}")
 
     dont_like_anything = request.args.get("nothing")
     if dont_like_anything == "true":
@@ -95,7 +102,7 @@ def algorithm_feedback():
     else:
         dont_like_anything = False
     algorithm_comparison = request.args.get("cmp")
-    order = session["permutation"][0]
+    
     ordered_ratings = {}
     for algo_name, idx in order.items():
         ordered_ratings[algo_name] = algorithm_ratings[idx]
@@ -143,6 +150,8 @@ def algorithm_feedback():
         ordered_weights[algo_name] = new_weights[idx]
     old_weights = session["weights"]
     ordered_weights[displyed_name_mapping["relevance_based"]] = old_weights[displyed_name_mapping["relevance_based"]]
+    ordered_weights[not_shown_algorithm] = old_weights[not_shown_algorithm]
+    print(f"Old weights = {old_weights}, new weights = {new_weights}")
     print(f"Ordered weights after fixup = {ordered_weights}")
     session["weights"] = ordered_weights # Take first non-empty weights TODO fix and set weights to each algorithm separately
 
@@ -164,6 +173,9 @@ def algorithm_feedback():
     for i in range(n_iterations):
         indices = set()
         for algo_displayed_name in displyed_name_mapping.values():
+            if algo_displayed_name not in session["orig_permutation"][i]:
+                print(f"@@ Ignoring {algo_displayed_name} for iteration={i}, orders = {session['orig_permutation']}")
+                continue
             indices.update([int(y["movie_idx"]) for y in recommendations[algo_displayed_name][i]])
         mov_indices.append(list(indices))
 
@@ -307,20 +319,23 @@ def compare_and_refine():
     movies = {}
 
     p = session["permutation"][0]
-    refinement_algorithms = [-1 for _ in displyed_name_mapping]
+    refinement_algorithms = [-1 for _ in range(len(p))] #[-1 for _ in displyed_name_mapping]
     for i, (algorithm, algorithm_displayed_name) in enumerate(displyed_name_mapping.items()):
         if session["movies"][algorithm_displayed_name][-1]:
+            order_idx = p[algorithm_displayed_name] if algorithm_displayed_name in p else -1
             # Only non-empty makes it to the results
             movies[algorithm_displayed_name] = {
                 "movies": session["movies"][algorithm_displayed_name][-1],
-                "order": p[algorithm_displayed_name]
+                "order": order_idx
             }
             algorithm_assignment[str(i)] = {
                 "algorithm": algorithm,
                 "name": algorithm_displayed_name,
-                "order": p[algorithm_displayed_name]
+                "order": order_idx
             }
-            refinement_algorithms[p[algorithm_displayed_name]] = int(algorithm != "relevance_based")
+            if order_idx != -1: # Those with negative indices are skipped
+                refinement_algorithms[order_idx] = int(algorithm != "relevance_based")
+            
 
     result_layout = "column-single"
 
@@ -346,7 +361,7 @@ def compare_and_refine():
             x[i]["movie"] = tr(input_name, x[i]['movie']) + " " + "|".join([tr(f"genre_{y.lower()}") for y in x[i]["genres"]])
 
     params = {
-        "movies": movies,
+        "movies": { algo: rec for algo, rec in movies.items() if algo in p}, # Only show a subset of algorithms
         "iteration": session["iteration"],
         "result_layout": result_layout,
         "MIN_ITERATION_TO_CANCEL": len(session["permutation"]),
@@ -411,6 +426,13 @@ def send_feedback():
     print(f"Weights initialized to {weights}")
 
     algorithms = list(displyed_name_mapping.values())
+    moo_algorithms = [displayed_name for name, displayed_name in displyed_name_mapping.items() if name != "relevance_based"]
+    starting_algorithm_index = np.random.randint(0, len(moo_algorithms))
+    assert len(moo_algorithms) == 2, "Current implementation below assumes 2 moo algorithms to choose from"
+    algorithms_to_show = [moo_algorithms[starting_algorithm_index]] * (N_ITERATIONS // 2) + [moo_algorithms[1 - starting_algorithm_index]] * (N_ITERATIONS // 2)
+    
+    
+
     # Add default entries so that even the non-chosen algorithm has an empty entry
     # to unify later access
     recommendations = {
@@ -425,7 +447,7 @@ def send_feedback():
     filter_out_movies = selected_movies
 
     prepare_recommendations(weights, recommendations, initial_weights_recommendation, selected_movies, filter_out_movies, k)
-
+    print(f"Recommendations={recommendations}")
     
     session["movies"] = recommendations
     session["initial_weights_recommendation"] = initial_weights_recommendation
@@ -438,27 +460,39 @@ def send_feedback():
     session["a_r"] = []
 
     # Build permutation
-    p = []
-    for i in range(N_ITERATIONS):
-        orders = dict()
-        available_orders = list(range(len(algorithms)))
-        for algorithm_displayed_name in algorithms:
-            
-            #if conf["shuffle_algorithms"]:
-            order_idx = np.random.randint(len(available_orders))
-            #else:
-            #    order_idx = 0
+    assert N_ITERATIONS % 4 == 0 # Since we have 3 algorithms and we show A1, AX then A
 
-            orders[algorithm_displayed_name] = available_orders[order_idx]
+    p = []
+    for not_shown_algorithm in [algorithms_to_show[-1], algorithms_to_show[0]]:
+        # Generate first part for the First MOO to be shown (second part is reciprocal order)
+        # Also generate first part for Second MOO to be shown (second part is again reciprocal order)
+        p1_orders = dict()
+        p2_orders = dict()
+        first_part_algorithms = set(algorithms) - {not_shown_algorithm} # Remove the algorithm that is going to be shown as second
+        available_orders = list(range(len(first_part_algorithms)))
+        assert len(available_orders) == 2, "We assume 2 algorithms are being compared in current implementation"
+
+        for algorithm_displayed_name in first_part_algorithms:
+            order_idx = np.random.randint(len(available_orders))
+            p1_orders[algorithm_displayed_name] = available_orders[order_idx]
+            p2_orders[algorithm_displayed_name] = 1 - available_orders[order_idx] # Assumes 2 algorithms
             del available_orders[order_idx]
 
-        p.append(orders)
+
+        p.append(p1_orders)
+        p.append(p1_orders)
+        p.append(p2_orders)
+        p.append(p2_orders)
+
     session["permutation"] = p
     session["orig_permutation"] = p
-
-    print(f"Recommendations={recommendations}")
+    session["algorithms_to_show"] = algorithms_to_show
     
-    elicitation_ended(session["elicitation_movies"], session["elicitation_selected_movies"], supports={key: np.round(value.astype(float), 4).tolist() for key, value in supports.items()})    
+    elicitation_ended(
+        session["elicitation_movies"], session["elicitation_selected_movies"],
+        orig_permutation=p, algorithms_to_show=algorithms_to_show, displyed_name_mapping=displyed_name_mapping,
+        supports={key: np.round(value.astype(float), 4).tolist() for key, value in supports.items()}
+    )    
 
     return redirect(url_for("multiobjective.compare_and_refine"))
 
