@@ -183,29 +183,48 @@
                 <b-row align-h="center">
                     <b-col class="ml-3 mr-3" v-for="i in refinementAlgorithms.length">
                         {% if refinement_layout == "0" %}
-                        <b-form method="GET" action="{{ refine_results_url }}">
+                        <div v-if="refinementAlgorithms[i - 1]">
+                            <b-row class="mb-3">
+                                <b-col class="text-center">You can tweak the recommendation algorithm by fine-tuning the amount of attention it pays to different objectives. This will affect recommendations in the next step. Description of individual objectives is hidden under the questionmark icon.</b-col>
+                            </b-row>
+                            <b-row>
+                                <b-col>
+                                    <b-form method="GET" action="{{ refine_results_url }}">
+                                        <b-row align-v="center">
+                                            <b-icon class="mr-1 h3" :id="'relevance-help'+i" icon="question-circle-fill" variant="primary"></b-icon>
+                                            <b-tooltip :target="'relevance-help'+i" triggers="hover">{{relevance_explanation}}</b-tooltip>
+                                            <label for="range-1">Relevance: [[ relevance[i - 1].toFixed(1) ]]</label>
+                                            <b-form-input :data-idx="i - 1" id="range-1" type="range" v-model.number="relevance[i - 1]" :formatter="onRelevanceChange2" step="0.01" min="0" max="1"></b-form-input>
+                                            <!-- <div class="mt-2">Value: [[ relevance ]]</div> -->
+                                        </b-row>
+                                        <b-row align-v="center" class="mt-3">
+                                            <b-icon class="mr-1 h3" :id="'diversity-help'+i" icon="question-circle-fill" variant="primary"></b-icon>
+                                            <b-tooltip :target="'diversity-help'+i" triggers="hover">{{diversity_explanation}}</b-tooltip>
+                                            <label for="range-2">Diversity: [[ diversity[i - 1].toFixed(1) ]]</label>
+                                            <b-form-input :data-idx="i - 1" id="range-2" type="range" v-model.number="diversity[i - 1]" :formatter="onDiversityChange2" step="0.01" min="0" max="1"></b-form-input>
+                                            <!-- <div class="mt-2">Value: [[ diversity ]]</div> -->
+                                        </b-row>
+                                        <b-row align-v="center" class="mt-3">
+                                            <b-icon class="mr-1 h3" :id="'novelty-help'+i" icon="question-circle-fill" variant="primary"></b-icon>
+                                            <b-tooltip :target="'novelty-help'+i" triggers="hover">{{novelty_explanation}}</b-tooltip>
+                                            <label for="range-3">Novelty: [[ novelty[i - 1].toFixed(1) ]]</label>
+                                            <b-form-input :data-idx="i - 1" id="range-3" type="range" v-model.number="novelty[i - 1]" :formatter="onNoveltyChange2" min="0" step="0.01" max="1"></b-form-input>
+                                            <!-- <div class="mt-2">Value: [[ novelty ]]</div> -->
+                                        </b-row>
+                                    </b-form>
+                                </b-col>
+                            </b-row>
+                        </div>
+                        <div v-else>
+                            <b-row align-v="center" class="mb-3">
+                                <b-col class="text-center">This algorithm does not allow to refine weights. It only considers relevance by showing items based on your past selections.</b-col>
+                            </b-row>
                             <b-row align-v="center">
-                                <b-icon class="mr-1 h3" :id="'relevance-help'+i" icon="question-circle-fill" variant="primary"></b-icon>
-                                <b-tooltip :target="'relevance-help'+i" triggers="hover">{{relevance_explanation}}</b-tooltip>
-                                <label for="range-1">Relevance: [[ relevance[i - 1].toFixed(1) ]]</label>
-                                <b-form-input :data-idx="i - 1" id="range-1" type="range" v-model.number="relevance[i - 1]" :formatter="onRelevanceChange2" step="0.01" min="0" max="1" :disabled="!refinementAlgorithms[i - 1]"></b-form-input>
-                                <!-- <div class="mt-2">Value: [[ relevance ]]</div> -->
+                                <b-col class="text-center">
+                                    The results correspond to setting with relevance 1.0 and diversity with novelty both being 0.0
+                                </b-col>
                             </b-row>
-                            <b-row align-v="center" class="mt-3">
-                                <b-icon class="mr-1 h3" :id="'diversity-help'+i" icon="question-circle-fill" variant="primary"></b-icon>
-                                <b-tooltip :target="'diversity-help'+i" triggers="hover">{{diversity_explanation}}</b-tooltip>
-                                <label for="range-2">Diversity: [[ diversity[i - 1].toFixed(1) ]]</label>
-                                <b-form-input :data-idx="i - 1" id="range-2" type="range" v-model.number="diversity[i - 1]" :formatter="onDiversityChange2" step="0.01" min="0" max="1" :disabled="!refinementAlgorithms[i - 1]"></b-form-input>
-                                <!-- <div class="mt-2">Value: [[ diversity ]]</div> -->
-                            </b-row>
-                            <b-row align-v="center" class="mt-3">
-                                <b-icon class="mr-1 h3" :id="'novelty-help'+i" icon="question-circle-fill" variant="primary"></b-icon>
-                                <b-tooltip :target="'novelty-help'+i" triggers="hover">{{novelty_explanation}}</b-tooltip>
-                                <label for="range-3">Novelty: [[ novelty[i - 1].toFixed(1) ]]</label>
-                                <b-form-input :data-idx="i - 1" id="range-3" type="range" v-model.number="novelty[i - 1]" :formatter="onNoveltyChange2" min="0" step="0.01" max="1" :disabled="!refinementAlgorithms[i - 1]"></b-form-input>
-                                <!-- <div class="mt-2">Value: [[ novelty ]]</div> -->
-                            </b-row>
-                        </b-form>
+                        </div>
                         {% elif refinement_layout == "1" %}
                         <b-form method="GET" action="{{ refine_results_url }}">
                             <b-row align-v="center">
@@ -559,7 +578,7 @@
                     </b-overlay>
                 </b-form>
                 {% else %}
-                <b-form @submit="onSubmit" method="GET" action="{{ url_for(consuming_plugin + '.finish_user_study') }}">
+                <b-form @submit="onSubmit" method="GET" action="{{ url_for(consuming_plugin + '.final_questionare') }}">
                     <input type="hidden" hidden="true" v-model="newWeights" name="new_weights"/>
                     <b-overlay
                     :show="busy"
@@ -567,7 +586,7 @@
                     opacity="0.6"
                     spinner-small
                     spinner-variant="primary"
-                    class="d-inline-block"
+                    block
                     >
                         <b-btn name="finish_compare" id="btn_next" block type="submit" variant="success" center>{{finish}}</b-btn>
                     </b-overlay>
