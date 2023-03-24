@@ -149,16 +149,10 @@ def load_data_1(elicitation_movies):
     ).get_initial_data([int(x["movie_idx"]) for x in elicitation_movies])
 
     # TODO user enrich_results instead
-    movie_ids = [loader.movie_index_to_id[movie_idx] for movie_idx in data]
-    res = [loader.movies_df_indexed.loc[movie_id].title for movie_id in movie_ids]
-    res_genres = [loader.movies_df_indexed.loc[movie_id].genres.split("|") for movie_id in movie_ids]
-    res_genres = [x if x != ["(no genres listed)"] else [] for x in res_genres]
     
-    res_url = [loader.get_image(movie_idx) for movie_idx in data]
-    result = [{"movie": movie, "url": url, "movie_idx": str(movie_idx), "genres": genres, "movie_id": movie_id} for movie, url, movie_idx, genres, movie_id in zip(res, res_url, data, res_genres, movie_ids)]
 
     # Result is a list of movies, each movie being a dict (JSON object)
-    return result
+    return enrich_results(data, loader)
 
 def load_data_2(elicitation_movies):
     
@@ -293,6 +287,7 @@ def prepare_wrapper_once():
     return loader, items, distance_matrix, users_viewed_item, movie_title_to_idx#, algo, ratings_df
 
 # Define enrich_results on each loader?
+# TODO make this to be custom implementation in multiobjective plugin
 def enrich_results(top_k, loader, support=None):
     print(loader)
     if type(loader) is MLDataLoader:
@@ -301,6 +296,8 @@ def enrich_results(top_k, loader, support=None):
         top_k_genres = [loader.movies_df_indexed.loc[movie_id].genres.split("|") for movie_id in top_k_ids]
         top_k_genres = [x if x != ["(no genres listed)"] else [] for x in top_k_genres]
         top_k_url = [loader.get_image(movie_idx) for movie_idx in top_k]
+        top_k_trailers = [loader.get_trailer_url(movie_idx) for movie_idx in top_k]
+        top_k_plots = [loader.get_plot(movie_idx) for movie_idx in top_k]
     else:
         top_k_ids = [loader.get_item_id(movie_idx) for movie_idx in top_k]
         top_k_description = [loader.items_df_indexed.loc[movie_id].title for movie_id in top_k_ids]
@@ -310,7 +307,8 @@ def enrich_results(top_k, loader, support=None):
             top_k_genres = ['' for movie_id in top_k_ids]
         top_k_genres = [x if x != ["(no genres listed)"] else [] for x in top_k_genres]
         top_k_url = [loader.get_item_index_image_url(movie_idx) for movie_idx in top_k]
-        
+        top_k_trailers = [""] * len(top_k)
+        top_k_plots = [""] * len(top_k)
         
     if support:
         top_k_supports = [
@@ -321,11 +319,33 @@ def enrich_results(top_k, loader, support=None):
             }
             for i in range(len(top_k))
         ]
-        return [{"movie": movie, "url": url, "movie_idx": str(movie_idx), "movie_id": movie_id, "genres": genres, "support": support} for movie, url, movie_idx, movie_id, genres, support in zip(top_k_description, top_k_url, top_k, top_k_ids, top_k_genres, top_k_supports)]
+        return [
+            {
+            "movie": movie,
+            "url": url,
+            "movie_idx": str(movie_idx),
+            "movie_id": movie_id,
+            "genres": genres,
+            "support": support,
+            "trailer_url": trailer_url,
+            "plot": plot
+            }
+            for movie, url, movie_idx, movie_id, genres, support, trailer_url, plot in zip(top_k_description, top_k_url, top_k, top_k_ids, top_k_genres, top_k_supports, top_k_trailers, top_k_plots)
+        ]
+    return [
+        {
+            "movie": movie,
+            "url": url,
+            "movie_idx": str(movie_idx),
+            "movie_id": movie_id,
+            "genres": genres,
+            "trailer_url": trailer_url,
+            "plot": plot
+        }
+        for movie, url, movie_idx, movie_id, genres, trailer_url, plot in zip(top_k_description, top_k_url, top_k, top_k_ids, top_k_genres, top_k_trailers, top_k_plots)
+    ]
 
-    return [{"movie": movie, "url": url, "movie_idx": str(movie_idx), "movie_id": movie_id, "genres": genres} for movie, url, movie_idx, movie_id, genres in zip(top_k_description, top_k_url, top_k, top_k_ids, top_k_genres)]
-
-def prepare_wrapper(selected_movies, model, mandate_allocation_factory, obj_weights, filter_out_movies = [], k=10, norm_f=standardization):
+def prepare_wrapper(selected_movies, model, mandate_allocation_factory, obj_weights, filter_out_movies = [], k=10, norm_f=cdf):
     loader, items, distance_matrix, users_viewed_item, movie_title_to_idx = prepare_wrapper_once()
 
     max_user = loader.ratings_df.userId.max()
@@ -389,7 +409,7 @@ def get_objective_importance(selected_movie_indices, shown_movies):
         "novelty": importances[2]
     }
 
-def weighted_average(selected_movies, model, weights, filter_out_movies = [], k=10, norm_f=identity, include_support=False):
+def weighted_average(selected_movies, model, weights, filter_out_movies = [], k=10, norm_f=cdf, include_support=False):
     obj_weights = weights
     obj_weights /= obj_weights.sum()
 

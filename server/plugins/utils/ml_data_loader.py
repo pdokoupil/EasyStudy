@@ -7,6 +7,7 @@ import numpy as np
 from collections import defaultdict
 import os
 
+import json
 
 from scipy.spatial.distance import squareform, pdist
 
@@ -140,7 +141,7 @@ class LinkFilter:
 
 class MLDataLoader:
     def __init__(self, ratings_path, movies_path, tags_path, links_path,
-        filters = None, rating_matrix_path = None, img_dir_path = None):
+        filters = None, rating_matrix_path = None, img_dir_path = None, descriptions_path = None):
 
         self.ratings_path = ratings_path
         self.movies_path = movies_path
@@ -167,7 +168,11 @@ class MLDataLoader:
         self.movie_index_to_url = dict()
         self.similarity_matrix = None
 
-        self.img_dir_path = img_dir_path        
+        self.img_dir_path = img_dir_path
+        self.descriptions_path = descriptions_path
+
+        self.trailer_urls = None
+        self.plots = None
 
     def _get_image(self, imdbId):
         try:
@@ -185,6 +190,18 @@ class MLDataLoader:
     def __setstate__(self, state):
         self.__dict__.update(state)
         self.access = Cinemagoer()
+
+    def get_trailer_url(self, movie_idx):
+        movie_id = str(self.movie_index_to_id[movie_idx])
+        if self.trailer_urls is None or movie_id not in self.trailer_urls:
+            return ""
+        return self.trailer_urls[movie_id]
+    
+    def get_plot(self, movie_idx):
+        movie_id = str(self.movie_index_to_id[movie_idx])
+        if self.plots is None or movie_id not in self.plots:
+            return ""
+        return self.plots[str(movie_id)]
 
     # Download all the images
     def download_images(self):
@@ -335,6 +352,12 @@ class MLDataLoader:
 
         self.movies_df_indexed = self.movies_df.set_index("movieId")
 
+
+        if self.descriptions_path:
+            with open(self.descriptions_path, "r", encoding="UTF-8") as f:
+                data = json.load(f)
+                self.trailer_urls = {movie_id: records["videos"][0] if len(records["videos"]) > 0 else "" for movie_id, records in data.items()}
+                self.plots = {movie_id: records["plot"] for movie_id, records in data.items()}
 
         # First check which images are downloaded so far
         already_downloaded = [] if not os.path.exists(self.img_dir_path) else os.listdir(self.img_dir_path)

@@ -27,7 +27,22 @@
                 </b-row>
                 <b-row align-h="center" class="mb-1 mt-1" v-for="row in variantResults">
                     <b-col sm="auto" class="align-middle" v-for="col in row">
-                        <b-img :id="variantNames[algoIdx] + '_' + col.movie_idx" style="width: 175px; height: auto;" center :src="col.url" v-on:click="onSelectMovie($event, col, variantsResults.indexOf(variantResults))" :name="col.movie_idx" :alt="col.movie" v-b-tooltip.hover :title="col.movie" />
+                        <div>
+                            <b-popover :target="variantNames[algoIdx] + '_' + col.movie_idx" triggers="hover" placement="right">
+                                <template #title>[[col.movie]]</template>
+                                 <div>
+                                    <strong>Plot: </strong>
+                                    [[col.plot]]
+                                 </div>
+                                 <div v-if="col.trailer_url" class="mt-1 text-center">
+                                    <b-button target="_blank" :href="col.trailer_url" size="sm" variant="primary">IMDb trailer</b-button>
+                                 </div>
+                                 
+                              </b-popover>
+                            <b-img :id="variantNames[algoIdx] + '_' + col.movie_idx" style="width: 175px; height: 260px;" block center :src="col.url" v-on:click="onSelectMovie($event, col, variantsResults.indexOf(variantResults))" :name="col.movie_idx" :alt="col.movie" />
+                            
+                            
+                        </div>
                     </b-col>
                 </b-row>
                 <b-row align-h="center">
@@ -602,7 +617,7 @@
 
 <script type='text/javascript'>
     // Capture JINJA stuff here
-    var movies = JSON.parse('{{ movies | tojson | safe}}');
+    var movies = {{movies | tojson | safe}}; //JSON.parse({{movies | tojson | safe}});
     var resultLayout = "{{result_layout}}";
     var iteration = "{{iteration}}";
     var minIterationToCancel = "{{MIN_ITERATION_TO_CANCEL}}";
