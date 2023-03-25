@@ -593,7 +593,7 @@
                     </b-overlay>
                 </b-form>
                 {% else %}
-                <b-form @submit="onSubmit" method="GET" action="{{ url_for(consuming_plugin + '.final_questionare') }}">
+                <b-form @submit="onSubmit" method="GET" action="{{ url_for(consuming_plugin + '.final_questionnaire') }}">
                     <input type="hidden" hidden="true" v-model="newWeights" name="new_weights"/>
                     <b-overlay
                     :show="busy"
