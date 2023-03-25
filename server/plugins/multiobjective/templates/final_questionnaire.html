@@ -1,0 +1,240 @@
+{% include 'header.html' %}
+
+<div id="app">
+    <b-container fluid>
+        <b-jumbotron header="{{header}}" lead="">
+            {{hint}}
+        </b-jumbotron>
+        <!-- <b-row align-h="center">
+            <h3>TODO add additional questions (case when the user finished after {{ iteration }}) iterations</h3>
+        </b-row> -->
+        <b-form method="GET" action="{{ continuation_url }}">
+            <b-row class="mb-3" align-h="center">
+                <b-col class="text-center">
+                    <b-form-group class="mb-5" name="q1" id="q1" v-slot="{ ariaDescribedby }">
+                        <b-label for="q1">
+                            <strong>1. The movies recommended to me matched my interest</strong>
+                        </b-label>
+                        <b-form-radio-group name="q1">
+                            <b-form-radio value="-2">Strongly Disagree</b-form-radio>
+                            <b-form-radio value="-1">Disagree</b-form-radio>
+                            <b-form-radio value="0">Neutral</b-form-radio>
+                            <b-form-radio value="1">Agree</b-form-radio>
+                            <b-form-radio value="2">Strongly Agree</b-form-radio>
+                        </b-form-radio-group>
+                    </b-form-group>
+
+                    <b-form-group name="q2" id="q2" class="mb-5" v-slot="{ ariaDescribedby }">
+                        <b-label for="q2">
+                            <strong>2. The movies recommended to me were novel</strong>
+                        </b-label>
+                        <b-form-radio-group>
+                            <b-form-radio value="-2">Strongly Disagree</b-form-radio>
+                            <b-form-radio value="-1">Disagree</b-form-radio>
+                            <b-form-radio value="0">Neutral</b-form-radio>
+                            <b-form-radio value="1">Agree</b-form-radio>
+                            <b-form-radio value="2">Strongly Agree</b-form-radio>
+                        </b-form-radio-group>
+                    </b-form-group>
+
+                    <b-form-group name="q3" id="q3" class="mb-5" v-slot="{ ariaDescribedby }">
+                        <b-label for="q3">
+                            <strong>3. The recommender system helped me to discover new, possibly interesting movies.</strong>
+                        </b-label>
+                        <b-form-radio-group>
+                            <b-form-radio value="-2">Strongly Disagree</b-form-radio>
+                            <b-form-radio value="-1">Disagree</b-form-radio>
+                            <b-form-radio value="0">Neutral</b-form-radio>
+                            <b-form-radio value="1">Agree</b-form-radio>
+                            <b-form-radio value="2">Strongly Agree</b-form-radio>
+                        </b-form-radio-group>
+                    </b-form-group>
+
+                    <b-form-group name="q4" id="q4" class="mb-5" v-slot="{ ariaDescribedby }">
+                        <b-label for="q4">
+                            <strong>4. The recommended items were diverse</strong>
+                        </b-label>
+                        <b-form-radio-group>
+                            <b-form-radio value="-2">Strongly Disagree</b-form-radio>
+                            <b-form-radio value="-1">Disagree</b-form-radio>
+                            <b-form-radio value="0">Neutral</b-form-radio>
+                            <b-form-radio value="1">Agree</b-form-radio>
+                            <b-form-radio value="2">Strongly Agree</b-form-radio>
+                        </b-form-radio-group>
+                    </b-form-group>
+
+                    <b-form-group name="q5" id="q5" class="mb-5" v-slot="{ ariaDescribedby }">
+                        <b-label for="q5">
+                            <strong>5. I found it easy to tell the system what are my preferences</strong>
+                        </b-label>
+                        <b-form-radio-group>
+                            <b-form-radio value="-2">Strongly Disagree</b-form-radio>
+                            <b-form-radio value="-1">Disagree</b-form-radio>
+                            <b-form-radio value="0">Neutral</b-form-radio>
+                            <b-form-radio value="1">Agree</b-form-radio>
+                            <b-form-radio value="2">Strongly Agree</b-form-radio>
+                        </b-form-radio-group>
+                    </b-form-group>
+
+                    <b-form-group name="q6" id="q6" class="mb-5" v-slot="{ ariaDescribedby }">
+                        <b-label for="q6">
+                            <strong>
+                                6. I found it easy to inform the system if I like or dislike the recommended movie
+                            </strong>
+                        </b-label>
+                        <b-form-radio-group>
+                            <b-form-radio value="-2">Strongly Disagree</b-form-radio>
+                            <b-form-radio value="-1">Disagree</b-form-radio>
+                            <b-form-radio value="0">Neutral</b-form-radio>
+                            <b-form-radio value="1">Agree</b-form-radio>
+                            <b-form-radio value="2">Strongly Agree</b-form-radio>
+                        </b-form-radio-group>
+                    </b-form-group>
+                    
+                    <b-form-group name="q7" id="q7" class="mb-5" v-slot="{ ariaDescribedby }">
+                        <b-label for="q7">
+                            <strong>
+                                7. The recommender system allows me to modify my taste profile
+                            </strong>
+                        </b-label>
+                        <b-form-radio-group>
+                            <b-form-radio value="-2">Strongly Disagree</b-form-radio>
+                            <b-form-radio value="-1">Disagree</b-form-radio>
+                            <b-form-radio value="0">Neutral</b-form-radio>
+                            <b-form-radio value="1">Agree</b-form-radio>
+                            <b-form-radio value="2">Strongly Agree</b-form-radio>
+                        </b-form-radio-group>
+                    </b-form-group>
+
+                    <b-form-group name="q8" id="q8" class="mb-5" v-slot="{ ariaDescribedby }">
+                        <b-label for="q8">
+                            <strong>8. The description of relevance, diversity and novelty was clear and sufficient</strong>
+                        </b-label>
+                        <b-form-radio-group>
+                            <b-form-radio value="-2">Strongly Disagree</b-form-radio>
+                            <b-form-radio value="-1">Disagree</b-form-radio>
+                            <b-form-radio value="0">Neutral</b-form-radio>
+                            <b-form-radio value="1">Agree</b-form-radio>
+                            <b-form-radio value="2">Strongly Agree</b-form-radio>
+                        </b-form-radio-group>
+                    </b-form-group>
+
+                    <b-form-group name="q9" id="q9" class="mb-5" v-slot="{ ariaDescribedby }">
+                        <b-label for="q9">
+                            <strong>
+                                9. I understood the purpose of tweaking relevance, diversity, and novelty
+                            </strong>
+                        </b-label>
+                        <b-form-radio-group>
+                            <b-form-radio value="-2">Strongly Disagree</b-form-radio>
+                            <b-form-radio value="-1">Disagree</b-form-radio>
+                            <b-form-radio value="0">Neutral</b-form-radio>
+                            <b-form-radio value="1">Agree</b-form-radio>
+                            <b-form-radio value="2">Strongly Agree</b-form-radio>
+                        </b-form-radio-group>
+                    </b-form-group>
+
+                    <b-form-group name="q10" id="q10" class="mb-5" v-slot="{ ariaDescribedby }">
+                        <b-label for="q10">
+                            <strong>
+                                10. Being able to tweak relevance, diversity, and novelty was useful for me
+                            </strong>
+                        </b-label>
+                        <b-form-radio-group>
+                            <b-form-radio value="-2">Strongly Disagree</b-form-radio>
+                            <b-form-radio value="-1">Disagree</b-form-radio>
+                            <b-form-radio value="0">Neutral</b-form-radio>
+                            <b-form-radio value="1">Agree</b-form-radio>
+                            <b-form-radio value="2">Strongly Agree</b-form-radio>
+                        </b-form-radio-group>
+                    </b-form-group>
+
+                    <b-form-group name="q11" id="q11" class="mb-5" v-slot="{ ariaDescribedby }">
+                        <b-label for="q11">
+                            <strong>
+                                11. Tweaking relevance, diversity, and novelty had visible effect on the upcomming recommendation
+                            </strong>
+                        </b-label>
+                        <b-form-radio-group>
+                            <b-form-radio value="-2">Strongly Disagree</b-form-radio>
+                            <b-form-radio value="-1">Disagree</b-form-radio>
+                            <b-form-radio value="0">Neutral</b-form-radio>
+                            <b-form-radio value="1">Agree</b-form-radio>
+                            <b-form-radio value="2">Strongly Agree</b-form-radio>
+                        </b-form-radio-group>
+                    </b-form-group>
+
+                    <b-form-group name="q12" id="q12" class="mb-5" v-slot="{ ariaDescribedby }">
+                        <b-label for="q12">
+                            <strong>
+                                12. The effect of tweaking relevance, diversity, and novelty fulfilled my expectations
+                            </strong>
+                        </b-label>
+                        <b-form-radio-group>
+                            <b-form-radio value="-2">Strongly Disagree</b-form-radio>
+                            <b-form-radio value="-1">Disagree</b-form-radio>
+                            <b-form-radio value="0">Neutral</b-form-radio>
+                            <b-form-radio value="1">Agree</b-form-radio>
+                            <b-form-radio value="2">Strongly Agree</b-form-radio>
+                        </b-form-radio-group>
+                    </b-form-group>
+
+                    <b-form-group name="q13" id="q13" class="mb-5" v-slot="{ ariaDescribedby }">
+                        <b-label for="q13">
+                            <strong>13. The mechanism (sliders) for tweaking the objectives was understandable and intuitive</strong>
+                        </b-label>
+                        <b-form-radio-group>
+                            <b-form-radio value="-2">Strongly Disagree</b-form-radio>
+                            <b-form-radio value="-1">Disagree</b-form-radio>
+                            <b-form-radio value="0">Neutral</b-form-radio>
+                            <b-form-radio value="1">Agree</b-form-radio>
+                            <b-form-radio value="2">Strongly Agree</b-form-radio>
+                        </b-form-radio-group>
+                    </b-form-group>
+
+                    <b-form-group name="q14" id="q14" class="mb-5" v-slot="{ ariaDescribedby }">
+                        <b-label for="q14">
+                            <strong>14. The recommender system gave me good suggestions</strong>
+                        </b-label>
+                        <b-form-radio-group>
+                            <b-form-radio value="-2">Strongly Disagree</b-form-radio>
+                            <b-form-radio value="-1">Disagree</b-form-radio>
+                            <b-form-radio value="0">Neutral</b-form-radio>
+                            <b-form-radio value="1">Agree</b-form-radio>
+                            <b-form-radio value="2">Strongly Agree</b-form-radio>
+                        </b-form-radio-group>
+                    </b-form-group>
+                </b-col>
+            </b-row>
+            <b-row class="mb-2" align-h="center">
+                <b-col class="text-center">
+                    <h4>Do you remember the following movies?</h4>
+                </b-col>
+            </b-row>
+            <b-row align-h="center">
+                <b-col cols="auto">
+                    <b-table :fields="fields" :items="items">
+                        <template #cell(_please_select)="data">
+                            <b-form-checkbox>The movie was among recommendations</b-form-checkbox>
+                            <b-form-checkbox>I selected the movie from recommendations</b-form-checkbox>
+                            <b-form-checkbox>I am not sure</b-form-checkbox>
+                        </template>
+                    </b-table>
+                </b-col>
+            </b-row>
+            <b-row align-h="center">
+                <b-col class="text-center">
+                    <b-btn type="submit" variant="primary" center>{{finish}}</b-btn>
+                </b-col>
+            </b-row>
+        </b-form>
+    </b-container>
+</div>
+
+<script>
+    var csrfToken = "{{csrf_token()}}";
+</script>
+<script src="{{url_for('static', filename='resolution_handling.js')}}"></script>
+<script src="{{url_for('static', filename='interaction_reporting.js')}}"></script>
+{{ emit_assets('multiobjective','final_questionnaire.js') }}     
+{% include 'footer.html' %}

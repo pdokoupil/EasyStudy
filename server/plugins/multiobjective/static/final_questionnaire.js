@@ -4,7 +4,15 @@ window.app = new Vue({
     data: function() {
         
         return {
-            
+            items: [
+                {name: "Movie 1", _please_select: 0},
+                {name: "Movie 2", _please_select: 0},
+                {name: "Movie 3", _please_select: 0}
+            ],
+            fields: [
+                {key: "name", label: "Movie name"},
+                {key: "_please_select", label: ""}
+            ]
         }
     },
     computed: {
@@ -21,6 +29,6 @@ window.app = new Vue({
         startScrollReportingWithLimit(`/utils/changed-viewport`, csrfToken, 1.0, document.getElementsByName("scrollableDiv"));
         registerClickedButtonReporting(`/utils/on-input`, csrfToken, btns);
         registerClickedRadioReporting("/utils/on-input", csrfToken, radios);
-        reportLoadedPage(`/utils/loaded-page`, csrfToken, "final_questionare");
+        reportLoadedPage(`/utils/loaded-page`, csrfToken, "final_questionnaire");
     }
 })

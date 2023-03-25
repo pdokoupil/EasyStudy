@@ -233,9 +233,9 @@ def prepare_recommendations(weights, recommendations, initial_weights_recommenda
         recommendations[algorithm_displayed_name][-1] = recommended_items
         initial_weights_recommendation[algorithm_displayed_name][-1] = initial_weights_recommended_items
 
-@bp.route("/final-questionare")
+@bp.route("/final-questionnaire")
 @multi_lang
-def final_questionare():
+def final_questionnaire():
     params = {
         "iteration": session["iteration"],
         "continuation_url": url_for(f'{__plugin_name__}.finish_user_study')
@@ -255,7 +255,7 @@ def final_questionare():
 
     
 
-    return render_template("final_questionare.html", **params)
+    return render_template("final_questionnaire.html", **params)
 
 @bp.route("/finish-user-study")
 def finish_user_study():
