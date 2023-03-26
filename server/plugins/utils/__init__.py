@@ -398,11 +398,13 @@ def finish():
             params["footer_override"] = conf["text_overrides"]["footer"]
 
     # Handle statistics
-    params["show_final_statistics"] = conf["show_final_statistics"]
-    if conf["show_final_statistics"]:
+    if "show_final_statistics" in conf and conf["show_final_statistics"]:
+        params["show_final_statistics"] = True
         # Prepare statistics
         algorithm_names = [x["displayed_name"] for x in conf["algorithm_parameters"]]
         params.update(prepare_basic_statistics(conf["n_algorithms_to_compare"], algorithm_names))
+    else:
+        params["show_final_statistics"] = False
 
     return render_template("finish.html", **params)
     
