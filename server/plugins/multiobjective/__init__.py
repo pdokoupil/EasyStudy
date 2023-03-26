@@ -16,6 +16,7 @@ from common import get_tr, load_languages, multi_lang, load_user_study_config
 from flask import Blueprint, request, redirect, render_template, url_for, session
 
 from plugins.utils.preference_elicitation import recommend_2_3, rlprop, weighted_average, get_objective_importance, prepare_tf_model, calculate_weight_estimate
+from plugins.utils.interaction_logging import log_interaction
 
 from plugins.fastcompare import elicitation_ended, iteration_started, iteration_ended
 
@@ -259,7 +260,8 @@ def final_questionnaire():
 
 @bp.route("/finish-user-study")
 def finish_user_study():
-    return "OK"
+    log_interaction(session["participation_id"], "final-questionnaire", **request.args)
+    return redirect(url_for("utils.finish"))
 
 # @bp.route("/refine-results")
 # def refine_results():

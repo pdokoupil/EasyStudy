@@ -5,9 +5,9 @@ window.app = new Vue({
         
         return {
             items: [
-                {name: "Movie 1", _please_select: 0},
-                {name: "Movie 2", _please_select: 0},
-                {name: "Movie 3", _please_select: 0}
+                {name: "Movie 1", _please_select: {ch1: false, ch2: false, ch3: false}},
+                {name: "Movie 2", _please_select: {ch1: false, ch2: false, ch3: false}},
+                {name: "Movie 3", _please_select: {ch1: false, ch2: false, ch3: false}}
             ],
             fields: [
                 {key: "name", label: "Movie name"},
