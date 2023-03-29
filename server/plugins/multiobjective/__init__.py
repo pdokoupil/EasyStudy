@@ -268,14 +268,17 @@ def compare_done():
     attention_movies_enriched = enrich_results(attention_movies, loader)
     attention_movies_enriched[orders[0]]["selected"] = False
     attention_movies_enriched[orders[0]]["recommended"] = False
+    attention_movies_enriched[orders[0]]["not_recommended"] = True
     attention_movies_enriched[orders[0]]["order"] = orders[0]
 
     attention_movies_enriched[orders[1]]["selected"] = False
     attention_movies_enriched[orders[1]]["recommended"] = True
+    attention_movies_enriched[orders[1]]["not_recommended"] = False
     attention_movies_enriched[orders[1]]["order"] = orders[1]
 
     attention_movies_enriched[orders[2]]["selected"] = True
     attention_movies_enriched[orders[2]]["recommended"] = True
+    attention_movies_enriched[orders[2]]["not_recommended"] = False
     attention_movies_enriched[orders[2]]["order"] = orders[2]
 
     session["attention_check"] = attention_movies_enriched
@@ -313,25 +316,24 @@ def finish_user_study():
 
     gold_attention_check = session["attention_check"]
 
-    real_attention_check = [
-        {
-            "movie_idx": x["movie_idx"],
-            "selected": False,
-            "recommended": False,
-            "not_sure": False,
-            "order": x["order"]
-        }
-        for x in gold_attention_check
-    ]
-
     real_attention_check = []
     for x in gold_attention_check:
 
-        recommended_key = f"{x['movie_idx']}ch1"
-        selected_key = f"{x['movie_idx']}ch2"
+        state_key = f"{x['movie_idx']}ch"
 
-        recommended = request.args[recommended_key] if recommended_key in request.args else False
-        selected = request.args[selected_key] if selected_key in request.args else False
+        not_recommended = request.args.get(state_key) == "0"
+        recommended = request.args.get(state_key) == "1"
+        selected = request.args.get(state_key) == "2"
+        not_sure = request.args.get(state_key) == "3"
+
+        hits = 0
+        if not not_sure:
+            # If both are either selected or not selected, add hit
+            if selected == x["selected"]:
+                hits += 1
+            virtual_recommended = recommended or selected # Selected automatically imply it was recommended
+            if virtual_recommended == x["recommended"]:
+                hits += 1
 
         real_attention_check.append({
             "movie_idx": x["movie_idx"],
@@ -341,12 +343,13 @@ def finish_user_study():
                 "selected": x["selected"]
             },
             "real": {
+                "not_recommended": not_recommended,
                 "recommended": recommended,
                 "selected": selected,
-                "not_sure": request.args[f"{x['movie_idx']}ch3"] if f"{x['movie_idx']}ch3" in request.args else False
+                "not_sure": not_sure,
+                "raw_value": request.args.get(state_key)
             },
-            "hits": int(recommended == x["recommended"]) + int(selected == x["selected"]), # User may hit either recommended, selected, or both,
-            "red_flag": selected and not recommended # Is true if selected = True, recommended = False 
+            "hits": hits, # User may hit either recommended, selected, or both
         })
 
     data = {
