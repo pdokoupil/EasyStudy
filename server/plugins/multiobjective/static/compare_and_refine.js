@@ -155,6 +155,10 @@ window.app = new Vue({
     },
     methods: {
 
+        onTrailerWatch(movieData) {
+            reportOnInput("/utils/on-input", csrfToken, "link", movieData);
+        },
+
         // Custom (movie specific) implementation of indexOf operator
         // Considers only movie's properties
         movieIndexOf(arr, item) {

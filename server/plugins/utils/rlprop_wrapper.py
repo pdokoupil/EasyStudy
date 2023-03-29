@@ -119,9 +119,13 @@ class RLPropWrapper:
 
         if return_support:
             support = {
-                "relevance": final_supports[0].astype(float),
-                "diversity": final_supports[1].astype(float),
-                "novelty": final_supports[2].astype(float)
+                "relevance": np.squeeze(final_supports[0].astype(float)),
+                "diversity": np.squeeze(final_supports[1].astype(float)),
+                "novelty": np.squeeze(final_supports[2].astype(float)),
+                "raw_rating": np.squeeze(np.take_along_axis(self.extended_rating_matrix, users_partial_lists, axis=1).astype(float)),
+                "raw_distance": np.squeeze(self.distance_matrix[np.ix_(users_partial_lists[0], users_partial_lists[0])].astype(float)),
+                "raw_users_viewed_item": np.squeeze(self.users_viewed_item[users_partial_lists[0]]).astype(int).tolist(),
+                "rating_matrix_shape": np.array([self.n_users, self.extended_rating_matrix.shape[1]]).astype(int).tolist()
             }
             return users_partial_lists, support 
 

@@ -35,7 +35,7 @@
                                     [[col.plot]]
                                  </div>
                                  <div v-if="col.trailer_url" class="mt-1 text-center">
-                                    <b-button target="_blank" :href="col.trailer_url" size="sm" variant="primary">IMDb trailer</b-button>
+                                    <b-button target="_blank" @click="onTrailerWatch(col)" :href="col.trailer_url" size="sm" variant="primary">IMDb trailer</b-button>
                                  </div>
                                  
                               </b-popover>
@@ -593,7 +593,7 @@
                     </b-overlay>
                 </b-form>
                 {% else %}
-                <b-form @submit="onSubmit" method="GET" action="{{ url_for(consuming_plugin + '.final_questionnaire') }}">
+                <b-form @submit="onSubmit" method="GET" action="{{ continuation_url }}">
                     <input type="hidden" hidden="true" v-model="newWeights" name="new_weights"/>
                     <b-overlay
                     :show="busy"
