@@ -227,10 +227,13 @@
             <b-row align-h="center">
                 <b-col cols="auto">
                     <b-table :fields="fields" :items="items">
+                        <template #cell(movie)="data">
+                            <b-img style="width: 175px; height: auto;" :src="data.value.url" v-b-tooltip.hover :title="data.value.name"></b-img>
+                        </template>
                         <template #cell(_please_select)="data">
-                            <b-form-checkbox :name="data.item.name + 'ch1'" v-model="data.value.ch1">The movie was among recommendations</b-form-checkbox>
-                            <b-form-checkbox :name="data.item.name + 'ch2'" v-model="data.value.ch2">I selected the movie from recommendations</b-form-checkbox>
-                            <b-form-checkbox :name="data.item.name + 'ch3'" v-model="data.value.ch3">I am not sure</b-form-checkbox>
+                            <b-form-checkbox :name="data.item.movie.movie_idx + 'ch1'" v-model="data.value.ch1">The movie was among recommendations</b-form-checkbox>
+                            <b-form-checkbox :name="data.item.movie.movie_idx + 'ch2'" v-model="data.value.ch2">I selected the movie from recommendations</b-form-checkbox>
+                            <b-form-checkbox :name="data.item.movie.movie_idx + 'ch3'" v-model="data.value.ch3">I am not sure</b-form-checkbox>
                         </template>
                     </b-table>
                 </b-col>
@@ -246,6 +249,7 @@
 
 <script>
     var csrfToken = "{{csrf_token()}}";
+    var attentionMovies = JSON.parse('{{attention_movies | tojson | safe}}');
 </script>
 <script src="{{url_for('static', filename='resolution_handling.js')}}"></script>
 <script src="{{url_for('static', filename='interaction_reporting.js')}}"></script>

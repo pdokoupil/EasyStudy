@@ -205,6 +205,7 @@ def calculate_weight_estimate(selected_movies, elicitation_movies, return_suppor
         assert False
 
     diversities = distance_matrix[np.ix_(movie_indices, movie_indices)]
+    raw_diversities = diversities
     #diversities = diversities[np.triu_indices(diversities.shape[0])].reshape((-1, 1)) # Train diversity on this
     diversities = (diversities.sum(axis=0) / (diversities.shape[0] - 1)).reshape(-1,1)
 
@@ -213,7 +214,8 @@ def calculate_weight_estimate(selected_movies, elicitation_movies, return_suppor
     relevances = relevances.mean(axis=0)
     # relevances = relevances[relevances > 0.0]
     relevances = relevances.reshape((-1, 1))
-    novelties = 1.0 - (loader.rating_matrix.astype(bool).sum(axis=0) / loader.rating_matrix.shape[0])
+    users_viewed_item = loader.rating_matrix.astype(bool).sum(axis=0)
+    novelties = 1.0 - (users_viewed_item / loader.rating_matrix.shape[0])
     novelties = novelties[movie_indices].reshape((-1, 1))
 
 
@@ -264,7 +266,11 @@ def calculate_weight_estimate(selected_movies, elicitation_movies, return_suppor
             "novelties": np.squeeze(novelties),
             "normalized_relevances": np.squeeze(rel_cdf.transform(relevances)),
             "normalized_diversities": np.squeeze(div_cdf.transform(diversities)),
-            "normalized_novelties": np.squeeze(nov_cdf.transform(novelties))
+            "normalized_novelties": np.squeeze(nov_cdf.transform(novelties)),
+            "raw_rating": np.squeeze(relevances),
+            "raw_distance": np.squeeze(raw_diversities.flatten()),
+            "raw_users_viewed_item": np.squeeze(users_viewed_item[movie_indices]),
+            "rating_matrix_shape": np.array(loader.rating_matrix.shape)
         }
         return result / result.sum(), supports
 
@@ -315,7 +321,10 @@ def enrich_results(top_k, loader, support=None):
             {
                 "relevance": np.round(support["relevance"][i], 4),
                 "diversity": np.round(support["diversity"][i], 4),
-                "novelty": np.round(support["novelty"][i], 4)
+                "novelty": np.round(support["novelty"][i], 4),
+                "raw_rating": np.round(support["raw_rating"][i], 4),
+                "raw_distance": np.squeeze(np.round(support["raw_distance"][i], 4)).tolist(),
+                "raw_users_viewed_item": support["raw_users_viewed_item"][i],
             }
             for i in range(len(top_k))
         ]
@@ -394,7 +403,7 @@ def rlprop(selected_movies, model, weights, filter_out_movies = [], k=10, norm_f
 
     if include_support:
         x, support = wrapper(k, return_support=include_support)
-        return enrich_results(x[0], loader, {key: value[0] for key,value in support.items()}) # We have just one user, so we take [0]
+        return enrich_results(x[0], loader, {key: value for key,value in support.items()})
 
     x = wrapper(k, return_support=include_support)
     return enrich_results(x[0], loader)
@@ -418,7 +427,7 @@ def weighted_average(selected_movies, model, weights, filter_out_movies = [], k=
 
     if include_support:
         x, support = wrapper(k, return_support=include_support)
-        return enrich_results(x[0], loader, {key: value[0] for key,value in support.items()}) # We have just one user, so we take [0]
+        return enrich_results(x[0], loader, {key: value for key,value in support.items()})
 
     x = wrapper(k, return_support=include_support)
     return enrich_results(x[0], loader)

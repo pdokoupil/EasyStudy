@@ -3,14 +3,26 @@ window.app = new Vue({
     delimiters: ['[[',']]'], // Used to replace double { escaping with double [ escaping (to prevent jinja vs vue inference)
     data: function() {
         
+        
+        let items = [];
+
+        for (let i in attentionMovies) {
+            let row = attentionMovies[i];
+            items.push({
+                movie: {
+                    name: row["movie"],
+                    movie_idx: row["movie_idx"],
+                    url: row["url"]
+                },
+                _please_select: {ch1: false, ch2: false, ch3: false}
+            });
+        }
+
+
         return {
-            items: [
-                {name: "Movie 1", _please_select: {ch1: false, ch2: false, ch3: false}},
-                {name: "Movie 2", _please_select: {ch1: false, ch2: false, ch3: false}},
-                {name: "Movie 3", _please_select: {ch1: false, ch2: false, ch3: false}}
-            ],
+            items: items,
             fields: [
-                {key: "name", label: "Movie name"},
+                {key: "movie", label: "Movie"},
                 {key: "_please_select", label: ""}
             ]
         }

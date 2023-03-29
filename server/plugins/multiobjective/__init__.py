@@ -1,3 +1,4 @@
+import random
 import sys
 import os
 
@@ -15,7 +16,7 @@ import numpy as np
 from common import get_tr, load_languages, multi_lang, load_user_study_config
 from flask import Blueprint, request, redirect, render_template, url_for, session
 
-from plugins.utils.preference_elicitation import recommend_2_3, rlprop, weighted_average, get_objective_importance, prepare_tf_model, calculate_weight_estimate
+from plugins.utils.preference_elicitation import recommend_2_3, rlprop, weighted_average, get_objective_importance, prepare_tf_model, calculate_weight_estimate, load_ml_dataset, enrich_results
 from plugins.utils.interaction_logging import log_interaction
 
 from plugins.fastcompare import elicitation_ended, iteration_started, iteration_ended
@@ -72,6 +73,18 @@ def plugin_name():
     return {
         "plugin_name": __plugin_name__
     }
+
+def get_all_recommended_items(n_iterations, recommendations):
+    mov_indices = []
+    for i in range(n_iterations):
+        indices = set()
+        for algo_displayed_name in displyed_name_mapping.values():
+            if algo_displayed_name not in session["orig_permutation"][i]:
+                #print(f"@@ Ignoring {algo_displayed_name} for iteration={i}, orders = {session['orig_permutation']}")
+                continue
+            indices.update([int(y["movie_idx"]) for y in recommendations[algo_displayed_name][i]])
+        mov_indices.append(list(indices))
+    return mov_indices
 
 @bp.route("/algorithm-feedback")
 def algorithm_feedback():
@@ -170,16 +183,7 @@ def algorithm_feedback():
     assert len(set(lengths)), "All algorithms should share the number of iterations"
     n_iterations = lengths[0] # Since all have same number of iteration, pick the first one
 
-    mov_indices = []
-    for i in range(n_iterations):
-        indices = set()
-        for algo_displayed_name in displyed_name_mapping.values():
-            if algo_displayed_name not in session["orig_permutation"][i]:
-                print(f"@@ Ignoring {algo_displayed_name} for iteration={i}, orders = {session['orig_permutation']}")
-                continue
-            indices.update([int(y["movie_idx"]) for y in recommendations[algo_displayed_name][i]])
-        mov_indices.append(list(indices))
-
+    mov_indices = get_all_recommended_items(n_iterations, recommendations)
 
     filter_out_movies = session["elicitation_selected_movies"] + sum(mov_indices[:HIDE_LAST_K], [])
     selected_movies = session["elicitation_selected_movies"] + sum(session["selected_movie_indices"], [])
@@ -234,6 +238,52 @@ def prepare_recommendations(weights, recommendations, initial_weights_recommenda
         recommendations[algorithm_displayed_name][-1] = recommended_items
         initial_weights_recommendation[algorithm_displayed_name][-1] = initial_weights_recommended_items
 
+@bp.route("/compare-done")
+def compare_done():
+    # Prepare questions for final questionnaire
+    # All recommended movies
+    for recommendations in session["movies"].values():
+        assert len(recommendations) == N_ITERATIONS
+    all_recommended = sum(get_all_recommended_items(N_ITERATIONS, session["movies"]),  [])
+    all_elicited = [x['movie_idx'] for x in session["elicitation_movies"]]
+    all_selected = sum(session["selected_movie_indices"], [])
+    
+    loader = load_ml_dataset()
+    all_indices = set(loader.movie_index_to_id.keys())
+
+    unseen_indices = all_indices.difference(all_recommended).difference(all_elicited)
+    
+    orders = [0, 1, 2]
+    np.random.shuffle(orders)
+
+    not_recommended_movie = random.sample(list(unseen_indices), 1)[0]
+    not_selected_movie = random.sample(all_recommended, 1)[0]
+    selected_recommended_movie = random.sample(all_selected, 1)[0]
+
+    attention_movies = [-1] * len(orders)
+    attention_movies[orders[0]] = not_recommended_movie
+    attention_movies[orders[1]] = not_selected_movie
+    attention_movies[orders[2]] = selected_recommended_movie
+
+    attention_movies_enriched = enrich_results(attention_movies, loader)
+    attention_movies_enriched[orders[0]]["selected"] = False
+    attention_movies_enriched[orders[0]]["recommended"] = False
+    attention_movies_enriched[orders[0]]["order"] = orders[0]
+
+    attention_movies_enriched[orders[1]]["selected"] = False
+    attention_movies_enriched[orders[1]]["recommended"] = True
+    attention_movies_enriched[orders[1]]["order"] = orders[1]
+
+    attention_movies_enriched[orders[2]]["selected"] = True
+    attention_movies_enriched[orders[2]]["recommended"] = True
+    attention_movies_enriched[orders[2]]["order"] = orders[2]
+
+    session["attention_check"] = attention_movies_enriched
+    
+    log_interaction(session["participation_id"], "attention-check-input", attention_check_input=session["attention_check"])
+
+    return redirect(url_for(f"{__plugin_name__}.final_questionnaire"))
+
 @bp.route("/final-questionnaire")
 @multi_lang
 def final_questionnaire():
@@ -254,13 +304,57 @@ def final_questionnaire():
     params["finish"] = tr("final_finish")
     params["hint"] = tr("final_hint")
 
-    
+    params["attention_movies"] = session["attention_check"]   
 
     return render_template("final_questionnaire.html", **params)
 
 @bp.route("/finish-user-study")
 def finish_user_study():
-    log_interaction(session["participation_id"], "final-questionnaire", **request.args)
+
+    gold_attention_check = session["attention_check"]
+
+    real_attention_check = [
+        {
+            "movie_idx": x["movie_idx"],
+            "selected": False,
+            "recommended": False,
+            "not_sure": False,
+            "order": x["order"]
+        }
+        for x in gold_attention_check
+    ]
+
+    real_attention_check = []
+    for x in gold_attention_check:
+
+        recommended_key = f"{x['movie_idx']}ch1"
+        selected_key = f"{x['movie_idx']}ch2"
+
+        recommended = request.args[recommended_key] if recommended_key in request.args else False
+        selected = request.args[selected_key] if selected_key in request.args else False
+
+        real_attention_check.append({
+            "movie_idx": x["movie_idx"],
+            "order": x["order"],
+            "gold": {
+                "recommended": x["recommended"],
+                "selected": x["selected"]
+            },
+            "real": {
+                "recommended": recommended,
+                "selected": selected,
+                "not_sure": request.args[f"{x['movie_idx']}ch3"] if f"{x['movie_idx']}ch3" in request.args else False
+            },
+            "hits": int(recommended == x["recommended"]) + int(selected == x["selected"]), # User may hit either recommended, selected, or both,
+            "red_flag": selected and not recommended # Is true if selected = True, recommended = False 
+        })
+
+    data = {
+        "attention_check": real_attention_check
+    }
+    data.update(**request.args)
+
+    log_interaction(session["participation_id"], "final-questionnaire", **data)
     return redirect(url_for("utils.finish"))
 
 # @bp.route("/refine-results")
@@ -374,7 +468,8 @@ def compare_and_refine():
             "diversity": {algo_name: round(weights[1], 2) for algo_name, weights in session["weights"].items()},
             "novelty": {algo_name: round(weights[2], 2) for algo_name, weights in session["weights"].items()}
         },
-        "refinement_algorithms": refinement_algorithms
+        "refinement_algorithms": refinement_algorithms,
+        "continuation_url": url_for(f"{__plugin_name__}.compare_done")
     }
    
     params["contacts"] = tr("footer_contacts")
