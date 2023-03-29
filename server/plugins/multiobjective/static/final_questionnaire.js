@@ -14,7 +14,7 @@ window.app = new Vue({
                     movie_idx: row["movie_idx"],
                     url: row["url"]
                 },
-                _please_select: {ch1: false, ch2: false, ch3: false}
+                _please_select: {ch: null}
             });
         }
 
