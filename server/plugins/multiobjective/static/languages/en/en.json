@@ -63,5 +63,10 @@
     "finish_novelty_explanation": "Novelty describes how new or unusual (not many users watched them) are the movies you have selected.",
     "refine_relevance_explanation": "By increasing relevance, algorithms will pay more attention to the movies that you have selected during preference elicitation and past iterations.",
     "refine_diversity_explanation": "By increasing diversity, algorithms will produce more diverse recommendations. This means there will be more variety in some aspect, e.g. different movie genres.",
-    "refine_novelty_explanation": "By increasing novelty, algorithms will pay more attention to movies that are novel, meaning they are less frequently watched by the users and are less well-known."
+    "refine_novelty_explanation": "By increasing novelty, algorithms will pay more attention to movies that are novel, meaning they are less frequently watched by the users and are less well-known.",
+    "moo_create_about_placeholder": "Enter text explaining the user study",
+    "moo_create_override_about": "Override 'About' text",
+    "moo_create_show_final_statistics": "Show final statistics",
+    "moo_create_override_algorithm_comparison_hint": "Override algorithm comparison hint",
+    "moo_create_algorithm_comparison_placeholder": "Enter text with algorithm comparison instructions"
 }

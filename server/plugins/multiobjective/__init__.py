@@ -42,8 +42,26 @@ __description__ = "Compare RLprop to Weighted Average strategy and allow fine-tu
 bp = Blueprint(__plugin_name__, __plugin_name__, url_prefix=f"/{__plugin_name__}")
 
 @bp.route("/create")
+@multi_lang
 def create():
-    return render_template("multiobjective_create.html")
+
+    tr = get_tr(languages, get_lang())
+
+    params = {}
+    params["contacts"] = tr("footer_contacts")
+    params["contact"] = tr("footer_contact")
+    params["charles_university"] = tr("footer_charles_university")
+    params["cagliari_university"] = tr("footer_cagliari_university")
+    params["t1"] = tr("footer_t1")
+    params["t2"] = tr("footer_t2")
+    params["about_placeholder"] = tr("moo_create_about_placeholder")
+    params["override_about"] = tr("moo_create_override_about")
+    params["show_final_statistics"] = tr("moo_create_show_final_statistics")
+    params["override_algorithm_comparison_hint"] = tr("moo_create_override_algorithm_comparison_hint")
+    params["algorithm_comparison_placeholder"] = tr("moo_create_algorithm_comparison_placeholder")
+
+
+    return render_template("multiobjective_create.html", **params)
 
 # Public facing endpoint
 @bp.route("/join", methods=["GET"])
@@ -145,10 +163,6 @@ def algorithm_feedback():
     y.append(selected_variants)
     session["selected_variants"] = y
 
-    #return redirect(url_for("multiobjective.refinement_feedback", refine_results_url=url_for("multiobjective.refine_results")))
-    #return redirect(url_for("multiobjective.compare_and_refine"))
-
-    # Second part taken from refine-results
     # Get new weights
     new_weights = request.args.get("new_weights").split(";") # Get new weights for each algorithm
     transformed_weights = []
@@ -169,8 +183,19 @@ def algorithm_feedback():
     print(f"Ordered weights after fixup = {ordered_weights}")
     session["weights"] = ordered_weights # Take first non-empty weights TODO fix and set weights to each algorithm separately
 
-    # Increase iteration
-    session["iteration"] += 1
+    # Log end of iteration here
+    iteration_ended(
+        session["iteration"], session["selected_movie_indices"], session["selected_variants"],
+        session["nothing"], session["cmp"], session["a_r"],
+        old_weights = old_weights, new_weights = session["weights"]
+    )
+
+    if session["iteration"] >= N_ITERATIONS:
+        # We are done, continue with another step
+        # This happens (intentionally) after logging iteration_ended
+        return redirect(url_for(f"{__plugin_name__}.compare_done"))
+
+
     ### And generate new recommendations ###
     recommendations = session["movies"]
     initial_weights_recommendation = session["initial_weights_recommendation"]
@@ -200,11 +225,9 @@ def algorithm_feedback():
     permutation = permutation[1:] + permutation[:1] # Move first item to the end
     session["permutation"] = permutation
 
-    iteration_ended(
-        session["iteration"], session["selected_movie_indices"], session["selected_variants"],
-        session["nothing"], session["cmp"], session["a_r"],
-        old_weights = old_weights, new_weights = session["weights"]
-    )
+    # Increase iteration
+    session["iteration"] += 1
+
     return redirect(url_for("multiobjective.compare_and_refine"))
 
 # @bp.route("/refinement-feedback")
@@ -258,7 +281,13 @@ def compare_done():
 
     not_recommended_movie = random.sample(list(unseen_indices), 1)[0]
     not_selected_movie = random.sample(all_recommended, 1)[0]
-    selected_recommended_movie = random.sample(all_selected, 1)[0]
+
+    if len(all_selected) == 0:
+        # It may (very rarely) happen that user does not select anything
+        # In that case, we show some other item that was just recommended but not selected
+        selected_recommended_movie = random.sample(all_recommended, 1)[0]
+    else:
+        selected_recommended_movie = random.sample(all_selected, 1)[0]
 
     attention_movies = [-1] * len(orders)
     attention_movies[orders[0]] = not_recommended_movie
@@ -276,7 +305,7 @@ def compare_done():
     attention_movies_enriched[orders[1]]["not_recommended"] = False
     attention_movies_enriched[orders[1]]["order"] = orders[1]
 
-    attention_movies_enriched[orders[2]]["selected"] = True
+    attention_movies_enriched[orders[2]]["selected"] = len(all_selected) > 0 # If nothing was selected, set to False
     attention_movies_enriched[orders[2]]["recommended"] = True
     attention_movies_enriched[orders[2]]["not_recommended"] = False
     attention_movies_enriched[orders[2]]["order"] = orders[2]
@@ -472,7 +501,7 @@ def compare_and_refine():
             "novelty": {algo_name: round(weights[2], 2) for algo_name, weights in session["weights"].items()}
         },
         "refinement_algorithms": refinement_algorithms,
-        "continuation_url": url_for(f"{__plugin_name__}.compare_done")
+        "continuation_url": url_for(f"{__plugin_name__}.algorithm_feedback")
     }
    
     params["contacts"] = tr("footer_contacts")
@@ -499,6 +528,16 @@ def compare_and_refine():
     params["relevance_explanation"] = tr("refine_relevance_explanation")
     params["diversity_explanation"] = tr("refine_diversity_explanation")
     params["novelty_explanation"] = tr("refine_novelty_explanation")
+
+    # Handle textual overrides
+    params["comparison_hint_override"] = None
+    params["footer_override"] = None
+    if "text_overrides" in conf:
+        if "comparison_hint" in conf["text_overrides"]:
+            params["comparison_hint_override"] = conf["text_overrides"]["comparison_hint"]
+
+        if "footer" in conf["text_overrides"]:
+            params["footer_override"] = conf["text_overrides"]["footer"]
 
     return render_template("compare_and_refine.html", **params)
 
