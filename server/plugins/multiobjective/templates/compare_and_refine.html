@@ -595,6 +595,11 @@
                 {% else %}
                 <b-form @submit="onSubmit" method="GET" action="{{ continuation_url }}">
                     <input type="hidden" hidden="true" v-model="newWeights" name="new_weights"/>
+                    <input type="hidden" hidden="true" :value="selectedMovieIndices" name="selected_movies"/>
+                    <input type="hidden" hidden="true" :value="selectedMovieVariants" name="selected_movie_variants"/>
+                    <input v-for="i in variantsResults.length" type="hidden" hidden="true" :key="i" :value="algorithmRatings[i - 1]" :name="'ar_'.concat(i)"/>
+                    <input type="hidden" hidden="true" :value="dontLikeAnythingValue" name="nothing"/>
+                    <input type="hidden" hidden="true" :value="algorithmComparisonValue" name="cmp"/>
                     <b-overlay
                     :show="busy"
                     rounded
