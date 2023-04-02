@@ -379,6 +379,7 @@ def finish():
     params["table_n_selected"] = tr("finish_table_n_selected")
     params["table_n_shown"] = tr("finish_table_n_shown")
     params["table_avg_rating"] = tr("finish_table_avg_rating")
+    params["finish_user_study"] = tr("finish_finish_user_study")
 
     # Prolific stuff
     if "PROLIFIC_PID" in flask.session:
