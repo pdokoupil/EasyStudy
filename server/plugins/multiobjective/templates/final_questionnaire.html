@@ -122,6 +122,38 @@
                         </b-col>
                     </b-row>
 
+                    <b-row class="mt-5">
+                        <b-col cols="auto">
+                            <b-icon class="h1" icon="image"></b-icon>
+                        </b-col>
+                        <b-col cols="auto">
+                            <b-row align-h="start">
+                                <b-col cols="auto">
+                                    <b-label :for="items.at(0).movie.movie_idx + 'ch'">
+                                        <strong>
+                                            5. Do you remember the following movie?
+                                        </strong>
+                                    </b-label>
+                                </b-col>
+                            </b-row>
+                            <b-row class="mt-3 mb-3" align-h="center">
+                                <b-col cols="auto">
+                                    <b-img style="width: 175px; height: auto;" :src="items.at(0).movie.url" v-b-tooltip.hover :title="items.at(0).movie.name"></b-img>
+                                </b-col>
+                            </b-row>
+                            <b-row align-h="start">
+                                <b-col cols="auto">
+                                    <b-form-radio-group :name="items.at(0).movie.movie_idx + 'ch'" required>
+                                        <b-form-radio value="0">Was not recommended at all</b-form-radio>
+                                        <b-form-radio value="1">Was among recommendations</b-form-radio>
+                                        <b-form-radio value="2">I selected the movie</b-form-radio>
+                                        <b-form-radio value="3">I am not sure</b-form-radio>
+                                    </b-form-radio-group>
+                                </b-col>
+                            </b-row>
+                        </b-col>
+                    </b-row>
+
                     <b-row class="mt-5" align-v="center">
                         <b-col class="mt-2" cols="auto">
                             <b-row>
@@ -138,11 +170,11 @@
                             </b-row>
                         </b-col>
                         <b-col class="ml-1">
-                            <b-form-group name="q5" id="q5">
-                                <b-label for="q5">
-                                    <strong>5. I found it easy to tell the system what movies I like or dislike.</strong>
+                            <b-form-group name="q6" id="q6">
+                                <b-label for="q6">
+                                    <strong>6. I found it easy to tell the system what movies I like or dislike.</strong>
                                 </b-label>
-                                <b-form-radio-group name="q5" required>
+                                <b-form-radio-group name="q6" required>
                                     <b-form-radio value="-2">Strongly Disagree</b-form-radio>
                                     <b-form-radio value="-1">Disagree</b-form-radio>
                                     <b-form-radio value="0">Neutral</b-form-radio>
@@ -159,13 +191,13 @@
                             <b-icon class="h1" icon="star-half"></b-icon>
                         </b-col>
                         <b-col>
-                            <b-form-group name="q6" id="q6">
-                                <b-label for="q6">
+                            <b-form-group name="q7" id="q7">
+                                <b-label for="q7">
                                     <strong>
-                                        6. I found it easy to tell the system whether it did a good job.
+                                        7. I found it easy to tell the system whether it did a good job.
                                     </strong>
                                 </b-label>
-                                <b-form-radio-group name="q6" required>
+                                <b-form-radio-group name="q7" required>
                                     <b-form-radio value="-2">Strongly Disagree</b-form-radio>
                                     <b-form-radio value="-1">Disagree</b-form-radio>
                                     <b-form-radio value="0">Neutral</b-form-radio>
@@ -182,32 +214,11 @@
                             <b-icon class="h1" icon="sliders"></b-icon>
                         </b-col>
                         <b-col>
-                            <b-form-group name="q7" id="q7">
-                                <b-label for="q7">
-                                    <strong>
-                                        7. The description of relevance, diversity, and, novelty was clear and sufficient.
-                                    </strong>
-                                </b-label>
-                                <b-form-radio-group name="q7" required>
-                                    <b-form-radio value="-2">Strongly Disagree</b-form-radio>
-                                    <b-form-radio value="-1">Disagree</b-form-radio>
-                                    <b-form-radio value="0">Neutral</b-form-radio>
-                                    <b-form-radio value="1">Agree</b-form-radio>
-                                    <b-form-radio value="2" class="mr-5">Strongly Agree</b-form-radio>
-                                    <b-form-radio value="3" class="ml-5">I don't understand</b-form-radio>
-                                </b-form-radio-group>
-                            </b-form-group>
-                        </b-col>
-                    </b-row>
-
-                    <b-row class="mt-5" align-v="center">
-                        <b-col class="mt-2" cols="auto">
-                            <b-icon class="h1" icon="sliders"></b-icon>
-                        </b-col>
-                        <b-col>
                             <b-form-group name="q8" id="q8">
                                 <b-label for="q8">
-                                    <strong>8. I understood the purpose of tweaking relevance, diversity, and novelty.</strong>
+                                    <strong>
+                                        8. The description of relevance, diversity, and, novelty was clear and sufficient.
+                                    </strong>
                                 </b-label>
                                 <b-form-radio-group name="q8" required>
                                     <b-form-radio value="-2">Strongly Disagree</b-form-radio>
@@ -228,9 +239,7 @@
                         <b-col>
                             <b-form-group name="q9" id="q9">
                                 <b-label for="q9">
-                                    <strong>
-                                        9. The initial values of sliders already provided good recommendations.
-                                    </strong>
+                                    <strong>9. I understood the purpose of tweaking relevance, diversity, and novelty.</strong>
                                 </b-label>
                                 <b-form-radio-group name="q9" required>
                                     <b-form-radio value="-2">Strongly Disagree</b-form-radio>
@@ -246,16 +255,14 @@
 
                     <b-row class="mt-5" align-v="center">
                         <b-col class="mt-2" cols="auto">
-                            <b-icon class="h1" icon="sliders"></b-icon>
-                        </b-col>
+                            <b-icon class="h1" icon="people"></b-icon>
+                        </b-col>        
                         <b-col>
-                            <b-form-group name="q10" id="q10">
-                                <b-label for="q10">
-                                    <strong>
-                                        10. Being able to change relevance, diversity, and novelty ratios was useful for me.
-                                    </strong>
+                            <b-form-group name="qs1" id="qs1">
+                                <b-label for="qs1">
+                                    <strong>10. I believe recommender systems can be very useful to people. To answer <br> this question correctly, you must select "Agree".</strong>
                                 </b-label>
-                                <b-form-radio-group name="q10" required>
+                                <b-form-radio-group name="qs1" required>
                                     <b-form-radio value="-2">Strongly Disagree</b-form-radio>
                                     <b-form-radio value="-1">Disagree</b-form-radio>
                                     <b-form-radio value="0">Neutral</b-form-radio>
@@ -275,7 +282,7 @@
                             <b-form-group name="q11" id="q11">
                                 <b-label for="q11">
                                     <strong>
-                                        11. Overall, the effect of tweaking relevance, diversity, and novelty fulfilled my expectations.
+                                        11. The initial values of sliders already provided good recommendations.
                                     </strong>
                                 </b-label>
                                 <b-form-radio-group name="q11" required>
@@ -298,7 +305,7 @@
                             <b-form-group name="q12" id="q12">
                                 <b-label for="q12">
                                     <strong>
-                                        12. Overall, after modifying the relevance, diversity, and novelty ratios, recommendations improved.
+                                        12. Being able to change relevance, diversity, and novelty ratios was useful for me.
                                     </strong>
                                 </b-label>
                                 <b-form-radio-group name="q12" required>
@@ -320,7 +327,9 @@
                         <b-col>
                             <b-form-group name="q13" id="q13">
                                 <b-label for="q13">
-                                    <strong>13. Modifying relevance, diversity, and, novelty values had a visible effect on the upcoming recommendations.</strong>
+                                    <strong>
+                                        13. Overall, the effect of tweaking relevance, diversity, and novelty fulfilled my expectations.
+                                    </strong>
                                 </b-label>
                                 <b-form-radio-group name="q13" required>
                                     <b-form-radio value="-2">Strongly Disagree</b-form-radio>
@@ -334,24 +343,35 @@
                         </b-col>
                     </b-row>
 
-                    <b-row class="mt-5" align-v="center">
-                        <b-col class="mt-2" cols="auto">
-                            <b-icon class="h1" icon="sliders"></b-icon>
+                    <b-row class="mt-5">
+                        <b-col cols="auto">
+                            <b-icon class="h1" icon="image"></b-icon>
                         </b-col>
-                        <b-col>
-                            <b-form-group name="q14" id="q14">
-                                <b-label for="q14">
-                                    <strong>14. The mechanism (slider) provided me with sufficient control over the recommendations.</strong>
-                                </b-label>
-                                <b-form-radio-group name="q14" required>
-                                    <b-form-radio value="-2">Strongly Disagree</b-form-radio>
-                                    <b-form-radio value="-1">Disagree</b-form-radio>
-                                    <b-form-radio value="0">Neutral</b-form-radio>
-                                    <b-form-radio value="1">Agree</b-form-radio>
-                                    <b-form-radio value="2" class="mr-5">Strongly Agree</b-form-radio>
-                                    <b-form-radio value="3" class="ml-5">I don't understand</b-form-radio>
-                                </b-form-radio-group>
-                            </b-form-group>
+                        <b-col cols="auto">
+                            <b-row align-h="start">
+                                <b-col cols="auto">
+                                    <b-label :for="items.at(1).movie.movie_idx + 'ch'">
+                                        <strong>
+                                            14. Do you remember the following movie?
+                                        </strong>
+                                    </b-label>
+                                </b-col>
+                            </b-row>
+                            <b-row class="mt-3 mb-3" align-h="center">
+                                <b-col cols="auto">
+                                    <b-img style="width: 175px; height: auto;" :src="items.at(1).movie.url" v-b-tooltip.hover :title="items.at(1).movie.name"></b-img>
+                                </b-col>
+                            </b-row>
+                            <b-row align-h="start">
+                                <b-col cols="auto">
+                                    <b-form-radio-group :name="items.at(1).movie.movie_idx + 'ch'" required>
+                                        <b-form-radio value="0">Was not recommended at all</b-form-radio>
+                                        <b-form-radio value="1">Was among recommendations</b-form-radio>
+                                        <b-form-radio value="2">I selected the movie</b-form-radio>
+                                        <b-form-radio value="3">I am not sure</b-form-radio>
+                                    </b-form-radio-group>
+                                </b-col>
+                            </b-row>
                         </b-col>
                     </b-row>
 
@@ -362,7 +382,9 @@
                         <b-col>
                             <b-form-group name="q15" id="q15">
                                 <b-label for="q15">
-                                    <strong>15. The mechanism (slider) was sufficient to tell the system what recommendations I want.</strong>
+                                    <strong>
+                                        15. Overall, after modifying the relevance, diversity, and novelty ratios, recommendations improved.
+                                    </strong>
                                 </b-label>
                                 <b-form-radio-group name="q15" required>
                                     <b-form-radio value="-2">Strongly Disagree</b-form-radio>
@@ -383,7 +405,7 @@
                         <b-col>
                             <b-form-group name="q16" id="q16">
                                 <b-label for="q16">
-                                    <strong>16. I was not able to describe my preferences w.r.t. relevance, diversity, and novelty.</strong>
+                                    <strong>16. Modifying relevance, diversity, and, novelty values had a visible effect on the upcoming recommendations.</strong>
                                 </b-label>
                                 <b-form-radio-group name="q16" required>
                                     <b-form-radio value="-2">Strongly Disagree</b-form-radio>
@@ -404,7 +426,7 @@
                         <b-col>
                             <b-form-group name="q17" id="q17">
                                 <b-label for="q17">
-                                    <strong>17. The mechanism (slider) for tweaking the objectives was understandable and intuitive.</strong>
+                                    <strong>17. The mechanism (slider) provided me with sufficient control over the recommendations.</strong>
                                 </b-label>
                                 <b-form-radio-group name="q17" required>
                                     <b-form-radio value="-2">Strongly Disagree</b-form-radio>
@@ -425,9 +447,125 @@
                         <b-col>
                             <b-form-group name="q18" id="q18">
                                 <b-label for="q18">
-                                    <strong>18. Appropriate values of relevance, diversity, and novelty ratios were easy to set.</strong>
+                                    <strong>18. The mechanism (slider) was sufficient to tell the system what recommendations I want.</strong>
                                 </b-label>
                                 <b-form-radio-group name="q18" required>
+                                    <b-form-radio value="-2">Strongly Disagree</b-form-radio>
+                                    <b-form-radio value="-1">Disagree</b-form-radio>
+                                    <b-form-radio value="0">Neutral</b-form-radio>
+                                    <b-form-radio value="1">Agree</b-form-radio>
+                                    <b-form-radio value="2" class="mr-5">Strongly Agree</b-form-radio>
+                                    <b-form-radio value="3" class="ml-5">I don't understand</b-form-radio>
+                                </b-form-radio-group>
+                            </b-form-group>
+                        </b-col>
+                    </b-row>
+
+                    <b-row class="mt-5" align-v="center">
+                        <b-col class="mt-2" cols="auto">
+                            <b-icon class="h1" icon="people"></b-icon>
+                        </b-col>        
+                        <b-col>
+                            <b-form-group name="qs2" id="qs2">
+                                <b-label for="qs2">
+                                    <strong>19. Using this recommender system was entertaining and I would recommend it to my friends. To answer <br> this question correctly, you must select "Strongly Disagree".</strong>
+                                </b-label>
+                                <b-form-radio-group name="qs2" required>
+                                    <b-form-radio value="-2">Strongly Disagree</b-form-radio>
+                                    <b-form-radio value="-1">Disagree</b-form-radio>
+                                    <b-form-radio value="0">Neutral</b-form-radio>
+                                    <b-form-radio value="1">Agree</b-form-radio>
+                                    <b-form-radio value="2" class="mr-5">Strongly Agree</b-form-radio>
+                                    <b-form-radio value="3" class="ml-5">I don't understand</b-form-radio>
+                                </b-form-radio-group>
+                            </b-form-group>
+                        </b-col>
+                    </b-row>
+
+                    <b-row class="mt-5" align-v="center">
+                        <b-col class="mt-2" cols="auto">
+                            <b-icon class="h1" icon="sliders"></b-icon>
+                        </b-col>
+                        <b-col>
+                            <b-form-group name="q20" id="q20">
+                                <b-label for="q20">
+                                    <strong>20. I was not able to describe my preferences w.r.t. relevance, diversity, and novelty.</strong>
+                                </b-label>
+                                <b-form-radio-group name="q20" required>
+                                    <b-form-radio value="-2">Strongly Disagree</b-form-radio>
+                                    <b-form-radio value="-1">Disagree</b-form-radio>
+                                    <b-form-radio value="0">Neutral</b-form-radio>
+                                    <b-form-radio value="1">Agree</b-form-radio>
+                                    <b-form-radio value="2" class="mr-5">Strongly Agree</b-form-radio>
+                                    <b-form-radio value="3" class="ml-5">I don't understand</b-form-radio>
+                                </b-form-radio-group>
+                            </b-form-group>
+                        </b-col>
+                    </b-row>
+
+                    <b-row class="mt-5" align-v="center">
+                        <b-col class="mt-2" cols="auto">
+                            <b-icon class="h1" icon="sliders"></b-icon>
+                        </b-col>
+                        <b-col>
+                            <b-form-group name="q21" id="q21">
+                                <b-label for="q21">
+                                    <strong>21. The mechanism (slider) for tweaking the objectives was understandable and intuitive.</strong>
+                                </b-label>
+                                <b-form-radio-group name="q21" required>
+                                    <b-form-radio value="-2">Strongly Disagree</b-form-radio>
+                                    <b-form-radio value="-1">Disagree</b-form-radio>
+                                    <b-form-radio value="0">Neutral</b-form-radio>
+                                    <b-form-radio value="1">Agree</b-form-radio>
+                                    <b-form-radio value="2" class="mr-5">Strongly Agree</b-form-radio>
+                                    <b-form-radio value="3" class="ml-5">I don't understand</b-form-radio>
+                                </b-form-radio-group>
+                            </b-form-group>
+                        </b-col>
+                    </b-row>
+
+                    <b-row class="mt-5">
+                        <b-col cols="auto">
+                            <b-icon class="h1" icon="image"></b-icon>
+                        </b-col>
+                        <b-col cols="auto">
+                            <b-row align-h="start">
+                                <b-col cols="auto">
+                                    <b-label :for="items.at(2).movie.movie_idx + 'ch'">
+                                        <strong>
+                                            22. Do you remember the following movie?
+                                        </strong>
+                                    </b-label>
+                                </b-col>
+                            </b-row>
+                            <b-row class="mt-3 mb-3" align-h="center">
+                                <b-col cols="auto">
+                                    <b-img style="width: 175px; height: auto;" :src="items.at(2).movie.url" v-b-tooltip.hover :title="items.at(2).movie.name"></b-img>
+                                </b-col>
+                            </b-row>
+                            <b-row align-h="start">
+                                <b-col cols="auto">
+                                    <b-form-radio-group :name="items.at(2).movie.movie_idx + 'ch'" required>
+                                        <b-form-radio value="0">Was not recommended at all</b-form-radio>
+                                        <b-form-radio value="1">Was among recommendations</b-form-radio>
+                                        <b-form-radio value="2">I selected the movie</b-form-radio>
+                                        <b-form-radio value="3">I am not sure</b-form-radio>
+                                    </b-form-radio-group>
+                                </b-col>
+                            </b-row>
+                        </b-col>
+                    </b-row>
+
+                    <b-row class="mt-5" align-v="center">
+                        <b-col class="mt-2" cols="auto">
+                            <b-icon class="h1" icon="sliders"></b-icon>
+                        </b-col>
+                        <b-col>
+                            <b-form-group name="q23" id="q23">
+                                <b-label for="q23">
+                                    <strong>23. Appropriate values of relevance, diversity, and novelty ratios were easy to set.</strong>
+                                </b-label>
+                                <b-form-radio-group name="q23" required>
                                     <b-form-radio value="-2">Strongly Disagree</b-form-radio>
                                     <b-form-radio value="-1">Disagree</b-form-radio>
                                     <b-form-radio value="0">Neutral</b-form-radio>
@@ -444,11 +582,11 @@
                             <b-icon class="h1" icon="window"></b-icon>
                         </b-col>
                         <b-col>
-                            <b-form-group name="q19" id="q19">
-                                <b-label for="q19">
-                                    <strong>19. Overall, I am satisfied with the recommender.</strong>
+                            <b-form-group name="q24" id="q24">
+                                <b-label for="q24">
+                                    <strong>24. Overall, I am satisfied with the recommender.</strong>
                                 </b-label>
-                                <b-form-radio-group name="q19" required>
+                                <b-form-radio-group name="q24" required>
                                     <b-form-radio value="-2">Strongly Disagree</b-form-radio>
                                     <b-form-radio value="-1">Disagree</b-form-radio>
                                     <b-form-radio value="0">Neutral</b-form-radio>
@@ -459,62 +597,18 @@
                             </b-form-group>
                         </b-col>
                     </b-row>
-                </b-col>
-            </b-row>
-            <b-row class="mb-2" align-h="center">
-                <b-col class="text-center">
-                    <h4>Do you remember the following movies?</h4>
-                </b-col>
-            </b-row>
-            <b-row align-h="center">
-                <b-col cols="auto">
-                    <b-table :fields="fields" :items="items">
-                        <template #cell(movie)="data">
-                            <b-img style="width: 175px; height: auto;" :src="data.value.url" v-b-tooltip.hover :title="data.value.name"></b-img>
-                        </template>
-                        <template #cell(_please_select)="data">
-                            <b-form-radio-group stacked :name="data.item.movie.movie_idx + 'ch'" required>
-                                <b-form-radio value="0">The movie was not recommended at all</b-form-radio>
-                                <b-form-radio value="1">The movie was among recommendations</b-form-radio>
-                                <b-form-radio value="2">I selected the movie from recommendations</b-form-radio>
-                                <b-form-radio value="3">I am not sure</b-form-radio>
-                            </b-form-radio-group>
-                        </template>
-                    </b-table>
-                </b-col>
-            </b-row>
 
-            <b-row class="mb-3" align-h="center">
-                <b-col cols="auto">
-                    <b-row class="mt-5" align-v="center">
-                        <b-col class="mt-2" cols="auto">
-                            <b-icon class="h1" icon="people"></b-icon>
-                        </b-col>        
-                        <b-col>
-                            <b-form-group name="qs1" id="qs1">
-                                <b-label for="qs1">
-                                    <strong>Using this recommender system was entertaining and I would recommend it to my friends. To answer <br> this question correctly, you must select "Strongly Disagree".</strong>
-                                </b-label>
-                                <b-form-radio-group name="qs1" required>
-                                    <b-form-radio value="-2">Strongly Disagree</b-form-radio>
-                                    <b-form-radio value="-1">Disagree</b-form-radio>
-                                    <b-form-radio value="1">Agree</b-form-radio>
-                                    <b-form-radio value="2" class="mr-5">Strongly Agree</b-form-radio>
-                                </b-form-radio-group>
-                            </b-form-group>
-                        </b-col>
-                    </b-row>
-        
+                    
                     <b-row class="mt-5" align-v="center">
                         <b-col class="mt-2" cols="auto">
                             <b-icon class="h1" icon="controller"></b-icon>
                         </b-col>
                         <b-col>
-                            <b-form-group name="qs2" id="qs2">
-                                <b-label for="qs2">
-                                    <strong>This recommender system provided me with many tips for interesting computer games.</strong>
+                            <b-form-group name="qs3" id="qs3">
+                                <b-label for="qs3">
+                                    <strong>25. This recommender system provided me with many tips for interesting computer games.</strong>
                                 </b-label>
-                                <b-form-radio-group name="qs2" required>
+                                <b-form-radio-group name="qs3" required>
                                     <b-form-radio value="-2">Strongly Disagree</b-form-radio>
                                     <b-form-radio value="-1">Disagree</b-form-radio>
                                     <b-form-radio value="1">Agree</b-form-radio>
@@ -525,6 +619,8 @@
                     </b-row>
                 </b-col>
             </b-row>
+
+
             
 
             <b-row align-h="center">
