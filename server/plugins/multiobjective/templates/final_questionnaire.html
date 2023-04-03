@@ -483,6 +483,50 @@
                     </b-table>
                 </b-col>
             </b-row>
+
+            <b-row class="mb-3" align-h="center">
+                <b-col cols="auto">
+                    <b-row class="mt-5" align-v="center">
+                        <b-col class="mt-2" cols="auto">
+                            <b-icon class="h1" icon="people"></b-icon>
+                        </b-col>        
+                        <b-col>
+                            <b-form-group name="qs1" id="qs1">
+                                <b-label for="qs1">
+                                    <strong>Using this recommender system was entertaining and I would recommend it to my friends. To answer <br> this question correctly, you must select "Strongly Disagree".</strong>
+                                </b-label>
+                                <b-form-radio-group name="qs1" required>
+                                    <b-form-radio value="-2">Strongly Disagree</b-form-radio>
+                                    <b-form-radio value="-1">Disagree</b-form-radio>
+                                    <b-form-radio value="1">Agree</b-form-radio>
+                                    <b-form-radio value="2" class="mr-5">Strongly Agree</b-form-radio>
+                                </b-form-radio-group>
+                            </b-form-group>
+                        </b-col>
+                    </b-row>
+        
+                    <b-row class="mt-5" align-v="center">
+                        <b-col class="mt-2" cols="auto">
+                            <b-icon class="h1" icon="controller"></b-icon>
+                        </b-col>
+                        <b-col>
+                            <b-form-group name="qs2" id="qs2">
+                                <b-label for="qs2">
+                                    <strong>This recommender system provided me with many tips for interesting computer games.</strong>
+                                </b-label>
+                                <b-form-radio-group name="qs2" required>
+                                    <b-form-radio value="-2">Strongly Disagree</b-form-radio>
+                                    <b-form-radio value="-1">Disagree</b-form-radio>
+                                    <b-form-radio value="1">Agree</b-form-radio>
+                                    <b-form-radio value="2" class="mr-5">Strongly Agree</b-form-radio>
+                                </b-form-radio-group>
+                            </b-form-group>
+                        </b-col>
+                    </b-row>
+                </b-col>
+            </b-row>
+            
+
             <b-row align-h="center">
                 <b-col class="text-center">
                     <b-btn type="submit" variant="primary" center>{{finish}}</b-btn>
