@@ -28,7 +28,7 @@
                 <b-row align-h="center" class="mb-1 mt-1" v-for="row in variantResults">
                     <b-col sm="auto" class="align-middle" v-for="col in row">
                         <div>
-                            <b-popover :target="variantNames[algoIdx] + '_' + col.movie_idx" triggers="hover" placement="right">
+                            <b-popover @show="popoverShown" @hidden="popoverHidden" :target="variantNames[algoIdx] + '_' + col.movie_idx" triggers="hover" placement="right">
                                 <template #title>[[col.movie]]</template>
                                  <div>
                                     <strong>Plot: </strong>
@@ -38,8 +38,8 @@
                                     <b-button target="_blank" @click="onTrailerWatch(col)" :href="col.trailer_url" size="sm" variant="primary">IMDb trailer</b-button>
                                  </div>
                                  
-                              </b-popover>
-                            <b-img :id="variantNames[algoIdx] + '_' + col.movie_idx" style="width: 175px; height: 260px;" block center :src="col.url" v-on:click="onSelectMovie($event, col, variantsResults.indexOf(variantResults))" :name="col.movie_idx" :alt="col.movie" />
+                            </b-popover>
+                            <b-img @mouseenter="itemMouseEnter" @mouseleave="itemMouseLeave" :id="variantNames[algoIdx] + '_' + col.movie_idx" style="width: 175px; height: 260px;" block center :src="col.url" v-on:click="onSelectMovie($event, col, variantsResults.indexOf(variantResults))" :name="col.movie_idx" :alt="col.movie" />
                             
                             
                         </div>
