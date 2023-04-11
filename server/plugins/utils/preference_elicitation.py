@@ -182,7 +182,7 @@ def load_data_3(elicitation_movies):
 def calculate_weight_estimate(selected_movies, elicitation_movies, return_supports=False):
     if not selected_movies:
         x = np.array([1.0, 1.0, 1.0])
-        return x / x.sum()
+        return x / x.sum(), {}
 
     loader = load_ml_dataset()
 
@@ -218,23 +218,31 @@ def calculate_weight_estimate(selected_movies, elicitation_movies, return_suppor
     novelties = 1.0 - (users_viewed_item / loader.rating_matrix.shape[0])
     novelties = novelties[movie_indices].reshape((-1, 1))
 
+    # for movie_idx in movie_indices:
+    #     if movie_idx in selected_movies:
+    #         r = loader.rating_matrix[:, movie_idx]
+    #         #r = r[r > 0.0]
+    #         r = r.mean(axis=0)
+    #         #r = r.mean()
+    #         selected_relevances.append(r) # TODO try without transposition
+    #         # selected_diversities.append(distance_matrix[movie_idx][movie_indices].mean())
+    #         d = distance_matrix[movie_idx][movie_indices].sum() / (len(movie_indices) - 1)
+    #         selected_diversities.append(d[d > 0].reshape(-1, 1))
+    #         selected_novelties.append(1.0 - (loader.rating_matrix[:, movie_idx].astype(bool).sum() / loader.rating_matrix.shape[0]))
 
-    for movie_idx in movie_indices:
-        if movie_idx in selected_movies:
-            r = loader.rating_matrix[:, movie_idx]
-            #r = r[r > 0.0]
-            r = r.mean(axis=0)
-            #r = r.mean()
-            selected_relevances.append(r) # TODO try without transposition
-            # selected_diversities.append(distance_matrix[movie_idx][movie_indices].mean())
-            d = distance_matrix[movie_idx][movie_indices].sum() / (len(movie_indices) - 1)
-            selected_diversities.append(d[d > 0].reshape(-1, 1))
-            selected_novelties.append(1.0 - (loader.rating_matrix[:, movie_idx].astype(bool).sum() / loader.rating_matrix.shape[0]))
+    for movie_idx in selected_movies:
+        r = loader.rating_matrix[:, movie_idx]
+        r = r.mean(axis=0)
+        selected_relevances.append(r)
+        d = distance_matrix[movie_idx][movie_indices].sum() / (len(movie_indices) - 1)
+        selected_diversities.append(d[d > 0].reshape(-1, 1))
+        selected_novelties.append(1.0 - (loader.rating_matrix[:, movie_idx].astype(bool).sum() / loader.rating_matrix.shape[0]))
+
     
     if (not selected_relevances) or (not selected_diversities) or (not selected_novelties):
         print(f"Something weird again: {movie_indices}, {selected_movies}")
         x = np.array([1.0, 1.0, 1.0])
-        return x / x.sum()
+        return x / x.sum(), {}
 
     # Take relevance values of all items and train CDF on it
     # Calculate CDF for relevances of all selected items and take their average
