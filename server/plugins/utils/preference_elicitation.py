@@ -345,9 +345,11 @@ def enrich_results(top_k, loader, support=None):
             "genres": genres,
             "support": support,
             "trailer_url": trailer_url,
-            "plot": plot
+            "plot": plot,
+            "rank": rank
             }
-            for movie, url, movie_idx, movie_id, genres, support, trailer_url, plot in zip(top_k_description, top_k_url, top_k, top_k_ids, top_k_genres, top_k_supports, top_k_trailers, top_k_plots)
+            for movie, url, movie_idx, movie_id, genres, support, trailer_url, plot, rank in
+                zip(top_k_description, top_k_url, top_k, top_k_ids, top_k_genres, top_k_supports, top_k_trailers, top_k_plots, range(len(top_k_ids)))
         ]
     return [
         {
@@ -357,9 +359,11 @@ def enrich_results(top_k, loader, support=None):
             "movie_id": movie_id,
             "genres": genres,
             "trailer_url": trailer_url,
-            "plot": plot
+            "plot": plot,
+            "rank": rank
         }
-        for movie, url, movie_idx, movie_id, genres, trailer_url, plot in zip(top_k_description, top_k_url, top_k, top_k_ids, top_k_genres, top_k_trailers, top_k_plots)
+        for movie, url, movie_idx, movie_id, genres, trailer_url, plot, rank in
+            zip(top_k_description, top_k_url, top_k, top_k_ids, top_k_genres, top_k_trailers, top_k_plots, range(len(top_k_ids)))
     ]
 
 def prepare_wrapper(selected_movies, model, mandate_allocation_factory, obj_weights, filter_out_movies = [], k=10, norm_f=cdf):

@@ -177,7 +177,9 @@ window.app = new Vue({
             return -1;
         },
         onSelectMovie(event, item, variant) {
+            let variantName = this.variantNames[variant];
             item['variant'] = variant;
+            item['variant_name'] = variantName;
             let index = this.movieIndexOf(this.selected, item);
             if (index > -1) {
                 // Already there, remove it
@@ -186,7 +188,12 @@ window.app = new Vue({
                     copies[j].classList.remove("selected");
                 }
                 this.selected.splice(index, 1);
-                reportDeselectedItem(`/utils/deselected-item`, csrfToken, item, this.selected, ()=>{ return {"variant": variant}; });
+                reportDeselectedItem(`/utils/deselected-item`, csrfToken, item, this.selected, ()=>{ 
+                    return {
+                        "variant": variant,
+                        "variant_name": variantName
+                    }; 
+                });
             } else {
                 // Not there, insert
                 var copies = document.getElementsByName(event.srcElement.name);
@@ -194,7 +201,12 @@ window.app = new Vue({
                     copies[j].classList.add("selected");
                 }
                 this.selected.push(item);
-                reportSelectedItem(`/utils/selected-item`, csrfToken, item, this.selected, ()=>{ return {"variant": variant}; });
+                reportSelectedItem(`/utils/selected-item`, csrfToken, item, this.selected, ()=>{
+                    return {
+                        "variant": variant,
+                        "variant_name": variantName
+                    };
+                });
             }
             this.selectedMovieIndices = this.selected.map((x) => x.movie_idx).join(",");
             this.selectedMovieVariants = this.selected.map((x) => x.variant).join(",");
