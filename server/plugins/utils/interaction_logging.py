@@ -1,6 +1,6 @@
 import datetime
 import json
-from models import Interaction, Participation
+from models import Interaction, Participation, Message
 from app import db
 
 def log_interaction(participation_id, interaction_type, **kwargs):
@@ -12,6 +12,15 @@ def log_interaction(participation_id, interaction_type, **kwargs):
     )
     db.session.add(x)
     db.session.commit() 
+
+def log_message(participation_id, **kwargs):
+    x = Message(
+        time = datetime.datetime.utcnow(),
+        data = json.dumps(kwargs, ensure_ascii=False),
+        participation = participation_id
+    )
+    db.session.add(x)
+    db.session.commit()
 
 def study_ended(participation_id, **kwargs):
 

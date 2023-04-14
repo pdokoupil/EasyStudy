@@ -13,7 +13,7 @@ import datetime
 from models import Interaction, Participation, Message, UserStudy
 from app import db
 
-from .interaction_logging import study_ended
+from .interaction_logging import study_ended, log_message
 
 __plugin_name__ = "utils"
 __description__ = "Plugin containing common, shared functionality that can be used from other plugins."
@@ -309,16 +309,12 @@ def on_input():
 
 @bp.route("/on-message", methods=["POST"])
 def on_message():
-    x = Message(
-        time = datetime.datetime.utcnow(),
-        data = json.dumps(request.get_json(), ensure_ascii=False)
-    )
-
     if "participation_id" in flask.session:
-        x.participation = Participation.query.filter(Participation.id == flask.session["participation_id"]).first().id
+        participation = Participation.query.filter(Participation.id == flask.session["participation_id"]).first().id
+    else:
+        participation = None
 
-    db.session.add(x)
-    db.session.commit()
+    log_message(participation, **request.get_json())
     return "OK"
 
 # TODO use from layoutshuffling statistics implementation as well
