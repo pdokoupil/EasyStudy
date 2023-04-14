@@ -319,8 +319,10 @@ def compare_done():
 @bp.route("/final-questionnaire")
 @multi_lang
 def final_questionnaire():
+    if "iteration" not in session:
+        print(f"This should no happen, session: {session}")
+
     params = {
-        "iteration": session["iteration"],
         "continuation_url": url_for(f'{__plugin_name__}.finish_user_study')
     }
 
