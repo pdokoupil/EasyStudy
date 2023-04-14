@@ -1,3 +1,28 @@
+window.onerror = function(message, url, lineNumber) {  
+    let err_json = JSON.stringify(message, Object.getOwnPropertyNames(message));
+    reportError("/utils/on-message", csrfToken, window.location.href, message, ()=> {
+        return {
+            "url": url,
+            "lineNumber": lineNumber,
+            "src_handler": "window.onerrror",
+            "err_json": err_json
+        }
+    });
+    return true;
+};
+
+Vue.config.errorHandler = function(err, vm, info) {
+    let err_json = JSON.stringify(err, Object.getOwnPropertyNames(err));
+    reportError("/utils/on-message", csrfToken, window.location.href, err, ()=> {
+        return {
+            "info": info,
+            "src_handler": "vue",
+            "err_json": err_json
+        }
+    });
+    return true;
+}
+
 window.app = new Vue({
     el: '#app',
     delimiters: ['[[',']]'], // Used to replace double { escaping with double [ escaping (to prevent jinja vs vue inference)

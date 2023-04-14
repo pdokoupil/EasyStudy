@@ -634,6 +634,7 @@
     var csrfToken = "{{csrf_token()}}";
     var attentionMovies = JSON.parse('{{attention_movies | tojson | safe}}');
 </script>
+<script src="{{url_for('static', filename='message_reporting.js')}}"></script>
 <script src="{{url_for('static', filename='resolution_handling.js')}}"></script>
 <script src="{{url_for('static', filename='interaction_reporting.js')}}"></script>
 {{ emit_assets('multiobjective','final_questionnaire.js') }}     
