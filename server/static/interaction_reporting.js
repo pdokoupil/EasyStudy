@@ -172,7 +172,12 @@ function registerClickedRadioReporting(endpoint, csrfToken, radios, extraCtxLamb
 function reportLoadedPage(endpoint, csrfToken, pageName, extraCtxLambda=()=>"") {
     data = {
         "page": pageName,
-        "context": getContext(extraCtxLambda())
+        "context": getContext(extraCtxLambda()),
+        "browser": {
+            "userAgent": navigator.userAgent,
+            "cookieEnabled": navigator.cookieEnabled,
+            "language": navigator.language
+        }
     };
     return fetch(endpoint,
         {
