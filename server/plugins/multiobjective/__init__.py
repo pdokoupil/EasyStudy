@@ -17,7 +17,7 @@ from common import get_tr, load_languages, multi_lang, load_user_study_config
 from flask import Blueprint, request, redirect, render_template, url_for, session
 
 from plugins.utils.preference_elicitation import recommend_2_3, rlprop, weighted_average, get_objective_importance, prepare_tf_model, calculate_weight_estimate, load_ml_dataset, enrich_results
-from plugins.utils.interaction_logging import log_interaction
+from plugins.utils.interaction_logging import log_interaction, log_message
 
 from plugins.fastcompare import elicitation_ended, iteration_started, iteration_ended
 
@@ -320,7 +320,18 @@ def compare_done():
 @multi_lang
 def final_questionnaire():
     if "iteration" not in session:
-        print(f"This should no happen, session: {session}")
+        print(f"This should no happen, session: {session}", flush=True)
+        part = session["participation_id"] if "participation_id" in session else None
+        data = {
+            "message": "Iteration not found",
+            "accessed": session.accessed,
+            "modified": session.modified,
+            "session_kv": dict(session.items())
+        }
+        log_message(part, **data)
+    else:
+        part = session["participation_id"] if "participation_id" in session else None
+        log_message(part, **{"message": "Everything is OK", "Check": session["attention_check"]})
 
     params = {
         "continuation_url": url_for(f'{__plugin_name__}.finish_user_study')
