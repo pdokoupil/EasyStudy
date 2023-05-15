@@ -10,3 +10,5 @@ server/instance/
 *.sqlite
 img
 cache
+.gitignore
+server/instance/db.sqlite
