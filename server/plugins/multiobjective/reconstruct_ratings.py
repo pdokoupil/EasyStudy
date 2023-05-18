@@ -16,7 +16,7 @@ import argparse
 
 import tensorflow as tf
 
-from plugins.utils.preference_elicitation import prepare_tf_model, load_ml_dataset, prepare_wrapper, weighted_average_strategy, rlprop, weighted_average
+from plugins.utils.preference_elicitation import prepare_tf_model, load_ml_dataset, prepare_wrapper, weighted_average_strategy, rlprop, weighted_average, recommend_2_3
 from plugins.utils.rlprop_wrapper import get_supports
 
 import pandas as pd
@@ -99,6 +99,30 @@ def create_elicitation_selections_csv(df_interaction):
             ]
             df_result = pd.concat([df_result, pd.DataFrame([new_row], columns=df_result.columns)], ignore_index=True)
                 
+    return df_result
+
+def create_selections_csv(df_interaction):
+    df_result = pd.DataFrame(columns = [
+        "userId",
+        "movieId",
+        "timestamp",
+        "session",
+        "rank",
+        "mo"
+    ])
+    
+    df_selections = df_interaction[df_interaction.interaction_type == "selected-item"]
+    for _, row in df_selections.iterrows():
+        d = json.loads(row.data)
+        new_row = [
+            row.participation,
+            d["selected_item"]["movie_idx"],
+            int(datetime.fromisoformat(row.time).timestamp()),
+            row.iteration,
+            d["selected_item"]["rank"],
+            d["selected_item"]["variant_name"] != "BETA"
+        ]
+        df_result = pd.concat([df_result, pd.DataFrame([new_row], columns=df_result.columns)], ignore_index=True)
     return df_result
 
 def create_impressions_csv(df_interaction):
@@ -354,6 +378,317 @@ def calc_beta_supports(df_interaction, df_elicitation_selections, df_impressions
             # 
         print(f"Participant = {participation} DONE after {time.perf_counter() - start_time}")
     return df_beta_supports
+
+
+# Calculates supports w.r.t past user selections, not w.r.t. items shown from a single recommendation algorithm
+# Only users selection during preference elicitation are considered for rating matrix estimation
+def calc_adjusted_supports(df_interaction, df_elicitation, df_elicitation_selections, df_impressions, df_impressions_beta, movie_title_to_idx):
+    df_supports = pd.DataFrame(columns=[
+        "userId",
+        "movieId",
+        "relevanceSupport",
+        "diversitySupport",
+        "noveltySupport",
+        "session",
+        "rank",
+        "algo",
+        "mo"
+    ])
+
+    num_broken = 0
+
+    for _, row in df_interaction.iterrows():
+        d = json.loads(row.data)
+        participation = row.participation
+        
+        print(f"Participant = {participation} STARTING")
+
+        el_ended = df_elicitation[(df_elicitation.participation == participation)].iloc[0]
+        orig_permutation = json.loads(el_ended.data)["orig_permutation"]
+
+        elicitation_selected = df_elicitation_selections[df_elicitation_selections.userId == participation].movieId.values.astype(int).tolist()
+
+        #df_impressions_user = df_impressions[df_impressions.userId == participation]
+        #df_impressions_beta_user = df_impressions_beta[df_impressions_beta.userId == participation]
+        #print(df_impressions_beta_user)
+
+        ### Support calculation ###
+        #users_partial_lists = np.full((wrapper.extended_rating_matrix.shape[0], len(real)), -1, dtype=np.int32)
+        movie_titles, scores, model = predict_ratings(elicitation_selected, elicitation_selected, return_model = True)
+        selected_variants = d["selected_variants"]
+        _, wrapper = prepare_wrapper(elicitation_selected, model, weighted_average_strategy, np.array([0.0, 0.5, 0.5]), elicitation_selected, k=len(sum(d["selected"], [])))
+        wrapper.init()
+        #partial_list = []
+        result = []
+        
+        #selected_algorithms = d
+        all_selected = []
+        
+        if len(selected_variants) != 8:
+            num_broken += 1
+            print(f"######### NUM BROKEN = {num_broken}")
+            continue
+
+        for iter, (selected_movie_idxs, selected_variants) in enumerate(zip(d["selected"], selected_variants)):
+
+            for selected_movie_idx, selected_variant in zip(selected_movie_idxs, selected_variants):
+                algo = None
+                for algo_name, variant in orig_permutation[iter].items():
+                    if variant == selected_variant:
+                        algo = algo_name
+
+                all_selected.append({
+                    "movie_idx": selected_movie_idx,
+                    "variant": selected_variant,
+                    "algorithm": algo,
+                    "mo": algo != "BETA",
+                    "session": iter + 1
+                })
+
+
+
+        users_partial_lists = np.full((wrapper.extended_rating_matrix.shape[0], len(all_selected)), -1, dtype=np.int32)
+        
+        for idx, selected_info in enumerate(all_selected):
+            
+            # Calculate support values
+            supports = get_supports(users_partial_lists, wrapper.items,
+                                            wrapper.extended_rating_matrix, wrapper.distance_matrix,
+                                            wrapper.users_viewed_item, k=idx+1, n_users=wrapper.n_users)
+            
+            supports[0, :, :] = wrapper.normalizations[0](supports[0].T).T * wrapper.discount_sequences[0][idx]
+            supports[1, :, :] = wrapper.normalizations[1](supports[1].reshape(-1, 1)).reshape((supports.shape[1], -1)) * wrapper.discount_sequences[1][idx]
+            supports[2, :, :] = wrapper.normalizations[2](supports[2].reshape(-1, 1)).reshape((supports.shape[1], -1)) * wrapper.discount_sequences[2][idx]
+            ### End of support calculation ###
+            result.append({
+                "movie_idx": selected_info["movie_idx"],
+                "support": {
+                    "relevance": supports[0, 0, idx],
+                    "diversity": supports[1, 0, idx],
+                    "novelty": supports[2, 0, idx]
+                },
+                "rank": idx,
+                "mo": selected_info["mo"],
+                "algorithm": selected_info["algorithm"]
+            })
+
+            new_row = [
+                participation,
+                selected_info["movie_idx"],
+                supports[0, 0, idx],
+                supports[1, 0, idx],
+                supports[2, 0, idx],
+                selected_info["session"],
+                idx,
+                selected_info["algorithm"],
+                selected_info["mo"]
+            ]
+            df_supports = pd.concat([df_supports, pd.DataFrame([new_row], columns=df_supports.columns)], axis=0)
+
+            users_partial_lists[0, idx] = selected_info["movie_idx"]
+
+
+    #     for i in range(N_ITERATIONS):
+    #         already_seen = df_impressions_user[df_impressions_user.iteration < i + 1].movieId.values.astype(int).tolist()
+    #         filter_out_movies = elicitation_selected + already_seen
+    #         selected_movies = elicitation_selected + sum(d["selected"][:i], [])
+
+    #         movie_titles, scores, model = predict_ratings(selected_movies, filter_out_movies, return_model = True)
+    #         movie_indices = [movie_title_to_idx[t] for t in movie_titles]
+            
+    #         #w = df_weights[(df_weights.userId == participation) & (df_weights.iteration == i + 1)].iloc[0]
+    #         #simulated_beta_result = weighted_average(selected_movies, model, np.array([1.0, 0.0, 0.0]), filter_out_movies, k=10, include_support=True)
+    #         #assert len(simulated_beta_result) == 10
+            
+    #         #weighted_average_res = weighted_average(selected_movies, model, np.array([w.relevanceWeight, w.diversityWeight, w.noveltyWeight]), filter_out_movies, k=10, include_support=True)
+    #         #rlprop_res = rlprop(selected_movies, model, np.array([w.relevanceWeight, w.diversityWeight, w.noveltyWeight]), filter_out_movies, k=10, include_support=True)
+    #         real = df_impressions_beta_user[df_impressions_beta_user.iteration == i + 1].movieId.values.astype(int).tolist()
+            
+    #         #print(f"iteration i = {i}, participation = {participation}")
+    #         #print(f"Real BETA result = {real}")
+    #         #print(f"Simulated BETA result with supports = {simulated_beta_result}")
+            
+    #         #print(f"Weighted average result = {weighted_average_res}")
+    #         #print(f"Rlprop result = {rlprop_res}")
+            
+    #         #if real != [int(x["movie_idx"]) for x in simulated_beta_result]: #, f"{real} != {[int(x['movie_idx']) for x in simulated_beta_result]}"
+            
+    #         print(f"Warning for participant = {participation}, and iteration == {i}, fallback calculation of supports")
+    #         _, wrapper = prepare_wrapper(selected_movies, model, weighted_average_strategy, np.array([1.0, 0.0, 0.0]), filter_out_movies)
+    #         wrapper.init()
+    #         partial_list = []
+    #         simulated_beta_result = []
+            
+            
+    #         for idx, m_index in enumerate(real):
+                
+    #             # Calculate support values
+    #             supports = get_supports(users_partial_lists, wrapper.items,
+    #                                             wrapper.extended_rating_matrix, wrapper.distance_matrix,
+    #                                             wrapper.users_viewed_item, k=idx+1, n_users=wrapper.n_users)
+                
+    #             supports[0, :, :] = wrapper.normalizations[0](supports[0].T).T * wrapper.discount_sequences[0][idx]
+    #             supports[1, :, :] = wrapper.normalizations[1](supports[1].reshape(-1, 1)).reshape((supports.shape[1], -1)) * wrapper.discount_sequences[1][idx]
+    #             supports[2, :, :] = wrapper.normalizations[2](supports[2].reshape(-1, 1)).reshape((supports.shape[1], -1)) * wrapper.discount_sequences[2][idx]
+    #             ### End of support calculation ###
+    #             simulated_beta_result.append({
+    #                 "movie_idx": m_index,
+    #                 "support": {
+    #                     "relevance": supports[0, 0, idx],
+    #                     "diversity": supports[1, 0, idx],
+    #                     "novelty": supports[2, 0, idx]
+    #                 },
+    #                 "rank": idx
+    #             })
+    #             partial_list.append(m_index)
+
+    #         assert partial_list == real, f"{partial_list} != {real}"
+
+            
+    #         for res in simulated_beta_result:
+    #             df_supports_user = pd.DataFrame({
+    #                 "userId": [participation],
+    #                 "movieId": [int(res["movie_idx"])],
+    #                 "relevanceSupport": [res["support"]["relevance"]],
+    #                 "diversitySupport": [res["support"]["diversity"]],
+    #                 "noveltySupport": [res["support"]["novelty"]],
+    #                 "session": [i + 1],
+    #                 "timestamp": [int(datetime.fromisoformat(row.time).timestamp())],
+    #                 "rank": [res["rank"]]
+    #             })
+            
+    #             df_beta_supports = pd.concat([df_beta_supports, df_supports_user], axis=0)
+
+
+    #         #print(f"@@ i={i}, real={real}, participation={participation}")
+    #         #print(f"@@ predicted={x}, already_seen={already_seen}, elicitation_selected={elicitation_selected}, rest={sum(d['selected'][:i], [])}")
+            
+            
+    #         #print(f"For iteration = {i + 1} we assume following recommendation: {x}, real was: {real}")
+    #         #assert x == real
+    #         # 
+    #     print(f"Participant = {participation} DONE after {time.perf_counter() - start_time}")
+    # return df_beta_supports
+    print(f"######### NUM BROKEN = {num_broken}")
+    return df_supports
+
+# Same as function above, but works iteratively, rating matrix is recaculated after every iteration
+def calc_adjusted_supports_2(df_interaction, df_elicitation, df_elicitation_selections, df_impressions, df_impressions_beta, movie_title_to_idx):
+    df_supports = pd.DataFrame(columns=[
+        "userId",
+        "movieId",
+        "relevanceSupport",
+        "diversitySupport",
+        "noveltySupport",
+        "session",
+        "rank",
+        "algo",
+        "mo"
+    ])
+
+    num_broken = 0
+
+    for _, row in df_interaction.iterrows():
+        d = json.loads(row.data)
+        participation = row.participation
+        start_time = time.perf_counter()
+        print(f"Participant = {participation} STARTING")
+
+        
+        el_ended = df_elicitation[(df_elicitation.participation == participation)].iloc[0]
+        orig_permutation = json.loads(el_ended.data)["orig_permutation"]
+
+        
+        elicitation_selected = df_elicitation_selections[df_elicitation_selections.userId == participation].movieId.values.astype(int).tolist()
+
+        df_impressions_user = df_impressions[df_impressions.userId == participation]
+        df_impressions_beta_user = df_impressions_beta[df_impressions_beta.userId == participation]
+        # print(df_impressions_beta_user)
+
+        selected_variants = d["selected_variants"]
+        
+        #selected_algorithms = d
+        all_selected = []
+        
+        if len(selected_variants) != 8:
+            num_broken += 1
+            print(f"######### NUM BROKEN = {num_broken}")
+            continue
+
+        for iter, (selected_movie_idxs, selected_variants) in enumerate(zip(d["selected"], selected_variants)):
+
+            for selected_movie_idx, selected_variant in zip(selected_movie_idxs, selected_variants):
+                algo = None
+                for algo_name, variant in orig_permutation[iter].items():
+                    if variant == selected_variant:
+                        algo = algo_name
+
+                all_selected.append({
+                    "movie_idx": selected_movie_idx,
+                    "variant": selected_variant,
+                    "algorithm": algo,
+                    "mo": algo != "BETA",
+                    "session": iter + 1
+                })
+
+        users_partial_lists = np.full((1, len(all_selected)), -1, dtype=np.int32)
+
+
+        for i in range(N_ITERATIONS):
+            already_seen = df_impressions_user[df_impressions_user.iteration < i + 1].movieId.values.astype(int).tolist()
+            filter_out_movies = elicitation_selected + already_seen
+            selected_movies = elicitation_selected + sum(d["selected"][:i], [])
+            print(f"Iteration = {i}, num selected = {selected_movies}")
+            movie_titles, scores, model = predict_ratings(selected_movies, filter_out_movies, return_model = True)
+            #real = df_impressions_beta_user[df_impressions_beta_user.iteration == i + 1].movieId.values.astype(int).tolist()
+            
+            _, wrapper = prepare_wrapper(selected_movies, model, weighted_average_strategy, np.array([1.0, 0.0, 0.0]), filter_out_movies, k=len(sum(d["selected"], [])))
+            wrapper.init()
+            
+            selected_so_far = len(sum(d["selected"][:i], []))
+            selected_in_iteration = len(d["selected"][i])
+            for idx in range(selected_so_far, selected_so_far + selected_in_iteration):
+                
+                selected_info = all_selected[idx]
+
+                # Calculate support values
+                supports = get_supports(users_partial_lists, wrapper.items,
+                                                wrapper.extended_rating_matrix, wrapper.distance_matrix,
+                                                wrapper.users_viewed_item, k=idx+1, n_users=wrapper.n_users)
+                
+                supports[0, :, :] = wrapper.normalizations[0](supports[0].T).T * wrapper.discount_sequences[0][idx]
+                supports[1, :, :] = wrapper.normalizations[1](supports[1].reshape(-1, 1)).reshape((supports.shape[1], -1)) * wrapper.discount_sequences[1][idx]
+                supports[2, :, :] = wrapper.normalizations[2](supports[2].reshape(-1, 1)).reshape((supports.shape[1], -1)) * wrapper.discount_sequences[2][idx]
+                ### End of support calculation ###
+                
+
+                new_row = [
+                    participation,
+                    selected_info["movie_idx"],
+                    supports[0, 0, idx],
+                    supports[1, 0, idx],
+                    supports[2, 0, idx],
+                    selected_info["session"],
+                    idx,
+                    selected_info["algorithm"],
+                    selected_info["mo"]
+                ]
+                df_supports = pd.concat([df_supports, pd.DataFrame([new_row], columns=df_supports.columns)], axis=0)
+
+                assert users_partial_lists[0, idx] == -1, f"{users_partial_lists}, idx={idx}"
+                users_partial_lists[0, idx] = selected_info["movie_idx"]
+
+
+            #print(f"@@ i={i}, real={real}, participation={participation}")
+            #print(f"@@ predicted={x}, already_seen={already_seen}, elicitation_selected={elicitation_selected}, rest={sum(d['selected'][:i], [])}")
+            
+            
+            #print(f"For iteration = {i + 1} we assume following recommendation: {x}, real was: {real}")
+            #assert x == real
+            # 
+        assert not np.any(users_partial_lists[0] == -1), f"{users_partial_lists}"
+        print(f"Participant = {participation} DONE after {time.perf_counter() - start_time}")
+    return df_supports
 
 def do_mmr(impression_indices, impression_scores, lmbda):
     partial_list = []
@@ -897,24 +1232,158 @@ def topic_coverage_on_hits(rec_list, all_user_selections):
     rec_list_genres = get_list_genres(rec_list_hits)
     return len(rec_list_genres) / len(get_all_genres())
 
+
+def calc_list_supports(real_list, wrapper):
+    users_partial_lists = np.full((1, len(real_list)), -1, dtype=np.int32)
+    final_supports = []
+    for idx, m_index in enumerate(real_list):
+        
+        # Calculate support values
+        supports = get_supports(users_partial_lists, wrapper.items,
+                                        wrapper.extended_rating_matrix, wrapper.distance_matrix,
+                                        wrapper.users_viewed_item, k=idx+1, n_users=wrapper.n_users)
+        
+        supports[0, :, :] = wrapper.normalizations[0](supports[0].T).T * wrapper.discount_sequences[0][idx]
+        supports[1, :, :] = wrapper.normalizations[1](supports[1].reshape(-1, 1)).reshape((supports.shape[1], -1)) * wrapper.discount_sequences[1][idx]
+        supports[2, :, :] = wrapper.normalizations[2](supports[2].reshape(-1, 1)).reshape((supports.shape[1], -1)) * wrapper.discount_sequences[2][idx]
+        
+        ### End of support calculation ###
+        final_supports.append({
+            "movie_idx": m_index,
+            "support": {
+                "relevance": supports[0, 0, idx],
+                "diversity": supports[1, 0, idx],
+                "novelty": supports[2, 0, idx]
+            },
+            "rank": idx
+        })
+        users_partial_lists[0, idx] = m_index
+    return final_supports
+
+def show_differences(df_interaction, df_elicitation_selections, df_impressions, df_impressions_beta, movie_title_to_idx, df_selections):
+
+    results = pd.DataFrame(columns=["userId", "session", "FT_vs_NO_FT", "FT_vs_BETA_FT", "FT_vs_REAL"])
+    results2 = pd.DataFrame(columns=["userId", "session", "rank", "movieId", "kind", "relevanceGain", "diversityGain", "noveltyGain"])
+
+    for _, row in df_interaction.iterrows():
+        d = json.loads(row.data)
+        participation = row.participation
+
+        elicitation_selected = df_elicitation_selections[df_elicitation_selections.userId == participation].movieId.values.astype(int).tolist()
+
+        df_impressions_user = df_impressions[df_impressions.userId == participation]
+        df_impressions_beta_user = df_impressions_beta[df_impressions_beta.userId == participation]
+        df_selections_user = df_selections[df_selections.userId == participation]
+        print(df_selections_user)
+
+        for i in range(N_ITERATIONS):
+            already_seen = df_impressions_user[df_impressions_user.iteration < i + 1].movieId.values.astype(int).tolist()
+            filter_out_movies = elicitation_selected + already_seen
+            selected_movies = elicitation_selected + sum(d["selected"][:i], [])
+
+            #print(f"i={i}, D selected = {d['selected']}, D len = {len(d['selected'])}, user selections from CSV = {df_selections_user[(df_selections_user.session < i + 1)].movieId.values.astype(int).tolist()}")
+
+            real = df_impressions_beta_user[df_impressions_beta_user.iteration == i + 1].movieId.values.astype(int).tolist()
+
+            alternative_source_selections = df_selections_user[(df_selections_user.session < i + 1)].movieId.values.astype(int).tolist()
+            alternative_source_selections = list(set(sum(d["selected"][:i], [])).intersection(alternative_source_selections))
+            #assert set(selected_movies) == set(elicitation_selected + alternative_source_selections), f"{selected_movies} != {elicitation_selected + alternative_source_selections}"
+
+            beta_selections = df_selections_user[(df_selections_user.session < i + 1) & (df_selections_user.mo == False)].movieId.values.astype(int).tolist()
+            print(f"Beta selections before: {beta_selections}")
+            beta_selections = list(set(sum(d["selected"][:i], [])).intersection(beta_selections)) ## Getting rid of deselections
+            print(f"Beta selections after: {beta_selections}")
+
+            top_k_fine_tuned, model = recommend_2_3(selected_movies, filter_out_movies, return_model=True)
+            top_k_fine_tuned = [int(x["movie_idx"]) for x in top_k_fine_tuned]
+            _, wrapper = prepare_wrapper(selected_movies, model, weighted_average_strategy, np.array([1.0, 0.0, 0.0]), filter_out_movies)
+            wrapper.init()
+            res = calc_list_supports(top_k_fine_tuned, wrapper)
+            #assert top_k_fine_tuned == [r["movie_idx"] for r in res], f"{top_k_fine_tuned} != {res}"
+            for r in res:
+                new_row = [participation, i + 1, r["rank"], r["movie_idx"], "ft", r["support"]["relevance"], r["support"]["diversity"], r["support"]["novelty"]]
+                results2 = pd.concat([results2, pd.DataFrame([new_row], columns=results2.columns)])
+
+
+            top_k_no_fine_tuned, model = recommend_2_3(elicitation_selected, filter_out_movies, return_model=True)
+            top_k_no_fine_tuned = [int(x["movie_idx"]) for x in top_k_no_fine_tuned]
+            _, wrapper = prepare_wrapper(elicitation_selected, model, weighted_average_strategy, np.array([1.0, 0.0, 0.0]), filter_out_movies)
+            wrapper.init()
+            res = calc_list_supports(top_k_no_fine_tuned, wrapper)
+            #assert top_k_no_fine_tuned == [r["movie_idx"] for r in res], f"{top_k_no_fine_tuned} != {res}"
+            for r in res:
+                new_row = [participation, i + 1, r["rank"], r["movie_idx"], "no_ft", r["support"]["relevance"], r["support"]["diversity"], r["support"]["novelty"]]
+                results2 = pd.concat([results2, pd.DataFrame([new_row], columns=results2.columns)])
+            
+            top_k_beta_fine_tuned, model = recommend_2_3(elicitation_selected + beta_selections, filter_out_movies, return_model=True)
+            top_k_beta_fine_tuned = [int(x["movie_idx"]) for x in top_k_beta_fine_tuned]
+            _, wrapper = prepare_wrapper(elicitation_selected + beta_selections, model, weighted_average_strategy, np.array([1.0, 0.0, 0.0]), filter_out_movies)
+            wrapper.init()
+            res = calc_list_supports(top_k_beta_fine_tuned, wrapper)
+            #assert top_k_beta_fine_tuned == [r["movie_idx"] for r in res], f"{top_k_beta_fine_tuned} != {res}"
+            for r in res:
+                new_row = [participation, i + 1, r["rank"], r["movie_idx"], "beta_ft", r["support"]["relevance"], r["support"]["diversity"], r["support"]["novelty"]]
+                results2 = pd.concat([results2, pd.DataFrame([new_row], columns=results2.columns)])
+            
+            ft_vs_no_ft = len(set(top_k_fine_tuned).intersection(top_k_no_fine_tuned))
+            ft_vs_beta_ft = len(set(top_k_fine_tuned).intersection(top_k_beta_fine_tuned))
+            ft_vs_real = len(set(top_k_fine_tuned).intersection(real))
+
+            print(f"#### [{participation}, {i + 1}] Intersection sizes: FT vs NO_FT = {ft_vs_no_ft}, FT vs BETA_FT = {ft_vs_beta_ft}, @@ FT vs REAL_FT = {ft_vs_real} @@")
+            
+            new_row = [participation, i + 1, ft_vs_no_ft, ft_vs_beta_ft, ft_vs_real]
+            results = pd.concat([results, pd.DataFrame([new_row], columns=results.columns)])
+
+            # Simulate whole recommendation lists
+            
+
+
+            # df_ratings_user = pd.DataFrame({
+            #     "userId": np.repeat(participation, scores.size),
+            #     "movieId": movie_indices,
+            #     "rawRating": scores,
+            #     "session": np.repeat(i + 1, scores.size)    
+            # })
+            
+            #print(df_ratings_user.head())
+            #df_ratings = pd.concat([df_ratings, df_ratings_user], axis=0)
+            #print("DF_ratings =")
+            #print(df_ratings.head())
+
+            #real = df_impressions_beta_user[df_impressions_beta_user.iteration == i + 1].movieId.values.astype(int).tolist()
+            
+            #print(f"@@ i={i}, real={real}, participation={participation}")
+            #print(f"@@ predicted={x}, already_seen={already_seen}, elicitation_selected={elicitation_selected}, rest={sum(d['selected'][:i], [])}")
+            
+            
+            #print(f"For iteration = {i + 1} we assume following recommendation: {x}, real was: {real}")
+            #assert x == real
+            # 
+
+    #return df_ratings
+    return results, results2
+
 parser = argparse.ArgumentParser()
 parser.add_argument("--reranking", action="store_true", default=False)
 parser.add_argument("--gen-ratings", action="store_true", default=False)
 parser.add_argument("--gen-beta-supports", action="store_true", default=False)
 parser.add_argument("--precalculate-normalizations", action="store_true", default=False)
 parser.add_argument("--lmbda", type=float)
+parser.add_argument("--participation-path", type=str, default="C:/Users/PD/Documents/MFF/beyinterecsys/data/18-4-2023 19-18/participation-export.json")
+parser.add_argument("--interaction-path", type=str, default="C:/Users/PD/Documents/MFF/beyinterecsys/data/18-4-2023 19-18/interaction-export.json")
 args = parser.parse_args()
 
 if __name__ == "__main__":
 
-    df_interaction = pd.read_json("C:/Users/PD/Documents/MFF/beyinterecsys/data/18-4-2023 19-18/interaction-export.json", encoding='utf-8')
+    df_interaction = pd.read_json(args.interaction_path, encoding='utf-8')
     df_interaction_raw = df_interaction.copy()
-    df_participation = pd.read_json("C:/Users/PD/Documents/MFF/beyinterecsys/data/18-4-2023 19-18/participation-export.json", encoding="utf-8")
+    df_participation = pd.read_json(args.participation_path, encoding="utf-8")
     df_participation = df_participation[df_participation.user_study_id >= 4]
     df_participation = df_participation.set_index("id")
     df_participation = df_participation[df_participation.participant_email != "a@a.a"]
     df_participation  = df_participation[df_participation.time_finished.notna()]
     df_interaction = df_interaction[df_interaction.participation.isin(df_participation.index)]
+    df_elicitation = df_interaction[df_interaction.interaction_type == "elicitation-ended"]
     
     df_interaction = df_interaction.apply(set_iteration, axis=1)
     df_interaction['iteration'] = df_interaction.groupby(['participation'], sort=False, group_keys=False)['iteration'].apply(lambda x: x.ffill())
@@ -930,6 +1399,7 @@ if __name__ == "__main__":
     
     df_impressions = create_impressions_csv(df_interaction_full)
     df_impressions_beta = create_beta_impressions_csv(df_interaction_full)
+    df_selections = create_selections_csv(df_interaction_full)
 
 
     movie_title_to_idx = dict()
@@ -955,3 +1425,15 @@ if __name__ == "__main__":
         print(f"Generating beta supports")
         df_weights = create_weights_csv(df_interaction_full)
         calc_beta_supports(df_interaction, df_elicitation_selections, df_impressions, df_impressions_beta, movie_title_to_idx, df_weights).to_csv("./beta_supports.csv", index=False)
+
+    #calc_adjusted_supports(df_interaction, df_elicitation, df_elicitation_selections, df_impressions, df_impressions_beta, movie_title_to_idx).to_csv("./tmp_1.csv", index=False)
+    #calc_adjusted_supports_2(df_interaction, df_elicitation, df_elicitation_selections, df_impressions, df_impressions_beta, movie_title_to_idx).to_csv("./tmp_2.csv", index=False)
+
+    #loader.movies_df.to_csv("movies_df_backup.csv", index=False)
+    #np.save("./similarity_matrix_backup.npy", loader.similarity_matrix)
+    #np.save("./rating_matrix_backup.npy", loader.rating_matrix)
+    
+
+    r1, r2 = show_differences(df_interaction, df_elicitation_selections, df_impressions, df_impressions_beta, movie_title_to_idx, df_selections)
+    r1.to_csv("./ft_no_ft_comparison.csv", index=False)
+    r2.to_csv("./ft_no_ft_recommendations.csv", index=False)
