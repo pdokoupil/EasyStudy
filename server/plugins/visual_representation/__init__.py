@@ -13,6 +13,12 @@ from sqlalchemy.orm import Session
 
 from flask import Blueprint, request, redirect, render_template, url_for, session
 
+
+
+import functools
+import os
+import numpy as np
+
 __plugin_name__ = "visualrepresentation"
 __version__ = "0.1.0"
 __author__ = "Patrik Dokoupil"
@@ -23,6 +29,8 @@ bp = Blueprint(__plugin_name__, __plugin_name__, url_prefix=f"/{__plugin_name__}
 
 MIN_ITERATIONS = 5
 N_ITERATIONS = 100
+
+
 
 # Uncomment this endpoint to make plugin visible in the administration
 @bp.route("/create")
@@ -44,7 +52,9 @@ def join():
 # Callback once user has joined we forward to preference elicitation
 @bp.route("/on-joined", methods=["GET", "POST"])
 def on_joined():
+    
     session["iteration"] = 1
+
     return redirect(url_for(f"{__plugin_name__}.compare_visualizations",
             consuming_plugin=__plugin_name__
         )
