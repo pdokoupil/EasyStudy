@@ -11,7 +11,6 @@ import sys
 from common import get_abs_project_root_path
 
 from pathlib import Path
-import jsonpickle
 
 N_EXAMPLES_PER_DATASET = 5 # We have 5 examples per dataset
 PER_METHOD_ATTENTION_CHECK = True
