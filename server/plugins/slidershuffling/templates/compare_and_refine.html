@@ -1,0 +1,682 @@
+{% include 'header.html' %}
+<style>
+    .verticalSeparator {
+        border-left: 10px solid red;
+    }
+</style>
+<div id="app">
+    <b-container fluid>
+        {% if comparison_hint_override is defined and comparison_hint_override is not none  %}
+        <div class="jumbotron smallJumbotron">
+            {{ comparison_hint_override | safe }}
+            <h5>({{iteration}}/{{MIN_ITERATION_TO_CANCEL}})</h5>
+        </div>
+        {% else %}
+        <b-jumbotron class="smallJumbotron" header="{{header}} ({{iteration}}/{{MIN_ITERATION_TO_CANCEL}})" lead="{{hint_lead}}" header-level="4">
+            {{hint}}
+            <strong>{{note}}:</strong> {{note_text}}
+        </b-jumbotron>
+        {% endif %}
+
+        <!-- https://stackoverflow.com/questions/43999618/how-to-define-a-temporary-variable-in-vue-js-template -->
+        <b-row class="ml-1 mr-1">
+            {% if result_layout == "columns" or result_layout == "column-single" %}
+            <b-col v-for="variantResults in variantsResults" :set="algoIdx = variantsResults.indexOf(variantResults)" :class="variantsResults.indexOf(variantResults) != 0 ? 'verticalSeparator' : ''">
+                <b-row align-h="center">
+                    <h5>{{algorithm}} [[ variantNames[algoIdx] ]]</h5>
+                </b-row>
+                <b-row align-h="center" class="mb-1 mt-1" v-for="row in variantResults">
+                    <b-col sm="auto" class="align-middle" v-for="col in row">
+                        <div>
+                            <b-popover @show="popoverShown" @hidden="popoverHidden" :target="variantNames[algoIdx] + '_' + col.movie_idx" triggers="hover" placement="right">
+                                <template #title>[[col.movie]]</template>
+                                 <div>
+                                    <strong>Plot: </strong>
+                                    [[col.plot]]
+                                 </div>
+                                 <div v-if="col.trailer_url" class="mt-1 text-center">
+                                    <b-button target="_blank" @click="onTrailerWatch(col)" :href="col.trailer_url" size="sm" variant="primary">IMDb trailer</b-button>
+                                 </div>
+                                 
+                            </b-popover>
+                            <b-img @mouseenter="itemMouseEnter" @mouseleave="itemMouseLeave" :id="variantNames[algoIdx] + '_' + col.movie_idx" style="width: 175px; height: 260px;" block center :src="col.url" v-on:click="onSelectMovie($event, col, variantsResults.indexOf(variantResults))" :name="col.movie_idx" :alt="col.movie" />
+                            
+                            
+                        </div>
+                    </b-col>
+                </b-row>
+                <b-row align-h="center">
+                    <b-col sm="4">
+                        <label for="rating-sm" class="mt-1">{{algorithm_satisfaction}}</label>
+                        <b-form-rating :variant="algorithmRatingVariant(variantsResults.indexOf(variantResults))" v-on:change="onAlgorithmRatingChanged($event, variantsResults.indexOf(variantResults))" show-value show-value-max id="rating-sm" size="sm"></b-form-rating>
+                    </b-col>
+                </b-row>
+            </b-col>
+            {%elif result_layout == "rows" or result_layout == "row-single" %}
+            <b-col align-h="center">
+                <b-row align-h="center" v-for="variantResults in variantsResults" :set="algoIdx = variantsResults.indexOf(variantResults)">
+                    <b-col class="text-center" align-h="center">
+                        <h5>{{algorithm}} [[ variantNames[algoIdx] ]]</h5>
+                        <b-row align-h="center" class="mb-1 mt-1" v-for="row in variantResults">
+                            {% if result_layout == "rows" %}
+                            <b-col class="col" xl="auto" class="align-middle" v-for="col in row">
+                            {% else %}
+                            <b-col class="align-middle" v-for="col in row">
+                            {% endif %}
+                                <b-img :id="variantNames[algoIdx] + '_' + col.movie_idx" fluid :src="col.url" v-on:click="onSelectMovie($event, col, variantsResults.indexOf(variantResults))" :name="col.movie_idx" :alt="col.movie" v-b-tooltip.hover :title="col.movie" />
+                            </b-col>
+                        </b-row>
+                        <b-row align-h="center">
+                            <b-col cols="4">
+                                <label for="rating-sm" class="mt-1">{{algorithm_satisfaction}}</label>
+                                <b-form-rating :variant="algorithmRatingVariant(variantsResults.indexOf(variantResults))" v-on:change="onAlgorithmRatingChanged($event, variantsResults.indexOf(variantResults))" show-value show-value-max id="rating-sm" size="sm"></b-form-rating>
+                            </b-col>
+                        </b-row>
+                        
+                        <!-- Separator (except for after last one) -->
+                        <b-row v-if="algoIdx < variantsResults.length - 1" class="mt-1 mb-1">
+                            <b-container fluid>
+                                <div style="height: 10px; background-color: red;"></div>
+                            </b-container>
+                        </b-row>
+                    </b-col>
+                </b-row>
+            </b-col>
+            {%elif result_layout == "row-single-scrollable" %}
+
+            <b-col align-h="center">
+                <b-row align-h="center" v-for="variantResults in variantsResults" :set="algoIdx = variantsResults.indexOf(variantResults)">
+                    <!-- <div class="text-center" style="max-width: 100%;" > -->
+                    <b-col class="text-center align-middle" align-h="center" xl="6" sm="auto" md=auto lg="6" >
+                        <h5>{{algorithm}} [[ variantNames[algoIdx] ]]</h5>
+                        <div :id="variantNames[algoIdx] + '-scrollableDiv'" name="scrollableDiv" style="overflow-x: auto; scroll-snap-type: x mandatory; white-space: nowrap; display: flex; flex-wrap: nowrap; align-items: center; width: 100%; text-align: left;" v-for="row in variantResults">
+                            <div style="scroll-snap-align: center; margin-right: 1px; flex: 0 0 auto;" cols="auto" class="mr-3" v-for="col in row">
+                                <b-img :id="variantNames[algoIdx] + '_' + col.movie_idx" :style="{width: 'auto', height: imageHeight + 'px'}" center :src="col.url" v-on:click="onSelectMovie($event, col, variantsResults.indexOf(variantResults))" :name="col.movie_idx" :alt="col.movie" v-b-tooltip.hover :title="col.movie" />
+                            </div>
+                        </div>
+                        <b-row align-v="center">
+                            <b-col align-h="start">
+                                <label for="rating-sm" class="mt-1">{{algorithm_satisfaction}}</label>
+                            </b-col>
+                            <b-col align-h="end">
+                                <b-form-rating
+                                    class="mt-1" :variant="algorithmRatingVariant(variantsResults.indexOf(variantResults))"
+                                    v-on:change="onAlgorithmRatingChanged($event, variantsResults.indexOf(variantResults))"
+                                    show-value show-value-max id="rating-sm" size="sm">
+                                </b-form-rating>
+                            </b-col>
+                        </b-row>
+                        
+                        <!-- Separator (except for after last one) -->
+                        <b-row v-if="algoIdx < variantsResults.length - 1" class="mt-1 mb-1">
+                            <b-container fluid>
+                                <div style="height: 10px; background-color: red;"></div>
+                            </b-container>
+                        </b-row>
+                    </b-col>
+                    <!-- </div> -->
+                </b-row>
+            </b-col>
+            {%elif result_layout == "max-columns" %}
+            <b-col v-for="variantResults in variantsResults" :set="algoIdx = variantsResults.indexOf(variantResults)" :class="variantsResults.indexOf(variantResults) != 0 ? 'verticalSeparator' : ''">
+                <b-row align-h="center">
+                    <h5>{{algorithm}} [[ variantNames[algoIdx] ]]</h5>
+                </b-row>
+                <b-row align-h="center" align-v="center" class="mb-1 mt-1" v-for="row in variantResults">
+                    <b-col lg="4" xl="auto" class="align-middle" v-for="col in row">
+                        <b-img :id="variantNames[algoIdx] + '_' + col.movie_idx" fluid :style="{ 'max-width': maxColumnsMaxWidth + 'px' }" center :src="col.url" v-on:click="onSelectMovie($event, col, variantsResults.indexOf(variantResults))" :name="col.movie_idx" :alt="col.movie" v-b-tooltip.hover :title="col.movie" />
+                    </b-col>
+                </b-row>
+                <b-row align-h="center">
+                    <b-col sm="4">
+                        <label for="rating-sm" class="mt-1">{{algorithm_satisfaction}}</label>
+                        <b-form-rating :variant="algorithmRatingVariant(variantsResults.indexOf(variantResults))" v-on:change="onAlgorithmRatingChanged($event, variantsResults.indexOf(variantResults))" show-value show-value-max id="rating-sm" size="sm"></b-form-rating>
+                    </b-col>
+                </b-row>
+            </b-col>
+            {% endif %}
+        </b-row>
+        <hr>
+        <b-row v-if="!selected.length" class="mt-2" align-h="center">
+            <b-form-checkbox
+                :state="dontLikeAnythingState"    
+                v-model="dontLikeAnythingValue"
+            >
+                {{like_nothing}}
+            </b-form-checkbox>
+        </b-row>
+        <b-row class="mt-3 ml-1 mr-1" align-h="center">
+            <b-form-group :hidden="variantsResults.length != 2" label-align="center" label="{{algorithm_how_compare}}" v-slot="{ ariaDescribedby }">
+                <b-form-radio-group
+                  id="radio-group-2"
+                  :aria-describedby="ariaDescribedby"
+                  name="radio-sub-component"
+                  :state="algorithmComparisonState"
+                  v-model="algorithmComparisonValue"
+                >
+                  <b-form-radio value="first">[[variantNames.at(0)]] {{significantly}}</b-form-radio>
+                  <b-form-radio value="second">[[variantNames.at(0)]] {{slightly}}</b-form-radio>
+                  <b-form-radio value="third">{{same}}</b-form-radio>
+                  <b-form-radio value="fourth">[[variantNames.at(1)]] {{slightly}}</b-form-radio>
+                  <b-form-radio value="fifth">[[variantNames.at(1)]] {{significantly}}</b-form-radio>
+                </b-form-radio-group>
+            </b-form-group>
+        </b-row>
+        
+        <!-- <b-row class="mt-4 mb-4">
+            <b-col center class="align-middle"></b-col>
+            <b-col center class="align-middle">
+                <b-btn block variant="primary" v-on:click="onClickContinue" :disabled="showRefinement || !allValidated">Continue</b-btn>
+            </b-col>
+            <b-col center class="align-middle"></b-col>
+        </b-row>
+         -->
+        <!-- Horizontal separator between results and refinement -->
+        <b-row class="mt-4 mb-4">
+            <b-col center class="align-middle"></b-col>
+            <b-col center class="align-middle text-center">
+                <b-button
+                    @click="showAndScroll"
+                    :disabled="showRefinement || !allValidated"
+                    block
+                    variant="primary"
+                    :class="showRefinement ? null : 'collapsed'"
+                    :aria-expanded="showRefinement ? 'true' : 'false'"
+                    aria-controls="collapse-1">Continue</b-button>
+            </b-col>
+            <b-col center class="align-middle"></b-col>
+        </b-row>
+        
+        <b-collapse id="collapse-1" v-model="showRefinement" class="mt-2">
+            <b-card>
+                <!-- <b-row class="mt-3 mb-3">
+                    <b-container fluid>
+                        <div style="height: 10px; background-color: green;"></div>
+                    </b-container>
+                </b-row> -->
+                <!-- Refinement starts here -->
+                <b-row align-h="center">
+                    <b-col class="ml-3 mr-3" v-for="i in refinementAlgorithms.length">
+                        {% if refinement_layout == "0" %}
+                        <div v-if="refinementAlgorithms[i - 1]">
+                            <b-row class="mb-3">
+                                <b-col class="text-center">You can tweak the recommendation algorithm by fine-tuning the amount of attention it pays to different objectives. This will affect recommendations in the next step. Description of individual objectives is hidden under the questionmark icon.</b-col>
+                            </b-row>
+                            <b-row>
+                                <b-col>
+                                    <b-form method="GET" action="{{ refine_results_url }}">
+                                        <b-row align-v="center">
+                                            <b-icon class="mr-1 h3" :id="'relevance-help'+i" icon="question-circle-fill" variant="primary"></b-icon>
+                                            <b-tooltip :target="'relevance-help'+i" triggers="hover">{{relevance_explanation}}</b-tooltip>
+                                            <label for="range-1">Relevance: [[ relevance[i - 1].toFixed(1) ]]</label>
+                                            <b-form-input :data-idx="i - 1" id="range-1" type="range" v-model.number="relevance[i - 1]" :formatter="onRelevanceChange2" step="0.01" min="0" max="1"></b-form-input>
+                                            <!-- <div class="mt-2">Value: [[ relevance ]]</div> -->
+                                        </b-row>
+                                        <b-row align-v="center" class="mt-3">
+                                            <b-icon class="mr-1 h3" :id="'diversity-help'+i" icon="question-circle-fill" variant="primary"></b-icon>
+                                            <b-tooltip :target="'diversity-help'+i" triggers="hover">{{diversity_explanation}}</b-tooltip>
+                                            <label for="range-2">Diversity: [[ diversity[i - 1].toFixed(1) ]]</label>
+                                            <b-form-input :data-idx="i - 1" id="range-2" type="range" v-model.number="diversity[i - 1]" :formatter="onDiversityChange2" step="0.01" min="0" max="1"></b-form-input>
+                                            <!-- <div class="mt-2">Value: [[ diversity ]]</div> -->
+                                        </b-row>
+                                        <b-row align-v="center" class="mt-3">
+                                            <b-icon class="mr-1 h3" :id="'novelty-help'+i" icon="question-circle-fill" variant="primary"></b-icon>
+                                            <b-tooltip :target="'novelty-help'+i" triggers="hover">{{novelty_explanation}}</b-tooltip>
+                                            <label for="range-3">Novelty: [[ novelty[i - 1].toFixed(1) ]]</label>
+                                            <b-form-input :data-idx="i - 1" id="range-3" type="range" v-model.number="novelty[i - 1]" :formatter="onNoveltyChange2" min="0" step="0.01" max="1"></b-form-input>
+                                            <!-- <div class="mt-2">Value: [[ novelty ]]</div> -->
+                                        </b-row>
+                                    </b-form>
+                                </b-col>
+                            </b-row>
+                        </div>
+                        <div v-else>
+                            <b-row align-v="center" class="mb-3">
+                                <b-col class="text-center">This algorithm does not allow to refine weights. It only considers relevance by showing items based on your past selections.</b-col>
+                            </b-row>
+                            <b-row align-v="center">
+                                <b-col class="text-center">
+                                    The results correspond to setting with relevance 1.0 and diversity with novelty both being 0.0
+                                </b-col>
+                            </b-row>
+                        </div>
+                        {% elif refinement_layout == "1" %}
+                        <b-form method="GET" action="{{ refine_results_url }}">
+                            <b-row align-v="center">
+                                <b-icon class="mr-1 h3" :id="'relevance-help'+i" icon="question-circle-fill" variant="primary"></b-icon>
+                                <b-tooltip :target="'relevance-help'+i" triggers="hover">{{relevance_explanation}}</b-tooltip>
+                                <label for="range-1">Relevance: [[ relevance[i - 1] ]]</label>
+                                <b-form-input :data-idx="i - 1" id="range-1" type="range" :formatter="onRelevanceChange" v-model.number="relevance[i - 1]" step="0.01" min="0" max="1" :disabled="!refinementAlgorithms[i - 1]"></b-form-input>
+                                <!-- <div class="mt-2">Value: [[ relevance ]]</div> -->
+                            </b-row>
+                            <b-row align-v="center" class="mt-3">
+                                <b-icon class="mr-1 h3" :id="'diversity-help'+i" icon="question-circle-fill" variant="primary"></b-icon>
+                                <b-tooltip :target="'diversity-help'+i" triggers="hover">{{diversity_explanation}}</b-tooltip>
+                                <label for="range-2">Diversity: [[ diversity[i - 1] ]]</label>
+                                <b-form-input :data-idx="i - 1" id="range-2" type="range" v-model.number="diversity[i - 1]" :formatter="onDiversityChange" step="0.01" min="0" max="1" :disabled="!refinementAlgorithms[i - 1]"></b-form-input>
+                                <!-- <div class="mt-2">Value: [[ diversity ]]</div> -->
+                            </b-row>
+                            <b-row align-v="center" class="mt-3">
+                                <b-icon class="mr-1 h3" :id="'novelty-help'+i" icon="question-circle-fill" variant="primary"></b-icon>
+                                <b-tooltip :target="'novelty-help'+i" triggers="hover">{{novelty_explanation}}</b-tooltip>
+                                <label for="range-3">Novelty: [[ novelty[i - 1] ]]</label>
+                                <b-form-input :data-idx="i - 1" id="range-3" type="range" v-model.number="novelty[i - 1]" :formatter="onNoveltyChange" min="0" step="0.01" max="1" :disabled="!refinementAlgorithms[i - 1]"></b-form-input>
+                                <!-- <div class="mt-2">Value: [[ novelty ]]</div> -->
+                            </b-row>
+                        </b-form>
+                        {% elif refinement_layout == "2" %}
+                        <b-form method="GET" action="{{ refine_results_url }}">
+                            <b-row>
+                                <b-col>
+                                    <b-form-group>
+                                        <label>
+                                            Results were <strong>relevant</strong>
+                                        </label>
+                                        <b-icon id="relevance-help" icon="question-circle-fill" variant="primary"></b-icon>
+                                        <b-tooltip target="relevance-help" triggers="hover">TODO</b-tooltip>
+                                        <b-form-radio-group
+                                        id="radio-group-1"
+                                        required="True"
+                                        :state="relevanceValue[i - 1] != null"
+                                        v-model="relevanceValue[i - 1]"
+                                        :disabled="!refinementAlgorithms[i - 1]"
+                                        >
+                                        <b-form-radio value="first">Strongly disagree</b-form-radio>
+                                        <b-form-radio value="second">Disagree</b-form-radio>
+                                        <b-form-radio value="third">Neutral</b-form-radio>
+                                        <b-form-radio value="fourth">Agree</b-form-radio>
+                                        <b-form-radio value="fifth">Strongly agree</b-form-radio>
+                                        </b-form-radio-group>
+                                    </b-form-group>
+                                </b-col>
+                            </b-row>
+                            <b-row class="mt-3">
+                                <b-col>
+                                    <b-form-group>
+                                        <label>
+                                            Results were <strong>diverse</strong>
+                                        </label>
+                                        <b-icon id="diverse-help" icon="question-circle-fill" variant="primary"></b-icon>
+                                        <b-tooltip target="diverse-help" triggers="hover">TODO</b-tooltip>
+                                        <b-form-radio-group
+                                        id="radio-group-2"
+                                        required="True"
+                                        :state="diversityValue[i - 1] != null"
+                                        v-model="diversityValue[i - 1]"
+                                        :disabled="!refinementAlgorithms[i - 1]"
+                                        >
+                                        <b-form-radio value="first">Strongly disagree</b-form-radio>
+                                        <b-form-radio value="second">Disagree</b-form-radio>
+                                        <b-form-radio value="third">Neutral</b-form-radio>
+                                        <b-form-radio value="fourth">Agree</b-form-radio>
+                                        <b-form-radio value="fifth">Strongly agree</b-form-radio>
+                                        </b-form-radio-group>
+                                    </b-form-group>
+                                </b-col>
+                            </b-row>
+                            <b-row class="mt-3">
+                                <b-col>
+                                    <b-form-group>
+                                        <label>
+                                            Results were <strong>novel</strong>
+                                        </label>
+                                        <b-icon id="novelty-help" icon="question-circle-fill" variant="primary"></b-icon>
+                                        <b-tooltip target="novelty-help" triggers="hover">TODO</b-tooltip>
+                                        <b-form-radio-group
+                                        id="radio-group-3"
+                                        required="True"
+                                        :state="noveltyValue[i - 1] != null"
+                                        v-model="noveltyValue[i - 1]"
+                                        :disabled="!refinementAlgorithms[i - 1]"
+                                        >
+                                        <b-form-radio value="first">Strongly disagree</b-form-radio>
+                                        <b-form-radio value="second">Disagree</b-form-radio>
+                                        <b-form-radio value="third">Neutral</b-form-radio>
+                                        <b-form-radio value="fourth">Agree</b-form-radio>
+                                        <b-form-radio value="fifth">Strongly agree</b-form-radio>
+                                        </b-form-radio-group>
+                                    </b-form-group>
+                                </b-col>
+                            </b-row>
+                        </b-form>
+                        {% elif refinement_layout == "3" %}
+                        <b-form method="GET" @submit="onSubmit" action="{{ refine_results_url }}">
+                            <input type="hidden" hidden="true" v-model="newWeights" name="new_weights"/>
+                            <b-row>
+                                <label for="range-1">
+                                    Would you like to make the algorithm pay more/less attention to <strong>relevance</strong>?
+                                    <b-icon id="relevance-help" icon="question-circle-fill" variant="primary"></b-icon>
+                                    <b-tooltip target="relevance-help" triggers="hover">TODO</b-tooltip>
+                                </label>
+                                <b-form-input id="range-1" :formatter="onRelevanceDeltaChange" type="range" v-model="relevanceDelta[i - 1]" min="-4" max="4" :disabled="!refinementAlgorithms[i - 1]"></b-form-input>
+                                
+                                <!-- <div class="mt-2">Value: [[ relevance ]]</div> -->
+                            </b-row>
+                            <b-row>
+                                <b-col class="text-left" align-h="start">
+                                    <div>No attention</div>
+                                </b-col>
+                                <b-col class="text-center" align-h="center">
+                                    <div>[[ deltaDescription[parseInt(relevanceDelta[i - 1]) + 4] ]]</div>
+                                </b-col>
+                                <b-col class="text-right" align-h="end">
+                                    <div>Full attention</div>
+                                </b-col>
+                            </b-row>
+                            <b-row class="mt-3">
+                                <label for="range-2">
+                                    Would you like to make the algorithm pay more/less attention to <strong>diversity</strong>?
+                                    <b-icon id="diverse-help" icon="question-circle-fill" variant="primary"></b-icon>
+                                    <b-tooltip target="diverse-help" triggers="hover">TODO</b-tooltip>
+                                </label>
+                                <b-form-input id="range-2" :formatter="onDiversityDeltaChange" type="range" v-model="diversityDelta[i - 1]" min="-4" max="4" :disabled="!refinementAlgorithms[i - 1]"></b-form-input>
+                                <!-- <div class="mt-2">Value: [[ diversity ]]</div> -->
+                            </b-row>
+                            <b-row>
+                                <b-col class="text-left" align-h="start">
+                                    <div>No attention</div>
+                                </b-col>
+                                <b-col class="text-center" align-h="center">
+                                    <div>[[ deltaDescription[parseInt(diversityDelta[i - 1]) + 4] ]]</div>
+                                </b-col>
+                                <b-col class="text-right" align-h="end">
+                                    <div>Full attention</div>
+                                </b-col>
+                            </b-row>
+                            <b-row class="mt-3">
+                                <label for="range-3">
+                                    Would you like to make the algorithm pay more/less attention to <strong>novelty</strong>?
+                                    <b-icon id="novelty-help" icon="question-circle-fill" variant="primary"></b-icon>
+                                    <b-tooltip target="novelty-help" triggers="hover">TODO</b-tooltip>
+                                </label>
+                                <b-form-input id="range-3" :formatter="onNoveltyDeltaChange" type="range" v-model="noveltyDelta[i - 1]" min="-4" max="4" :disabled="!refinementAlgorithms[i - 1]"></b-form-input>
+                                <!-- <div class="mt-2">Value: [[ novelty ]]</div> -->
+                            </b-row>
+                            <b-row>
+                                <b-col class="text-left" align-h="start">
+                                    <div>No attention</div>
+                                </b-col>
+                                <b-col class="text-center" align-h="center">
+                                    <div>[[ deltaDescription[parseInt(noveltyDelta[i - 1]) + 4] ]]</div>
+                                </b-col>
+                                <b-col class="text-right" align-h="end">
+                                    <div>Full attention</div>
+                                </b-col>
+                            </b-row>
+                        </b-form>
+                        {% elif refinement_layout == "4" %}
+                        <b-form method="GET" action="{{ refine_results_url }}">
+                            <b-row>
+                                <b-col>
+                                    <b-form-group>
+                                        <label>
+                                            Relevance
+                                        </label>
+                                        <b-icon id="relevance-help" icon="question-circle-fill" variant="primary"></b-icon>
+                                        <b-tooltip target="relevance-help" triggers="hover">TODO</b-tooltip>
+                                        <b-form-radio-group
+                                        id="radio-group-1"
+                                        required="True"
+                                        :state="relevanceValue[i - 1] != null"
+                                        v-model="relevanceValue[i - 1]"
+                                        :disabled="!refinementAlgorithms[i - 1]"
+                                        >
+                                        <b-form-radio value="first">Less</b-form-radio>
+                                        <b-form-radio value="second">Slightly less</b-form-radio>
+                                        <b-form-radio value="third">Same</b-form-radio>
+                                        <b-form-radio value="fourth">More</b-form-radio>
+                                        <b-form-radio value="fifth">Slightly more</b-form-radio>
+                                        </b-form-radio-group>
+                                    </b-form-group>
+                                </b-col>
+                            </b-row>
+                            <b-row class="mt-3">
+                                <b-col>
+                                    <b-form-group>
+                                        <label>
+                                            Diversity
+                                        </label>
+                                        <b-icon id="diverse-help" icon="question-circle-fill" variant="primary"></b-icon>
+                                        <b-tooltip target="diverse-help" triggers="hover">TODO</b-tooltip>
+                                        <b-form-radio-group
+                                        id="radio-group-2"
+                                        required="True"
+                                        :state="diversityValue[i - 1] != null"
+                                        v-model="diversityValue[i - 1]"
+                                        :disabled="!refinementAlgorithms[i - 1]"
+                                        >
+                                        <b-form-radio value="first">Less</b-form-radio>
+                                        <b-form-radio value="second">Slightly less</b-form-radio>
+                                        <b-form-radio value="third">Same</b-form-radio>
+                                        <b-form-radio value="fourth">More</b-form-radio>
+                                        <b-form-radio value="fifth">Slightly more</b-form-radio>
+                                        </b-form-radio-group>
+                                    </b-form-group>
+                                </b-col>
+                            </b-row>
+                            <b-row class="mt-3">
+                                <b-col>
+                                    <b-form-group>
+                                        <label>
+                                            Novelty
+                                        </label>
+                                        <b-icon id="novelty-help" icon="question-circle-fill" variant="primary"></b-icon>
+                                        <b-tooltip target="novelty-help" triggers="hover">TODO</b-tooltip>
+                                        <b-form-radio-group
+                                        id="radio-group-3"
+                                        required="True"
+                                        :state="noveltyValue[i - 1] != null"
+                                        v-model="noveltyValue[i - 1]"
+                                        :disabled="!refinementAlgorithms[i - 1]"
+                                        >
+                                        <b-form-radio value="first">Less</b-form-radio>
+                                        <b-form-radio value="second">Slightly less</b-form-radio>
+                                        <b-form-radio value="third">Same</b-form-radio>
+                                        <b-form-radio value="fourth">More</b-form-radio>
+                                        <b-form-radio value="fifth">Slightly more</b-form-radio>
+                                        </b-form-radio-group>
+                                    </b-form-group>
+                                </b-col>
+                            </b-row>
+                        </b-form>
+                        {% elif refinement_layout == "5" %}
+                        <b-form method="GET" action="{{ refine_results_url }}">
+                            <b-row>
+                                <label for="range-1">Relevance: [[ middleRelevance.at(i - 1) ]]</label>
+                                <b-form-input id="range-1" type="range" v-model="middleRelevance[i - 1]" value="0.5" min="0" step="0.01" max="1" :disabled="!refinementAlgorithms[i - 1]"></b-form-input>
+                                <!-- <div class="mt-2">Value: [[ relevance ]]</div> -->
+                            </b-row>
+                            <b-row class="mt-3">
+                                <label for="range-2">Diversity: [[ middleDiversity.at(i - 1) ]]</label>
+                                <b-form-input id="range-2" type="range" v-model="middleDiversity[i - 1]" value="0.5" min="0" step="0.01" max="1" :disabled="!refinementAlgorithms[i - 1]"></b-form-input>
+                                <!-- <div class="mt-2">Value: [[ diversity ]]</div> -->
+                            </b-row>
+                            <b-row class="mt-3">
+                                <label for="range-3">Novelty: [[ middleNovelty.at(i - 1) ]]</label>
+                                <b-form-input id="range-3" type="range" v-model="middleNovelty[i - 1]" value="0.5" min="0" step="0.01" max="1" :disabled="!refinementAlgorithms[i - 1]"></b-form-input>
+                                <!-- <div class="mt-2">Value: [[ novelty ]]</div> -->
+                            </b-row>
+                        </b-form>
+                        {% elif refinement_layout == "6" %}
+                        <script>
+                            var defaultRelevance = 0.5;
+                            var defaultDiversity = 0.5;
+                            var defaultNovelty = 0.5;
+                        </script>
+                        <b-form method="GET" action="{{ refine_results_url }}">
+                            <b-row>
+                                <label for="range-1">Relevance: [[ relevance.at(i - 1) ]]</label>
+                                <b-form-input id="range-1" type="range" :formatter="onRelevanceChange" v-model.number="relevance[i - 1]" step="0.01" min="0" max="1" :disabled="!refinementAlgorithms[i - 1]"></b-form-input>
+                                <!-- <div class="mt-2">Value: [[ relevance ]]</div> -->
+                            </b-row>
+                            <b-row class="mt-3">
+                                <label for="range-2">Diversity: [[ diversity.at(i - 1) ]]</label>
+                                <b-form-input id="range-2" type="range" v-model.number="diversity[i - 1]" :formatter="onDiversityChange" step="0.01" min="0" max="1" :disabled="!refinementAlgorithms[i - 1]"></b-form-input>
+                                <!-- <div class="mt-2">Value: [[ diversity ]]</div> -->
+                            </b-row>
+                            <b-row class="mt-3">
+                                <label for="range-3">Novelty: [[ novelty.at(i - 1) ]]</label>
+                                <b-form-input id="range-3" type="range" v-model.number="novelty[i - 1]" :formatter="onNoveltyChange" min="0" step="0.01" max="1" :disabled="!refinementAlgorithms[i - 1]"></b-form-input>
+                                <!-- <div class="mt-2">Value: [[ novelty ]]</div> -->
+                            </b-row>
+                        </b-form>
+                        {% elif refinement_layout == "7" %}
+                        <b-form method="GET" action="{{ refine_results_url }}">
+                            <b-row align-h="center" class="mb-5 mt-5 text-center">
+                                <strong>Remaining budget: [[budget.at(i - 1)]]</strong>
+                            </b-row>
+                            <b-row>
+                                <b-col class="text-left">
+                                    <b-button class="btnFit" @click="decrease(i - 1, 'relevance')" :disabled="!refinementAlgorithms[i - 1] || boughtRelevance[i - 1] <= 0">-</b-button>
+                                </b-col>
+                                <b-col class="text-center">
+                                    R=[[boughtRelevance.at(i - 1)]]
+                                </b-col>
+                                <b-col class="text-right">
+                                    <b-button class="btnFit" @click="increase(i - 1, 'relevance')" :disabled="!refinementAlgorithms[i - 1] || budget[i - 1] <= 0">+</b-button>
+                                </b-col>
+                            </b-row>
+                            <b-row class="mt-3">
+                                <b-col class="text-left">
+                                    <b-button class="btnFit" @click="decrease(i - 1, 'diversity')" :disabled="!refinementAlgorithms[i - 1] || boughtDiversity[i - 1] <= 0">-</b-button>
+                                </b-col>
+                                <b-col class="text-center">
+                                    D=[[boughtDiversity.at(i - 1)]]
+                                </b-col>
+                                <b-col class="text-right">
+                                    <b-button class="btnFit" @click="increase(i - 1, 'diversity')" :disabled="!refinementAlgorithms[i - 1] || budget[i - 1] <= 0">+</b-button>
+                                </b-col>
+                            </b-row>
+                            <b-row class="mt-3">
+                                <b-col class="text-left">
+                                    <b-button class="btnFit" @click="decrease(i - 1, 'novelty')" :disabled="!refinementAlgorithms[i - 1] || boughtNovelty[i - 1] <= 0">-</b-button>
+                                </b-col>
+                                <b-col class="text-center">
+                                    N=[[boughtNovelty.at(i - 1)]]
+                                </b-col>
+                                <b-col class="text-right">
+                                    <b-button class="btnFit" @click="increase(i - 1, 'novelty')" :disabled="!refinementAlgorithms[i - 1] || budget[i - 1] <= 0">+</b-button>
+                                </b-col>
+                            </b-row>
+                        </b-form>
+                        {% endif %}
+                    </b-col>
+                </b-row>
+                <!-- Refinement ends here -->
+            </b-card>
+        </b-collapse>
+
+        
+
+        <b-row class="mt-4" v-if="showRefinement">
+            <b-col center class="align-middle">
+                
+            </b-col>
+            <b-col center class="align-middle">
+                {% if iteration < MIN_ITERATION_TO_CANCEL %}
+                <b-form @submit="onSubmit" method="GET" action="{{ url_for(consuming_plugin + '.algorithm_feedback') }}">
+                    <input type="hidden" hidden="true" v-model="newWeights" name="new_weights"/>
+                    <input type="hidden" hidden="true" :value="selectedMovieIndices" name="selected_movies"/>
+                    <input type="hidden" hidden="true" :value="selectedMovieVariants" name="selected_movie_variants"/>
+                    <input v-for="i in variantsResults.length" type="hidden" hidden="true" :key="i" :value="algorithmRatings[i - 1]" :name="'ar_'.concat(i)"/>
+                    <input type="hidden" hidden="true" :value="dontLikeAnythingValue" name="nothing"/>
+                    <input type="hidden" hidden="true" :value="algorithmComparisonValue" name="cmp"/>
+                    <b-overlay
+                    :show="busy"
+                    rounded
+                    opacity="0.6"
+                    spinner-small
+                    spinner-variant="primary"
+                    block
+                    >
+                        <b-button name="next_compare" id="btn_next" type="submit" block variant="primary" center>{{next}}</b-button>
+                    </b-overlay>
+                </b-form>
+                {% else %}
+                <b-form @submit="onSubmit" method="GET" action="{{ continuation_url }}">
+                    <input type="hidden" hidden="true" v-model="newWeights" name="new_weights"/>
+                    <input type="hidden" hidden="true" :value="selectedMovieIndices" name="selected_movies"/>
+                    <input type="hidden" hidden="true" :value="selectedMovieVariants" name="selected_movie_variants"/>
+                    <input v-for="i in variantsResults.length" type="hidden" hidden="true" :key="i" :value="algorithmRatings[i - 1]" :name="'ar_'.concat(i)"/>
+                    <input type="hidden" hidden="true" :value="dontLikeAnythingValue" name="nothing"/>
+                    <input type="hidden" hidden="true" :value="algorithmComparisonValue" name="cmp"/>
+                    <b-overlay
+                    :show="busy"
+                    rounded
+                    opacity="0.6"
+                    spinner-small
+                    spinner-variant="primary"
+                    block
+                    >
+                        <b-btn name="finish_compare" id="btn_next" block type="submit" variant="success" center>{{finish}}</b-btn>
+                    </b-overlay>
+                </b-form>
+                {% endif %}
+            </b-col>
+            <b-col></b-col>
+        </b-row>
+    </b-container>
+    
+    
+</div>
+
+<script type='text/javascript'>
+    // Capture JINJA stuff here
+    var movies = {{movies | tojson | safe}}; //JSON.parse({{movies | tojson | safe}});
+    var resultLayout = "{{result_layout}}";
+    var iteration = "{{iteration}}";
+    var minIterationToCancel = "{{MIN_ITERATION_TO_CANCEL}}";
+    var csrfToken = "{{csrf_token()}}"
+    
+    {% if result_layout == "columns" %}
+    var itemsPerRow = 2; // Two items per row
+    {% elif result_layout == "column-single" %}
+    var itemsPerRow = 1; // Single item per row (thus a column)
+    {% elif result_layout == "rows" %}
+    var itemsPerRow = 5; // 5 items per row
+    {% elif result_layout == "row-single" %}
+    var itemsPerRow = 1000; // I.e. everything
+    {% elif result_layout == "row-single-scrollable" %}
+    var itemsPerRow = 1000; // Deserves special handling in HTML/CSS
+    {% elif result_layout == "max-columns" %}
+    var itemsPerRow = 1000; // Deserves special handling in JS & HTML/CSS
+    {% endif %}
+
+    function compare_ctx_lambda() {
+        return {
+            "items": Array.from(document.getElementsByTagName("img")).map(x => {
+                return {
+                    "id": x.id, // Corresponds to movie idx
+                    "name": x.name,
+                    "url": x.src,
+                    "title": x.title,
+                    "viewport": getElementBoundingBox(x)
+                };
+            }),
+            "movie_scroll": true
+        };
+    }
+
+    if (defaultRelevance == undefined) {
+        var defaultRelevance = JSON.parse('{{ metrics["relevance"] | tojson | safe }}');;
+        var defaultDiversity = JSON.parse('{{ metrics["diversity"] | tojson | safe }}');
+        var defaultNovelty = JSON.parse('{{ metrics["novelty"] | tojson | safe }}');
+    }
+
+    var refinementLayout = "{{version}}";
+
+    var refinementAlgorithms = JSON.parse("{{refinement_algorithms | tojson | safe}}");
+
+</script>
+<script src="{{url_for('static', filename='resolution_handling.js')}}"></script>
+<script src="{{url_for('static', filename='interaction_reporting.js')}}"></script>
+{{ emit_assets('multiobjective','compare_and_refine.js') }}      
+{% if footer_override is defined and footer_override is not none %}
+  <div class="footerDiv mt-3">
+    {{ footer_override|safe }}
+  </div>
+</body>
+</html>
+{% else %}
+{% include 'footer.html' %}
+{% endif %}
