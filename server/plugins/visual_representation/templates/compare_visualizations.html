@@ -141,4 +141,12 @@
         }
       })
     </script>
+{% if footer_override is defined and footer_override is not none %}
+<div class="footerDiv mt-3">
+  {{ footer_override|safe }}
+</div>
+</body>
+</html>
+{% else %}
 {% include 'footer.html' %}
+{% endif %}
