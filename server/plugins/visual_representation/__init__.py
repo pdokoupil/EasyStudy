@@ -2,12 +2,14 @@ import json
 import sys
 
 from plugins.utils.interaction_logging import log_interaction
-from server.common import load_user_study_config
 
 [sys.path.append(i) for i in ['.', '..']]
 [sys.path.append(i) for i in ['../.', '../..', '../../.']]
 
 from models import UserStudy
+
+from common import load_user_study_config
+
 
 from multiprocessing import Process
 from sqlalchemy import create_engine
