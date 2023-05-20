@@ -1,6 +1,8 @@
+import json
 import sys
 
 from plugins.utils.interaction_logging import log_interaction
+from server.common import load_user_study_config
 
 [sys.path.append(i) for i in ['.', '..']]
 [sys.path.append(i) for i in ['../.', '../..', '../../.']]
@@ -13,7 +15,7 @@ from sqlalchemy.orm import Session
 
 from flask import Blueprint, request, redirect, render_template, url_for, session
 
-
+from plugins.visual_representation.utils import build_permutation, dumper
 
 import functools
 import os
@@ -35,7 +37,19 @@ N_ITERATIONS = 100
 # Uncomment this endpoint to make plugin visible in the administration
 @bp.route("/create")
 def create():
-    return render_template("visual_representation_create.html")
+    params = {
+        "footer_placeholder": "",
+        "about_placeholder": "",
+        "informed_consent_placeholder": "",
+        "algorithm_comparison_placeholder": "",
+        "finished_text_placeholder": "",
+        "override_footer": "Override Footer",
+        "override_about": "Override About",
+        "override_informed_consent": "Override Informed Consent",
+        "override_algorithm_comparison_hint": "Override Selection Instructions",
+        "override_finished_text": "Override Final Text"
+    }
+    return render_template("visual_representation_create.html", **params)
 
 @bp.context_processor
 def plugin_name():
@@ -53,19 +67,19 @@ def join():
 @bp.route("/on-joined", methods=["GET", "POST"])
 def on_joined():
     
-    session["iteration"] = 1
+    session["iteration"] = 0
+    session["permutation"] = build_permutation()
 
     return redirect(url_for(f"{__plugin_name__}.compare_visualizations",
             consuming_plugin=__plugin_name__
         )
     )
 
-def iteration_ended(iteration, selected_visualization, shown_visualizations):
+def iteration_ended(iteration, payload):
     data = {
-        "iteration": iteration,
-        "selected_visualization": selected_visualization,
-        "shown_visualizations": shown_visualizations
+        "iteration": iteration
     }
+    data.update(**payload)
     log_interaction(session["participation_id"], "iteration-ended", **data)
 
 @bp.route("/compare-visualizations")
@@ -74,29 +88,64 @@ def compare_visualizations():
         "continuation_url": url_for(f"{__plugin_name__}.handle_feedback"),
         "finish_url": url_for(f"{__plugin_name__}.finish_user_study"),
         "iteration": session["iteration"],
-        "n_iterations": N_ITERATIONS,
-        "MIN_ITERATIONS_TO_CANCEL": MIN_ITERATIONS
+        "iteration_data": json.loads(json.dumps(session["permutation"][session["iteration"]], default=dumper)),
+        "n_iterations": len(session["permutation"])
     }
+
+    conf = load_user_study_config(session["user_study_id"])
+    if "text_overrides" in conf:
+        if "comparison_hint" in conf["text_overrides"]:
+            params["comparison_hint_override"] = conf["text_overrides"]["comparison_hint"]
+
+        if "footer" in conf["text_overrides"]:
+            params["footer_override"] = conf["text_overrides"]["footer"]
+
     return render_template("compare_visualizations.html", **params)
 
 @bp.route("/finish-user-study")
 def finish_user_study():
-    return render_template("visual_representation_finish.html")
+
+    conf = load_user_study_config(session["user_study_id"])
+    params = {}
+    # Handle overrides
+    params["finished_text_override"] = None
+    params["footer_override"] = None
+    if "text_overrides" in conf:
+        if "finished_text" in conf["text_overrides"]:
+            params["finished_text_override"] = conf["text_overrides"]["finished_text"]
+
+        if "footer" in conf["text_overrides"]:
+            params["footer_override"] = conf["text_overrides"]["footer"]
+
+    return render_template("visual_representation_finish.html", **params)
 
 @bp.route("/handle-feedback")
 def handle_feedback():
     it = session["iteration"]
-    
     it += 1
     session["iteration"] = it
 
-    
-    selected_visualization = int(request.args.get("selected_visualization"))
-    iteration_ended(it - 1, selected_visualization, shown_visualizations=[])
+    method = request.args.get("method")
+    dataset = request.args.get("dataset")
+    selection_id = request.args.get("selection_id")
+    class_name = request.args.get("class_name")
+    example_name = request.args.get("example_name")
+    example_class_name = request.args.get("example_class_name")
 
-    if it - 1 >= MIN_ITERATIONS:
+    payload = {
+        "method": method,
+        "dataset": dataset,
+        "selection_id": selection_id,
+        "class_name": class_name,
+        "example_name": example_name,
+        "example_class_name": example_class_name
+    }
+
+    iteration_ended(it - 1, payload)
+
+    if it >= len(session["permutation"]):
         return redirect(url_for(f"{__plugin_name__}.finish_user_study"))
-    
+
     return redirect(url_for(f"{__plugin_name__}.compare_visualizations"))
 
 ### Long running initialization is here ####

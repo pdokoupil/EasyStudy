@@ -2,9 +2,16 @@
     <!-- Our application root element -->
     <div id="app">
       <b-container align-h="center" fluid>
-        <b-jumbotron header-level="4" header="Thank you!" lead="Finished user study text">
-            TODO some extra text
+        
+        {% if finished_text_override is defined and finished_text_override is not none  %}
+        <div class="jumbotron smallJumbotron">
+            {{ finished_text_override | safe }}
+        </div>
+        {% else %}
+        <b-jumbotron class="smallJumbotron" header="Done" lead="Thank you!" header-level="4">
         </b-jumbotron>
+        {% endif %}
+
         {% if prolific_pid is defined and prolific_pid is not none %}
         <b-row align-h="center">
             <b-col class="text-center" align-h="center" cols="6">
