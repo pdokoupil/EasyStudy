@@ -91,8 +91,8 @@ window.app = new Vue({
             selected: [],
             selectedMovieVariants: [],
             selectedMovieIndices: "",
-            algorithmComparisonValue: numAlgorithms == 2 ? null : 0,
-            algorithmComparisonValidated: numAlgorithms != 2, // For two algorithms, always mark it is nonvalid and wait for rating
+            algorithmComparisonValue: defaultComparisonValue != null ? defaultComparisonValue : (numAlgorithms == 2 ? null : 0),
+            algorithmComparisonValidated: defaultComparisonValidation == true ? true : numAlgorithms != 2, // For two algorithms, always mark it is nonvalid and wait for rating
             numAlgorithms: numAlgorithms,
             dontLikeAnythingValue: false,
             algorithmRatings: algorithmRatings,
@@ -139,7 +139,15 @@ window.app = new Vue({
             boughtNovelty: boughtNovelty,
             lastRelevanceChange: new Date(),
             lastDiversityChange: new Date(),
-            lastNoveltyChange: new Date()
+            lastNoveltyChange: new Date(),
+            refinementValidated: defaultRefinementValidated,
+            optionWeights: {
+                "first": 0.5,
+                "second": 0.66,
+                "third": 1.0,
+                "fourth": 1.5,
+                "fifth": 2.0
+            }
         }
     },
     computed: {
@@ -161,6 +169,13 @@ window.app = new Vue({
 
         onTrailerWatch(movieData) {
             reportOnInput("/utils/on-input", csrfToken, "link", movieData);
+        },
+
+        checkRefinementValidation() {
+            console.log(refinementLayout);
+            if (refinementLayout == "4") {
+                this.refinementValidated = this.relevanceValue.some(x => x != null) && this.diversityValue.some(x => x != null) && this.noveltyValue.some(x => x != null);
+            }
         },
 
         // Custom (movie specific) implementation of indexOf operator
@@ -659,7 +674,19 @@ window.app = new Vue({
 
                     // this.newWeights[i] = `${this.newRelevance[i]/sum},${this.newDiversity[i]/sum},${this.newNovelty[i]/sum}`;
                     // console.log("New weights are: " + this.newWeights[i]);
-                    this.newWeights[i] = `${this.relevance[i]},${this.diversity[i]},${this.novelty[i]}`;
+                    
+                    switch (refinementLayout) {
+                        case "4":
+                            let newRel = this.relevance[i] * this.optionWeights[this.relevanceValue[i]];
+                            let newDiv = this.diversity[i] * this.optionWeights[this.diversityValue[i]];
+                            let newNov = this.novelty[i] * this.optionWeights[this.noveltyValue[i]];
+                            let s = (newRel + newDiv + newNov);
+                            this.newWeights[i] = `${newRel / s},${newDiv / s},${newNov / s}`;
+                            break;
+                        case "0":
+                            this.newWeights[i] = `${this.relevance[i]},${this.diversity[i]},${this.novelty[i]}`;
+                            break
+                    }
                 }
             }
             this.newWeights = this.newWeights.join(";");

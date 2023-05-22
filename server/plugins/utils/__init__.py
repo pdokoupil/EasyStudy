@@ -148,7 +148,10 @@ def join():
 
         if "footer" in config["text_overrides"]:
             params["footer_override"] = config["text_overrides"]["footer"]
-    
+
+    if "disable_demographics" in config:
+        params["disable_demographics"] = config["disable_demographics"]
+
     return render_template("join.html", **params)
 
 @bp.route("/preference-elicitation", methods=["GET", "POST"])

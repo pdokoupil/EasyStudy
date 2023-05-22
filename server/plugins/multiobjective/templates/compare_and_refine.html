@@ -145,6 +145,8 @@
                 {{like_nothing}}
             </b-form-checkbox>
         </b-row>
+        
+        {% if disable_relative_comparison != True %}
         <b-row class="mt-3 ml-1 mr-1" align-h="center">
             <b-form-group :hidden="variantsResults.length != 2" label-align="center" label="{{algorithm_how_compare}}" v-slot="{ ariaDescribedby }">
                 <b-form-radio-group
@@ -162,6 +164,7 @@
                 </b-form-radio-group>
             </b-form-group>
         </b-row>
+        {% endif %}
         
         <!-- <b-row class="mt-4 mb-4">
             <b-col center class="align-middle"></b-col>
@@ -405,80 +408,126 @@
                             </b-row>
                         </b-form>
                         {% elif refinement_layout == "4" %}
-                        <b-form method="GET" action="{{ refine_results_url }}">
+                        <div v-if="refinementAlgorithms[i - 1]">
+                            <b-row class="mb-3">
+                                <b-col class="text-center">You can tweak the recommendation algorithm by fine-tuning the amount of attention it pays to different objectives. This will affect recommendations in the next step. Description of individual objectives is hidden under the questionmark icon.</b-col>
+                            </b-row>
                             <b-row>
                                 <b-col>
-                                    <b-form-group>
-                                        <label>
-                                            Relevance
-                                        </label>
-                                        <b-icon id="relevance-help" icon="question-circle-fill" variant="primary"></b-icon>
-                                        <b-tooltip target="relevance-help" triggers="hover">TODO</b-tooltip>
-                                        <b-form-radio-group
-                                        id="radio-group-1"
-                                        required="True"
-                                        :state="relevanceValue[i - 1] != null"
-                                        v-model="relevanceValue[i - 1]"
-                                        :disabled="!refinementAlgorithms[i - 1]"
-                                        >
-                                        <b-form-radio value="first">Less</b-form-radio>
-                                        <b-form-radio value="second">Slightly less</b-form-radio>
-                                        <b-form-radio value="third">Same</b-form-radio>
-                                        <b-form-radio value="fourth">More</b-form-radio>
-                                        <b-form-radio value="fifth">Slightly more</b-form-radio>
-                                        </b-form-radio-group>
-                                    </b-form-group>
+                                    <b-form method="GET" action="{{ refine_results_url }}">
+                                        <b-row align-v="center" align-h="center" style="text-align: center;">
+                                            <b-col align-h="center" style="text-align: center;">
+                                                <b-row align-v="center" align-h="center" style="text-align: center;">
+                                                    <b-col cols="auto">
+                                                        <b-row>
+                                                            <b-icon class="mr-1 h3" :id="'relevance-help'+i" icon="question-circle-fill" variant="primary"></b-icon>
+                                                            <b-tooltip :target="'relevance-help'+i" triggers="hover">{{relevance_explanation}}</b-tooltip>
+                                                            <label for="radio-group-1">Relevance:</label>
+                                                        </b-row>
+                                                    </b-col>
+                                                    <!-- <b-form-input :data-idx="i - 1" id="range-1" type="range" v-model.number="relevance[i - 1]" :formatter="onRelevanceChange2" step="0.01" min="0" max="1"></b-form-input> -->
+                                                    <b-col>
+                                                        <b-form-group>
+                                                            <b-form-radio-group
+                                                            class="pt-2 ml-2"
+                                                            :data-idx="i - 1"
+                                                            id="radio-group-1"
+                                                            required="True"
+                                                            :state="relevanceValue[i - 1] != null"
+                                                            v-model="relevanceValue[i - 1]"
+                                                            v-on:change="checkRefinementValidation"
+                                                            >
+                                                            <b-form-radio value="first">Less</b-form-radio>
+                                                            <b-form-radio value="second">Slightly less</b-form-radio>
+                                                            <b-form-radio value="third">Same</b-form-radio>
+                                                            <b-form-radio value="fourth">Slightly more</b-form-radio>
+                                                            <b-form-radio value="fifth">More</b-form-radio>
+                                                        </b-form-radio-group>
+                                                        </b-form-group>
+                                                    </b-col>
+                                                </b-row>
+                                            </b-col>
+                                        </b-row>
+                                        <b-row align-v="center" align-h="center" class="mt-3">
+                                            <b-col align-h="center" style="text-align: center;">
+                                                <b-row align-v="center" align-h="center" style="text-align: center;">
+                                                    <b-col cols="auto">
+                                                        <b-row>
+                                                            <b-icon class="mr-1 h3" :id="'diversity-help'+i" icon="question-circle-fill" variant="primary"></b-icon>
+                                                            <b-tooltip :target="'diversity-help'+i" triggers="hover">{{diversity_explanation}}</b-tooltip>
+                                                            <label for="radio-group-2">Diversity:</label>
+                                                        </b-row>
+                                                    </b-col>
+                                                    <!-- <b-form-input :data-idx="i - 1" id="range-1" type="range" v-model.number="relevance[i - 1]" :formatter="onRelevanceChange2" step="0.01" min="0" max="1"></b-form-input> -->
+                                                    <b-col>
+                                                        <b-form-group>
+                                                            <b-form-radio-group
+                                                                class="pt-2 ml-2"
+                                                                :data-idx="i - 1"
+                                                                id="radio-group-2"
+                                                                required="True"
+                                                                :state="diversityValue[i - 1] != null"
+                                                                v-model="diversityValue[i - 1]"
+                                                                v-on:change="checkRefinementValidation"
+                                                                >
+                                                                <b-form-radio value="first">Less</b-form-radio>
+                                                                <b-form-radio value="second">Slightly less</b-form-radio>
+                                                                <b-form-radio value="third">Same</b-form-radio>
+                                                                <b-form-radio value="fourth">Slightly more</b-form-radio>
+                                                                <b-form-radio value="fifth">More</b-form-radio>
+                                                            </b-form-radio-group>
+                                                        </b-form-group>
+                                                    </b-col>
+                                                </b-row>
+                                            </b-col>
+                                        </b-row>
+                                        <b-row align-v="center" align-h="center" class="mt-3">
+                                            <b-col align-h="center" style="text-align: center;">
+                                                <b-row align-v="center" align-h="center" style="text-align: center;">
+                                                    <b-col cols="auto">
+                                                        <b-row>
+                                                            <b-icon class="mr-1 h3" :id="'novelty-help'+i" icon="question-circle-fill" variant="primary"></b-icon>
+                                                            <b-tooltip :target="'novelty-help'+i" triggers="hover">{{novelty_explanation}}</b-tooltip>
+                                                            <label for="radio-group-3">Novelty:</label>
+                                                        </b-row>
+                                                    </b-col>
+                                                    <!-- <b-form-input :data-idx="i - 1" id="range-1" type="range" v-model.number="relevance[i - 1]" :formatter="onRelevanceChange2" step="0.01" min="0" max="1"></b-form-input> -->
+                                                    <b-col>
+                                                        <b-form-group>
+                                                            <b-form-radio-group
+                                                                class="pt-2 ml-2"
+                                                                :data-idx="i - 1"
+                                                                id="radio-group-3"
+                                                                required="True"
+                                                                :state="noveltyValue[i - 1] != null"
+                                                                v-model="noveltyValue[i - 1]"
+                                                                v-on:change="checkRefinementValidation"
+                                                                >
+                                                                <b-form-radio value="first">Less</b-form-radio>
+                                                                <b-form-radio value="second">Slightly less</b-form-radio>
+                                                                <b-form-radio value="third">Same</b-form-radio>
+                                                                <b-form-radio value="fourth">Slightly more</b-form-radio>
+                                                                <b-form-radio value="fifth">More</b-form-radio>
+                                                            </b-form-radio-group>
+                                                        </b-form-group>
+                                                    </b-col>
+                                                </b-row>
+                                            </b-col>
+                                        </b-row>
+                                    </b-form>
                                 </b-col>
                             </b-row>
-                            <b-row class="mt-3">
-                                <b-col>
-                                    <b-form-group>
-                                        <label>
-                                            Diversity
-                                        </label>
-                                        <b-icon id="diverse-help" icon="question-circle-fill" variant="primary"></b-icon>
-                                        <b-tooltip target="diverse-help" triggers="hover">TODO</b-tooltip>
-                                        <b-form-radio-group
-                                        id="radio-group-2"
-                                        required="True"
-                                        :state="diversityValue[i - 1] != null"
-                                        v-model="diversityValue[i - 1]"
-                                        :disabled="!refinementAlgorithms[i - 1]"
-                                        >
-                                        <b-form-radio value="first">Less</b-form-radio>
-                                        <b-form-radio value="second">Slightly less</b-form-radio>
-                                        <b-form-radio value="third">Same</b-form-radio>
-                                        <b-form-radio value="fourth">More</b-form-radio>
-                                        <b-form-radio value="fifth">Slightly more</b-form-radio>
-                                        </b-form-radio-group>
-                                    </b-form-group>
-                                </b-col>
+                        </div>
+                        <div v-else>
+                            <b-row align-v="center" class="mb-3">
+                                <b-col class="text-center">This algorithm does not allow to refine weights. It only considers relevance by showing items based on your past selections.</b-col>
                             </b-row>
-                            <b-row class="mt-3">
-                                <b-col>
-                                    <b-form-group>
-                                        <label>
-                                            Novelty
-                                        </label>
-                                        <b-icon id="novelty-help" icon="question-circle-fill" variant="primary"></b-icon>
-                                        <b-tooltip target="novelty-help" triggers="hover">TODO</b-tooltip>
-                                        <b-form-radio-group
-                                        id="radio-group-3"
-                                        required="True"
-                                        :state="noveltyValue[i - 1] != null"
-                                        v-model="noveltyValue[i - 1]"
-                                        :disabled="!refinementAlgorithms[i - 1]"
-                                        >
-                                        <b-form-radio value="first">Less</b-form-radio>
-                                        <b-form-radio value="second">Slightly less</b-form-radio>
-                                        <b-form-radio value="third">Same</b-form-radio>
-                                        <b-form-radio value="fourth">More</b-form-radio>
-                                        <b-form-radio value="fifth">Slightly more</b-form-radio>
-                                        </b-form-radio-group>
-                                    </b-form-group>
+                            <!-- <b-row align-v="center">
+                                <b-col class="text-center">
+                                    The results correspond to setting with relevance 1.0 and diversity with novelty both being 0.0
                                 </b-col>
-                            </b-row>
-                        </b-form>
+                            </b-row> -->
+                        </div>
                         {% elif refinement_layout == "5" %}
                         <b-form method="GET" action="{{ refine_results_url }}">
                             <b-row>
@@ -521,44 +570,82 @@
                             </b-row>
                         </b-form>
                         {% elif refinement_layout == "7" %}
-                        <b-form method="GET" action="{{ refine_results_url }}">
+                        <div v-if="refinementAlgorithms[i - 1]">
+                            <b-row class="mb-3">
+                                <b-col class="text-center">You can tweak the recommendation algorithm by fine-tuning the amount of attention it pays to different objectives. This will affect recommendations in the next step. Description of individual objectives is hidden under the questionmark icon.</b-col>
+                            </b-row>
                             <b-row align-h="center" class="mb-5 mt-5 text-center">
                                 <strong>Remaining budget: [[budget.at(i - 1)]]</strong>
                             </b-row>
                             <b-row>
-                                <b-col class="text-left">
-                                    <b-button class="btnFit" @click="decrease(i - 1, 'relevance')" :disabled="!refinementAlgorithms[i - 1] || boughtRelevance[i - 1] <= 0">-</b-button>
-                                </b-col>
-                                <b-col class="text-center">
-                                    R=[[boughtRelevance.at(i - 1)]]
-                                </b-col>
-                                <b-col class="text-right">
-                                    <b-button class="btnFit" @click="increase(i - 1, 'relevance')" :disabled="!refinementAlgorithms[i - 1] || budget[i - 1] <= 0">+</b-button>
+                                <b-col>
+                                    <b-form method="GET" action="{{ refine_results_url }}">
+                                        <b-row align-v="center">
+                                            <b-col class="text-left">
+                                                <b-button class="btnFit" @click="decrease(i - 1, 'relevance')" :disabled="!refinementAlgorithms[i - 1] || boughtRelevance[i - 1] <= 0">-</b-button>
+                                            </b-col>
+                                            
+                                            <b-col>
+                                                <b-row>
+                                                    <b-icon class="mr-1 h3" :id="'relevance-help'+i" icon="question-circle-fill" variant="primary"></b-icon>
+                                                    <b-tooltip :target="'relevance-help'+i" triggers="hover">{{relevance_explanation}}</b-tooltip>
+                                                    <label for="range-1">Relevance: [[boughtRelevance.at(i - 1)]]</label>
+                                                    <!-- <b-form-input :data-idx="i - 1" id="range-1" type="range" v-model.number="relevance[i - 1]" :formatter="onRelevanceChange2" step="0.01" min="0" max="1"></b-form-input> -->
+                                                </b-row>
+                                            </b-col>
+
+                                            <b-col class="text-right">
+                                                <b-button class="btnFit" @click="increase(i - 1, 'relevance')" :disabled="!refinementAlgorithms[i - 1] || budget[i - 1] <= 0">+</b-button>
+                                            </b-col>
+                                        </b-row>
+                                        <b-row align-v="center" class="mt-3">
+                                            
+                                            <b-col class="text-left">
+                                                <b-button class="btnFit" @click="decrease(i - 1, 'diversity')" :disabled="!refinementAlgorithms[i - 1] || boughtDiversity[i - 1] <= 0">-</b-button>
+                                            </b-col>
+                                            <b-col class="text-center">
+                                                <b-row>
+                                                    <b-icon class="mr-1 h3" :id="'diversity-help'+i" icon="question-circle-fill" variant="primary"></b-icon>
+                                                    <b-tooltip :target="'diversity-help'+i" triggers="hover">{{diversity_explanation}}</b-tooltip>
+                                                    <label for="range-2">Diversity: [[boughtDiversity.at(i - 1)]]</label>
+                                                    <!-- <b-form-input :data-idx="i - 1" id="range-2" type="range" v-model.number="diversity[i - 1]" :formatter="onDiversityChange2" step="0.01" min="0" max="1"></b-form-input> -->
+                                                </b-row>
+                                            </b-col>
+                                            <b-col class="text-right">
+                                                <b-button class="btnFit" @click="increase(i - 1, 'diversity')" :disabled="!refinementAlgorithms[i - 1] || budget[i - 1] <= 0">+</b-button>
+                                            </b-col>
+
+                                        </b-row>
+                                        <b-row align-v="center" class="mt-3">
+                                            <b-col class="text-left">
+                                                <b-button class="btnFit" @click="decrease(i - 1, 'novelty')" :disabled="!refinementAlgorithms[i - 1] || boughtNovelty[i - 1] <= 0">-</b-button>
+                                            </b-col>
+                                            <b-col class="text-center">
+                                                <b-row>
+                                                    <b-icon class="mr-1 h3" :id="'novelty-help'+i" icon="question-circle-fill" variant="primary"></b-icon>
+                                                    <b-tooltip :target="'novelty-help'+i" triggers="hover">{{novelty_explanation}}</b-tooltip>
+                                                    <label for="range-3">Novelty: [[boughtNovelty.at(i - 1)]]</label>
+                                                    <!-- <b-form-input :data-idx="i - 1" id="range-3" type="range" v-model.number="novelty[i - 1]" :formatter="onNoveltyChange2" min="0" step="0.01" max="1"></b-form-input> -->
+                                                </b-row>
+                                            </b-col>
+                                            <b-col class="text-right">
+                                                <b-button class="btnFit" @click="increase(i - 1, 'novelty')" :disabled="!refinementAlgorithms[i - 1] || budget[i - 1] <= 0">+</b-button>
+                                            </b-col>
+                                        </b-row>
+                                    </b-form>
                                 </b-col>
                             </b-row>
-                            <b-row class="mt-3">
-                                <b-col class="text-left">
-                                    <b-button class="btnFit" @click="decrease(i - 1, 'diversity')" :disabled="!refinementAlgorithms[i - 1] || boughtDiversity[i - 1] <= 0">-</b-button>
-                                </b-col>
-                                <b-col class="text-center">
-                                    D=[[boughtDiversity.at(i - 1)]]
-                                </b-col>
-                                <b-col class="text-right">
-                                    <b-button class="btnFit" @click="increase(i - 1, 'diversity')" :disabled="!refinementAlgorithms[i - 1] || budget[i - 1] <= 0">+</b-button>
-                                </b-col>
+                        </div>
+                        <div v-else>
+                            <b-row align-v="center" class="mb-3">
+                                <b-col class="text-center">This algorithm does not allow to refine weights. It only considers relevance by showing items based on your past selections.</b-col>
                             </b-row>
-                            <b-row class="mt-3">
-                                <b-col class="text-left">
-                                    <b-button class="btnFit" @click="decrease(i - 1, 'novelty')" :disabled="!refinementAlgorithms[i - 1] || boughtNovelty[i - 1] <= 0">-</b-button>
-                                </b-col>
-                                <b-col class="text-center">
-                                    N=[[boughtNovelty.at(i - 1)]]
-                                </b-col>
-                                <b-col class="text-right">
-                                    <b-button class="btnFit" @click="increase(i - 1, 'novelty')" :disabled="!refinementAlgorithms[i - 1] || budget[i - 1] <= 0">+</b-button>
-                                </b-col>
+                            <b-row align-v="center">
+                                <!-- <b-col class="text-center">
+                                    The results correspond to setting with relevance 1.0 and diversity with novelty both being 0.0
+                                </b-col> -->
                             </b-row>
-                        </b-form>
+                        </div>
                         {% endif %}
                     </b-col>
                 </b-row>
@@ -589,7 +676,7 @@
                     spinner-variant="primary"
                     block
                     >
-                        <b-button name="next_compare" id="btn_next" type="submit" block variant="primary" center>{{next}}</b-button>
+                        <b-button :disabled="!refinementValidated" name="next_compare" id="btn_next" type="submit" block variant="primary" center>{{next}}</b-button>
                     </b-overlay>
                 </b-form>
                 {% else %}
@@ -608,7 +695,7 @@
                     spinner-variant="primary"
                     block
                     >
-                        <b-btn name="finish_compare" id="btn_next" block type="submit" variant="success" center>{{finish}}</b-btn>
+                        <b-btn :disabled="!refinementValidated" name="finish_compare" id="btn_next" block type="submit" variant="success" center>{{finish}}</b-btn>
                     </b-overlay>
                 </b-form>
                 {% endif %}
@@ -627,6 +714,13 @@
     var iteration = "{{iteration}}";
     var minIterationToCancel = "{{MIN_ITERATION_TO_CANCEL}}";
     var csrfToken = "{{csrf_token()}}"
+
+    var defaultComparisonValue = "{{disable_relative_comparison}}";
+    var defaultComparisonValidation = defaultComparisonValue == "True" ? true : false;
+    defaultComparisonValue = defaultComparisonValue == "True" ? 0 : null;
+
+    var refinementLayout = "{{refinement_layout}}";
+    var defaultRefinementValidated = refinementLayout != "4";
     
     {% if result_layout == "columns" %}
     var itemsPerRow = 2; // Two items per row
@@ -663,7 +757,8 @@
         var defaultNovelty = JSON.parse('{{ metrics["novelty"] | tojson | safe }}');
     }
 
-    var refinementLayout = "{{version}}";
+
+    //var refinementLayout = "{{version}}";
 
     var refinementAlgorithms = JSON.parse("{{refinement_algorithms | tojson | safe}}");
 
