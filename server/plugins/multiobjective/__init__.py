@@ -486,7 +486,7 @@ def compare_and_refine():
     for algo_name, movie_lists in session["movies"].items():
         shown_movie_indices[algo_name] = [[int(x["movie_idx"]) for x in movie_list] for movie_list in movie_lists]
         
-    session["refinement_layout"] = request.args.get("version") or "0"
+    session["refinement_layout"] = request.args.get("version") or session["refinement_layout"]
 
     iteration_started(
         session["iteration"], movies, algorithm_assignment,
@@ -551,6 +551,9 @@ def compare_and_refine():
 
         if "footer" in conf["text_overrides"]:
             params["footer_override"] = conf["text_overrides"]["footer"]
+
+    if "disable_relative_comparison" in conf:
+        params["disable_relative_comparison"] = conf["disable_relative_comparison"]
 
     return render_template("compare_and_refine.html", **params)
 
@@ -639,6 +642,7 @@ def send_feedback():
     session["permutation"] = p
     session["orig_permutation"] = p
     session["algorithms_to_show"] = algorithms_to_show
+    session["refinement_layout"] = "0"
     
     elicitation_ended(
         session["elicitation_movies"], session["elicitation_selected_movies"],
