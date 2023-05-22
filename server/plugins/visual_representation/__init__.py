@@ -53,7 +53,8 @@ def create():
     return render_template("visual_representation_create.html", **params)
 
 from flask import send_file, current_app
-from jinja2 import Markup, FileSystemLoader, Environment
+from jinja2 import FileSystemLoader, Environment
+from markupsafe import Markup
 
 loader = FileSystemLoader('./')
 
