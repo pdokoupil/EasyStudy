@@ -18,6 +18,7 @@ PER_METHOD_ATTENTION_CHECK = True
 ##### Util types ######
 class Example:
     def __init__(self, path, name, example_class):
+        path = path.replace(os.sep, "/")
         self.path = str(path)
         self.name = str(name)
         self.example_class = example_class
@@ -32,21 +33,22 @@ class Example:
         return json.loads(
             #json.dumps(self, default=lambda o: getattr(o, '__dict__', str(o)))
             json.dumps({
-                "path": self.path,
+                #"path": self.path,
                 "name": self.name,
                 "example_class_name": self.example_class.name,
-                "rel_path": url_for('static', filename=f'datasets/vizualizations/' + self.path.split('vizualizations/')[1])
+                "rel_path": url_for('static', filename=f'datasets/vizualizations/' + self.path.split(f'vizualizations/')[1])
             })
         )
 
 class ExampleClass:
     def __init__(self, name, path, dataset_name):
+        path = path.replace(os.sep, "/")
         self.name = str(name)
         self.path = str(path)
         #print(self.name)
         self.class_image_path = [x for x in os.listdir(Path(path).parent) if os.path.isfile(os.path.join(Path(path).parent, x)) and "." in x and x.startswith(name)]
         assert len(self.class_image_path) == 1, f"class={name}, res={self.class_image_path}"
-        self.class_image_path = os.path.join(Path(path).parent.absolute(), self.class_image_path[0])
+        self.class_image_path = os.path.join(Path(path).parent.absolute(), self.class_image_path[0]).replace(os.sep, "/")
         #print(self.class_image_path)
         self.examples = []
         self.dataset_name = str(dataset_name)
@@ -66,10 +68,10 @@ class ExampleClass:
             #json.dumps(self, default=lambda o: getattr(o, '__dict__', str(o)))
             json.dumps({
                 "name": self.name,
-                "path": self.path,
-                "class_image_path": self.class_image_path,
-                "rel_path": url_for('static', filename=f'datasets/vizualizations/' + self.path.split('vizualizations/')[1]),
-                "class_image_rel_path": url_for('static', filename=f'datasets/vizualizations/' + self.class_image_path.split('vizualizations/')[1])
+                #"path": self.path,
+                #"class_image_path": self.class_image_path,
+                "rel_path": url_for('static', filename=f'datasets/vizualizations/' + self.path.split(f'vizualizations/')[1]),
+                "class_image_rel_path": url_for('static', filename=f'datasets/vizualizations/' + self.class_image_path.split(f'vizualizations/')[1])
             })
         )
 
@@ -213,10 +215,11 @@ def build_permutation():
             for example in examples:
                 assert type(example.example_class) == ExampleClass
                 shown_classes = classes if len(classes) <= 4 else [example.example_class] + np.random.choice(classes, size=3, replace=False).tolist()
+                shown_classes = shown_classes[:]
                 # Shuffle classes
                 np.random.shuffle(shown_classes)
 
-                permutation.append(SingleIteration(it, example, shown_classes[:], method, dataset))
+                permutation.append(SingleIteration(it, example, shown_classes, method, dataset))
                 it += 1
 
             if PER_METHOD_ATTENTION_CHECK and dataset == attention_check_dataset:

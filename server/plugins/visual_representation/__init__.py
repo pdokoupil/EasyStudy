@@ -35,7 +35,6 @@ MIN_ITERATIONS = 5
 N_ITERATIONS = 100
 
 
-
 # Uncomment this endpoint to make plugin visible in the administration
 @bp.route("/create")
 def create():
@@ -53,11 +52,58 @@ def create():
     }
     return render_template("visual_representation_create.html", **params)
 
+from flask import send_file, current_app
+from jinja2 import Markup, FileSystemLoader, Environment
+
+loader = FileSystemLoader('./')
+
+
+def include_file(name):
+    print("OK")
+    return Markup(loader.get_source(env, name)[0])
+
+env = Environment(loader=loader)
+env.globals['include_file'] = include_file
+
 @bp.context_processor
 def plugin_name():
     return {
-        "plugin_name": __plugin_name__
+        "plugin_name": __plugin_name__,
+        "include_file": include_file
     }
+
+@bp.route("/table-data-example", methods=["GET"])
+def table_data_example():
+    example_name = request.args.get('name')
+    p = session["permutation"][session["iteration"]]
+    
+    if p.method != "table-t":
+        return "", 404
+    
+    if example_name != p.example.name:
+        return "", 404
+
+    return include_file('static/datasets/vizualizations/' + p.example.path.split(f'vizualizations/')[1])
+
+@bp.route("/table-data", methods=["GET"])
+def table_data():
+    class_name = request.args.get('name')
+
+    p = session["permutation"][session["iteration"]]
+    if p.method != "table-t":
+        return "", 404
+
+    shown_classes = p.shown_classes
+    for cls in shown_classes:
+        if cls.name == class_name:
+            return include_file('static/datasets/vizualizations/' + cls.class_image_path.split(f'vizualizations/')[1])
+
+    return "", 404
+#current_app.jinja_env.globals.update(include_file=include_file)
+
+
+
+
 
 # Public facing endpoint
 @bp.route("/join", methods=["GET"])

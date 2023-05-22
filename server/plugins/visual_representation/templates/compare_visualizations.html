@@ -27,10 +27,14 @@
             </b-col>
           </b-row>
           <b-row align-h="center">
-            <b-col align-h="center" class="text-center">
+            <b-col align-h="center" style="text-align: center;" cols="auto" class="text-center align-middle">
                 <!-- <b-img src="{{emit_assets('visualrepresentation', filename='img/red.png')}}"/> -->
                 {% if iteration_data['method'] == 'table-t' %}
-                    <object type="text/html" style="width: 100%; text-align: center;" :data="data.example.rel_path"></object>
+                  <div style="overflow-x: auto; scroll-snap-type: x mandatory; white-space: nowrap; display: flex; flex-wrap: nowrap; align-items: center; width: 100%; text-align: center;">
+                    <div id="sourceDiv"></div>
+                  </div>
+                
+                    <!-- <object style="width: 100%; display: block; justify-content: center;" height="85px;" :data="data.example.rel_path"></object> -->
                 {% else %}
                     <b-img :src="data.example.rel_path"/>
                 {% endif %}
@@ -44,17 +48,17 @@
             </b-col>
           </b-row>
           {% if iteration_data['method'] == 'table-t' %}
-          <b-row v-for="shown_class in data.shown_classes">
-            <b-col align-h="center" class="text-center">
-                <div :id="data.method + '_' + data.dataset + '_' + shown_class.name" style="z-index: 1;" @click="onSelectVisualization($event, shown_class)">
-                  <object
+          <b-row align-h="center" v-for="shown_class in data.shown_classes">
+            <b-col align-h="center" style="text-align: center;" cols="auto" class="text-center align-middle">
+                <div style="overflow-x: auto; scroll-snap-type: x mandatory; white-space: nowrap; display: flex; flex-wrap: nowrap; align-items: center; width: 100%; text-align: center;" :id="data.method + '_' + data.dataset + '_' + shown_class.name" style="z-index: 1;" @click="onSelectVisualization($event, shown_class)">
+                  <div :id="data.method + '_' + data.dataset + '_' + shown_class.name + '_table'" style="position: relative; z-index: -1; display: inline-block;">
+
+                  </div>
+                  <!-- <object
                     style="width: 100%; height: auto; pointer-events: auto; position: relative; z-index: -1;" :data="shown_class.class_image_rel_path"
-                  ></object>
+                  ></object> -->
                 </div>
                   
-                <!-- </div> -->
-                
-                <!-- <b-img :id="data.method + '_' + data.dataset + '_' + shown_class.name" @click="onSelectVisualization($event, shown_class)" :src="shown_class.class_image_rel_path"/> -->
             </b-col>
           </b-row>
           {% else %}
@@ -98,8 +102,9 @@
     <script>
       var csrfToken = "{{csrf_token()}}";
       var data = JSON.parse('{{ iteration_data | tojson | safe}}');
-      console.log(data);
+      //console.log(data);
 
+      
       window.app = new Vue({
         el: '#app',
         delimiters: ['[[',']]'], // Used to replace double { escaping with double [ escaping (to prevent jinja vs vue inference)
@@ -138,7 +143,14 @@
                     //"variant_name": this.variantNames[visualizationIndex],
                 });
             }
-        }
+        },
+        async mounted() {
+            document.getElementById("sourceDiv").innerHTML = await fetch(`{{url_for('visualrepresentation.table_data_example')}}?name=${data.example.name}`).then(resp => resp.text()).catch(err => null);
+            for (idx in this.data.shown_classes) {
+              let d = this.data.shown_classes[idx];
+              document.getElementById(data.method + '_' + data.dataset + '_' + d.name + '_table').innerHTML = await fetch(`{{url_for('visualrepresentation.table_data')}}?name=${d.name}`).then(resp => resp.text()).catch(err => null);
+            }
+          },
       })
     </script>
 {% if footer_override is defined and footer_override is not none %}
