@@ -133,7 +133,7 @@ def get_methods():
         if methods is None:
             methods = found_methods
         else:
-            assert set(methods) == set(found_methods), f"Same methods for all datasets: {methods}, {x}, {found_methods}"
+            methods = list(set(methods).union(found_methods))
     assert methods is not None
     return methods
 
@@ -188,6 +188,9 @@ def build_permutation():
     permutation = []
 
     it = 0
+
+    per_dataset_classes = get_per_dataset_classes()
+
     for method in methods:
         if PER_METHOD_ATTENTION_CHECK:
             # Randomly select dataset for which we will make the attention check
@@ -196,8 +199,10 @@ def build_permutation():
             
 
         for dataset in datasets:
+            if not method in per_dataset_classes[dataset]:
+                continue
             #examples = per_dataset_selected_examples[dataset]
-            classes = list(get_per_dataset_classes()[dataset][method].values())
+            classes = list(per_dataset_classes[dataset][method].values())
             assert type(classes[0]) == ExampleClass, type(classes[0])
             
             examples = [] #[x for x in classes if x.]
@@ -214,7 +219,7 @@ def build_permutation():
 
             for example in examples:
                 assert type(example.example_class) == ExampleClass
-                shown_classes = classes if len(classes) <= 4 else [example.example_class] + np.random.choice(classes, size=3, replace=False).tolist()
+                shown_classes = classes if len(classes) <= 4 else [example.example_class] + np.random.choice([c for c in classes if c != example.example_class], size=3, replace=False).tolist()
                 shown_classes = shown_classes[:]
                 # Shuffle classes
                 np.random.shuffle(shown_classes)

@@ -5,6 +5,34 @@
         outline: 5px solid greenyellow;
         outline-offset: -5px;
       }
+
+      .theImage {
+        outline: 2px solid grey;
+      }
+
+      .myContainer {
+        width: 100%; /* Set the desired width of the container */
+        overflow-x: scroll; /* Enable horizontal scrolling for the container */
+        white-space: nowrap; /* Prevent rows from wrapping to the next line */
+        position: relative;
+      }
+
+      .myRow {
+        display: inline-block; /* Display rows in a horizontal line */
+        width: 100%; /* Set the desired width for each row */
+      }
+
+
+      .centered-content {
+        position: sticky;
+  left: 50%;
+  transform: translateX(-50%);
+  text-align: center;
+  z-index: 1;
+  background-color: white;
+  width: max-content;
+}
+
     </style>
     <div id="app">
       <b-container align-h="center" fluid>
@@ -21,55 +49,56 @@
         </b-jumbotron>
         {% endif %}
 
-        <b-row align-h="center" class="mt-1 mb-1">
+        <div class="myContainer">
+          <b-row align-h="center" class="mt-1 mb-1">
             <b-col class="text-center">
+              <b-col class="centered-content">
                 <h5>Input</h5>
+              </b-col>
             </b-col>
           </b-row>
           <b-row align-h="center">
             <b-col align-h="center" style="text-align: center;" cols="auto" class="text-center align-middle">
                 <!-- <b-img src="{{emit_assets('visualrepresentation', filename='img/red.png')}}"/> -->
                 {% if iteration_data['method'] == 'table-t' %}
-                  <div style="overflow-x: auto; scroll-snap-type: x mandatory; white-space: nowrap; display: flex; flex-wrap: nowrap; align-items: center; width: 100%; text-align: center;">
+                  <!-- <div style="overflow-x: auto; scroll-snap-type: x mandatory; white-space: nowrap; display: flex; flex-wrap: nowrap; align-items: center; width: 100%; text-align: center;"> -->
                     <div id="sourceDiv"></div>
-                  </div>
+                  <!-- </div> -->
                 
                     <!-- <object style="width: 100%; display: block; justify-content: center;" height="85px;" :data="data.example.rel_path"></object> -->
                 {% else %}
-                    <b-img :src="data.example.rel_path"/>
+                    <b-img height="308px" class="theImage" :src="data.example.rel_path"/>
                 {% endif %}
             </b-col>
           </b-row>
           <b-row align-h="center" class="mt-1 mb-1">
             <b-col class="text-center">
-                <h5>
-                    Classes
-                </h5>
+              <b-col class="centered-content">
+                <h5>Classes</h5>
+              </b-col>
             </b-col>
           </b-row>
           {% if iteration_data['method'] == 'table-t' %}
-          <b-row align-h="center" v-for="shown_class in data.shown_classes">
-            <b-col align-h="center" style="text-align: center;" cols="auto" class="text-center align-middle">
-                <div style="overflow-x: auto; scroll-snap-type: x mandatory; white-space: nowrap; display: flex; flex-wrap: nowrap; align-items: center; width: 100%; text-align: center;" :id="data.method + '_' + data.dataset + '_' + shown_class.name" style="z-index: 1;" @click="onSelectVisualization($event, shown_class)">
-                  <div :id="data.method + '_' + data.dataset + '_' + shown_class.name + '_table'" style="position: relative; z-index: -1; display: inline-block;">
-
-                  </div>
-                  <!-- <object
-                    style="width: 100%; height: auto; pointer-events: auto; position: relative; z-index: -1;" :data="shown_class.class_image_rel_path"
-                  ></object> -->
+          <b-row v-for="shown_class in data.shown_classes" align-h="center" class="text-center">
+              <div class="myRow">
+                <div :id="data.method + '_' + data.dataset + '_' + shown_class.name" style="padding-left: 15px; padding-right: 15px; z-index: 1; position: relative; display: inline-block;" @click="onSelectVisualization($event, shown_class)">
+                  <div :id="data.method + '_' + data.dataset + '_' + shown_class.name + '_table'" style="position: relative; z-index: -1; display: inline-block;"></div>
                 </div>
-                  
-            </b-col>
-          </b-row>
+                
+              </div>
+            </b-row>
+          
+
           {% else %}
           <b-row>
             <b-col v-for="shown_class in data.shown_classes" align-h="center" class="text-center">
-                <b-img :id="data.method + '_' + data.dataset + '_' + shown_class.name" @click="onSelectVisualization($event, shown_class)" :src="shown_class.class_image_rel_path"/>
+                <b-img height="308px" class="theImage" :id="data.method + '_' + data.dataset + '_' + shown_class.name" @click="onSelectVisualization($event, shown_class)" :src="shown_class.class_image_rel_path"/>
             </b-col>
           </b-row>
           {% endif %}
           <b-row align-h="center" class="mt-5">
-            <b-col cols="2">
+            <b-col cols="2" class="text-center">
+              <b-col class="centered-content">
                 {% if iteration < n_iterations - 1 %}
                 <b-form action="{{ continuation_url }}" method="GET">
                     <input type="hidden" hidden="true" :value="selectedItem.method" name="method"/>
@@ -91,8 +120,13 @@
                     <b-btn type="submit" variant="success" block :disabled="selectedItem.id == null">Finish</b-btn>
                 </b-form>
                 {% endif %}
+              </b-col>
+                
             </b-col>
           </b-row>
+        </div>
+
+        
       </b-container>
     </div>
 
