@@ -25,13 +25,13 @@
 
       .centered-content {
         position: sticky;
-  left: 50%;
-  transform: translateX(-50%);
-  text-align: center;
-  z-index: 1;
-  background-color: white;
-  width: max-content;
-}
+        left: 50%;
+        transform: translateX(-50%);
+        text-align: center;
+        z-index: 1;
+        background-color: white;
+        width: max-content;
+      }
 
     </style>
     <div id="app">
@@ -96,8 +96,9 @@
             </b-col>
           </b-row>
           {% endif %}
-          <b-row align-h="center" class="mt-5">
-            <b-col cols="2" class="text-center">
+
+          <b-row align-h="center" class="mt-1 mb-1">
+            <b-col class="text-center">
               <b-col class="centered-content">
                 {% if iteration < n_iterations - 1 %}
                 <b-form action="{{ continuation_url }}" method="GET">
@@ -121,7 +122,6 @@
                 </b-form>
                 {% endif %}
               </b-col>
-                
             </b-col>
           </b-row>
         </div>
