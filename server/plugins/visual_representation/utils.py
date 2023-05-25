@@ -194,7 +194,9 @@ def build_permutation():
     for method in methods:
         if PER_METHOD_ATTENTION_CHECK:
             # Randomly select dataset for which we will make the attention check
-            attention_check_dataset = np.random.choice([d for d in datasets if d != "recipesWeighted"])
+            # receipesWeighted is valid only for SOM
+            valid_datasets = [d for d, v in per_dataset_classes.items() if method in v]
+            attention_check_dataset = np.random.choice(valid_datasets)
             #print(F"Attention check dataset = {attention_check_dataset}")
             
 
