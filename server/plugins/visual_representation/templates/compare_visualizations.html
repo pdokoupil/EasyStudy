@@ -49,7 +49,7 @@
         </b-jumbotron>
         {% endif %}
 
-        <div class="myContainer">
+        <div class="myContainer" name="scrollableDiv">
           <b-row align-h="center" class="mt-1 mb-1">
             <b-col class="text-center">
               <b-col class="centered-content">
@@ -62,12 +62,12 @@
                 <!-- <b-img src="{{emit_assets('visualrepresentation', filename='img/red.png')}}"/> -->
                 {% if iteration_data['method'] == 'table-t' %}
                   <!-- <div style="overflow-x: auto; scroll-snap-type: x mandatory; white-space: nowrap; display: flex; flex-wrap: nowrap; align-items: center; width: 100%; text-align: center;"> -->
-                    <div id="sourceDiv"></div>
+                    <div class="theItem" :id="data.method + '_' + data.dataset + '_' + data.example.name + '_' + data.example.example_class_name + '_src'" id="sourceDiv"></div>
                   <!-- </div> -->
                 
                     <!-- <object style="width: 100%; display: block; justify-content: center;" height="85px;" :data="data.example.rel_path"></object> -->
                 {% else %}
-                    <b-img height="308px" class="theImage" :src="data.example.rel_path"/>
+                    <b-img height="308px" :id="data.method + '_' + data.dataset + '_' + data.example.name + '_' + data.example.example_class_name + '_src'" class="theImage theItem" :src="data.example.rel_path"/>
                 {% endif %}
             </b-col>
           </b-row>
@@ -81,7 +81,7 @@
           {% if iteration_data['method'] == 'table-t' %}
           <b-row v-for="shown_class in data.shown_classes" align-h="center" class="text-center">
               <div class="myRow">
-                <div :id="data.method + '_' + data.dataset + '_' + shown_class.name" style="padding-left: 15px; padding-right: 15px; z-index: 1; position: relative; display: inline-block;" @click="onSelectVisualization($event, shown_class)">
+                <div class="theItem" :id="data.method + '_' + data.dataset + '_' + shown_class.name" style="padding-left: 15px; padding-right: 15px; z-index: 1; position: relative; display: inline-block;" @click="onSelectVisualization($event, shown_class)">
                   <div :id="data.method + '_' + data.dataset + '_' + shown_class.name + '_table'" style="position: relative; z-index: -1; display: inline-block;"></div>
                 </div>
                 
@@ -92,7 +92,7 @@
           {% else %}
           <b-row>
             <b-col v-for="shown_class in data.shown_classes" align-h="center" class="text-center">
-                <b-img height="308px" class="theImage" :id="data.method + '_' + data.dataset + '_' + shown_class.name" @click="onSelectVisualization($event, shown_class)" :src="shown_class.class_image_rel_path"/>
+                <b-img height="308px" class="theImage theItem" :id="data.method + '_' + data.dataset + '_' + shown_class.name" @click="onSelectVisualization($event, shown_class)" :src="shown_class.class_image_rel_path"/>
             </b-col>
           </b-row>
           {% endif %}
@@ -129,7 +129,7 @@
         
       </b-container>
     </div>
-
+    <script src="{{url_for('static', filename='resolution_handling.js')}}"></script>
     <script src="{{url_for('static', filename='interaction_reporting.js')}}"></script>
 
     <!-- Start running your app -->
@@ -138,6 +138,23 @@
       var data = JSON.parse('{{ iteration_data | tojson | safe}}');
       //console.log(data);
 
+      function get_compare_ctx_lambda(src) {
+        return function compare_ctx_lambda() {
+            return {
+                "items": Array.from(document.getElementsByClassName("theItem")).map(x => {
+                    return {
+                        "id": x.id, // Corresponds to movie idx
+                        "name": x.name,
+                        "url": x.src,
+                        "title": x.title,
+                        "viewport": getElementBoundingBox(x),
+                        "source": src
+                    };
+                })
+            };
+        }
+      }
+      
       
       window.app = new Vue({
         el: '#app',
@@ -160,7 +177,7 @@
                 //console.log(event.srcElement.id);
                 //console.log(data.method, data.dataset, shownClass.name);
 
-                let oldSelection = this.selectedItem;
+                let oldSelection = structuredClone(this.selectedItem);
                 if (shownClass.name != oldSelection.className) {
                     event.srcElement.classList.add("selected");
                     if (oldSelection.id != null) {
@@ -179,11 +196,30 @@
             }
         },
         async mounted() {
-            document.getElementById("sourceDiv").innerHTML = await fetch(`{{url_for('visualrepresentation.table_data_example')}}?name=${data.example.name}`).then(resp => resp.text()).catch(err => null);
+            let elem = document.getElementById("sourceDiv");
+            if (elem != null) {
+              elem.innerHTML = await fetch(`{{url_for('visualrepresentation.table_data_example')}}?name=${data.example.name}`).then(resp => resp.text()).catch(err => null);
+            }
             for (idx in this.data.shown_classes) {
               let d = this.data.shown_classes[idx];
-              document.getElementById(data.method + '_' + data.dataset + '_' + d.name + '_table').innerHTML = await fetch(`{{url_for('visualrepresentation.table_data')}}?name=${d.name}`).then(resp => resp.text()).catch(err => null);
+              let elem = document.getElementById(data.method + '_' + data.dataset + '_' + d.name + '_table');
+              if (elem == null) {
+                continue;
+              }
+              elem.innerHTML = await fetch(`{{url_for('visualrepresentation.table_data')}}?name=${d.name}`).then(resp => resp.text()).catch(err => null);
             }
+
+            // Register the handlers for event reporting
+            startViewportChangeReportingWithLimit(`/utils/changed-viewport`, csrfToken, 1.0, true, get_compare_ctx_lambda("page-scroll"));
+            startScrollReportingWithLimit(`/utils/changed-viewport`, csrfToken, 1.0, document.getElementsByName("scrollableDiv"), get_compare_ctx_lambda("horizontal-scroll"));
+            reportLoadedPage(`/utils/loaded-page`, csrfToken, "compare_visualizations", ()=>
+                {
+                    return {
+                        "data": data,
+                        "iteration": "{{iteration}}"
+                    };
+                }
+            );
           },
       })
     </script>

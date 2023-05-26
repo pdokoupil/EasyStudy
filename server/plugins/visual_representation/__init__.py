@@ -119,6 +119,8 @@ def on_joined():
     session["iteration"] = 0
     session["permutation"] = build_permutation()
 
+    log_interaction(session["participation_id"], "permutation-generated", permutation=json.loads(json.dumps(session["permutation"], default=dumper)))
+
     return redirect(url_for(f"{__plugin_name__}.compare_visualizations",
             consuming_plugin=__plugin_name__
         )
@@ -131,13 +133,28 @@ def iteration_ended(iteration, payload):
     data.update(**payload)
     log_interaction(session["participation_id"], "iteration-ended", **data)
 
+def iteration_started(iteration, payload):
+    data = {
+        "iteration": iteration
+    }
+    data.update(**payload)
+    log_interaction(session["participation_id"], "iteration-started", **data)
+
+def study_ended(iteration, payload):
+    data = {
+        "iteration": iteration
+    }
+    data.update(**payload)
+    log_interaction(session["participation_id"], "study-ended", **data)
+
 @bp.route("/compare-visualizations")
 def compare_visualizations():
+    iteration_data = json.loads(json.dumps(session["permutation"][session["iteration"]], default=dumper))
     params = {
         "continuation_url": url_for(f"{__plugin_name__}.handle_feedback"),
         "finish_url": url_for(f"{__plugin_name__}.finish_user_study"),
         "iteration": session["iteration"],
-        "iteration_data": json.loads(json.dumps(session["permutation"][session["iteration"]], default=dumper)),
+        "iteration_data": iteration_data,
         "n_iterations": len(session["permutation"])
     }
 
@@ -148,6 +165,11 @@ def compare_visualizations():
 
         if "footer" in conf["text_overrides"]:
             params["footer_override"] = conf["text_overrides"]["footer"]
+
+    payload = {
+        "shown": iteration_data
+    }
+    iteration_started(session["iteration"], payload)
 
     return render_template("compare_visualizations.html", **params)
 
@@ -166,14 +188,17 @@ def finish_user_study():
         if "footer" in conf["text_overrides"]:
             params["footer_override"] = conf["text_overrides"]["footer"]
 
+    study_ended(session["iteration"], {})
+
     return render_template("visual_representation_finish.html", **params)
 
 @bp.route("/handle-feedback")
 def handle_feedback():
-    it = session["iteration"]
-    it += 1
-    session["iteration"] = it
-
+    it = session['iteration']
+    shown_data = json.loads(json.dumps(session["permutation"][it], default=dumper))
+    it = it + 1
+    session['iteration'] = it
+    
     method = request.args.get("method")
     dataset = request.args.get("dataset")
     selection_id = request.args.get("selection_id")
@@ -182,12 +207,15 @@ def handle_feedback():
     example_class_name = request.args.get("example_class_name")
 
     payload = {
-        "method": method,
-        "dataset": dataset,
-        "selection_id": selection_id,
-        "class_name": class_name,
-        "example_name": example_name,
-        "example_class_name": example_class_name
+        "selected": {
+            "method": method,
+            "dataset": dataset,
+            "selection_id": selection_id,
+            "class_name": class_name,
+            "example_name": example_name,
+            "example_class_name": example_class_name
+        },
+        "shown": shown_data
     }
 
     iteration_ended(it - 1, payload)
