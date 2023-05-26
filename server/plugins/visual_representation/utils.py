@@ -173,7 +173,7 @@ def build_permutation():
             classes = list(per_dataset_classes[dataset][list(per_dataset_classes[dataset].keys())[0]].values())
             # If we have less than or equal to 4 classes, take all of them (convert classes to names)
             # Otherwise take class corresponding to selected example and sample remaining three classes on random
-            shown_class_names = [c.name for c in classes] if len(classes) <= 4 else [x] + np.random.choice([c.name for c in classes if c != x], size=3, replace=False).tolist()
+            shown_class_names = [c.name for c in classes] if len(classes) <= 4 else [x] + np.random.choice([c.name for c in classes if c.name != x], size=3, replace=False).tolist()
             per_dataset_selected_example_shown_class_names[dataset][(x, y)] = shown_class_names
 
     permutation = []
@@ -246,7 +246,7 @@ def build_permutation():
                 artificial_example = Example(attention_check_class.class_image_path, f"{method}_{dataset}_{attention_check_class.name}_atn", attention_check_class)
 
                 # Chose classes to shown below 
-                atn_check_shown_classes = classes if len(classes) <= 4 else [artificial_example.example_class] + np.random.choice([c for c in classes if c != artificial_example.example_class], size=3, replace=False).tolist()
+                atn_check_shown_classes = classes if len(classes) <= 4 else [artificial_example.example_class] + np.random.choice([c for c in classes if c.name != artificial_example.example_class.name], size=3, replace=False).tolist()
                 atn_check_shown_classes = atn_check_shown_classes[:]
                 
                 # Shuffle classes for the attention check
