@@ -27,7 +27,7 @@ function getContext(extra="") {
 }
 
 function reportViewportChange(endpoint, csrfToken, extraCtxLambda=()=>"") {
-    data = {
+    let data = {
         "viewport": getViewportBoundingBox(),
         "screen_sizes": getScreenSizes(),
         "context": getContext(extraCtxLambda())
@@ -170,7 +170,7 @@ function registerClickedRadioReporting(endpoint, csrfToken, radios, extraCtxLamb
 }
 
 function reportLoadedPage(endpoint, csrfToken, pageName, extraCtxLambda=()=>"") {
-    data = {
+    let data = {
         "page": pageName,
         "context": getContext(extraCtxLambda()),
         "browser": {
@@ -193,7 +193,7 @@ function reportLoadedPage(endpoint, csrfToken, pageName, extraCtxLambda=()=>"") 
 }
 
 function reportSelectedItem(endpoint, csrfToken, selectedItem, selectedItems, extraCtxLambda=()=>"") {
-    data = {
+    let data = {
         "selected_item": selectedItem,
         "selected_items": selectedItems,
         "context": getContext(extraCtxLambda())
@@ -212,7 +212,7 @@ function reportSelectedItem(endpoint, csrfToken, selectedItem, selectedItems, ex
 }
 
 function reportDeselectedItem(endpoint, csrfToken, deselectedItem, selectedItems, extraCtxLambda=()=>"") {
-    data = {
+    let data = {
         "deselected_item": deselectedItem,
         "selected_items": selectedItems,
         "context": getContext(extraCtxLambda())
