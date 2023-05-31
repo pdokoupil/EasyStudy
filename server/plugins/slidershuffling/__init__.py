@@ -580,8 +580,14 @@ def send_feedback():
     session["algorithms_to_show"] = [displyed_name_mapping["rlprop"]] * N_ITERATIONS
 
     # Set randomly generated refinement layout
-    refinement_layout_name = np.random.choice(list(refinement_layouts.keys()))
-    session["refinement_layout"] = refinement_layouts[refinement_layout_name]
+    if "refinement_layout" in conf and conf["refinement_layout"]:
+        print("Using configured refinement layout")
+        refinement_layout_name = conf["refinement_layout"]
+        session["refinement_layout"] = refinement_layouts[refinement_layout_name]
+    else:
+        print(f"Using random refinement layout")
+        refinement_layout_name = np.random.choice(list(refinement_layouts.keys()))
+        session["refinement_layout"] =  refinement_layouts[refinement_layout_name]
     
     elicitation_ended(
         session["elicitation_movies"], session["elicitation_selected_movies"],
