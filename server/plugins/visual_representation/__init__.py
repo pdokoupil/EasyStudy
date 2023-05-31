@@ -2,6 +2,7 @@ import json
 import sys
 
 from plugins.utils.interaction_logging import log_interaction
+from models import Interaction
 
 [sys.path.append(i) for i in ['.', '..']]
 [sys.path.append(i) for i in ['../.', '../..', '../../.']]
@@ -187,6 +188,16 @@ def finish_user_study():
 
         if "footer" in conf["text_overrides"]:
             params["footer_override"] = conf["text_overrides"]["footer"]
+
+
+    iterations = Interaction.query.filter((Interaction.participation == session["participation_id"]) & (Interaction.interaction_type == "iteration-ended")).all()
+    n_identified = 0
+    for it in iterations:
+        d = json.loads(it.data)
+        n_identified += d["selected"]["class_name"] == d["selected"]["example_class_name"]
+
+    params["n_identified"] = min(n_identified, len(session["permutation"]))
+    params["n_shown"] = len(session["permutation"])
 
     study_ended(session["iteration"], {})
 

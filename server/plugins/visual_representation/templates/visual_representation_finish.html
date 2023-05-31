@@ -12,6 +12,12 @@
         </b-jumbotron>
         {% endif %}
 
+        <b-row align-h="center">
+          <b-col class="text-center">
+            You correctly identified <strong>{{ n_identified }}</strong> out of <strong>{{ n_shown }}</strong> shown examples.
+          </b-col>
+        </b-row>
+
         {% if prolific_pid is defined and prolific_pid is not none %}
         <b-row align-h="center">
             <b-col class="text-center" align-h="center" cols="6">

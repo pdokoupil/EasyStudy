@@ -6,6 +6,15 @@
         outline-offset: -5px;
       }
 
+      .hovered {
+        outline: 5px solid greenyellow !important;
+        outline-offset: -5px;
+      }
+
+      .selectableItem {
+        cursor: pointer;
+      }
+
       .theImage {
         outline: 2px solid grey;
       }
@@ -33,6 +42,15 @@
         width: max-content;
       }
 
+      .horizontal-separator {
+        height: 5px;
+        width:100%; 
+        background-color: red; 
+        position: sticky; 
+        top: 0; 
+        left: 0;
+      }
+
     </style>
     <div id="app">
       <b-container align-h="center" fluid>
@@ -53,7 +71,7 @@
           <b-row align-h="center" class="mt-1 mb-1">
             <b-col class="text-center">
               <b-col class="centered-content">
-                <h5>Input</h5>
+                <h5>Input visualization</h5>
               </b-col>
             </b-col>
           </b-row>
@@ -71,17 +89,18 @@
                 {% endif %}
             </b-col>
           </b-row>
-          <b-row align-h="center" class="mt-1 mb-1">
+          <div class="mt-3 mb-3 horizontal-separator"></div>
+          <b-row align-h="center" class="mb-5">
             <b-col class="text-center">
               <b-col class="centered-content">
-                <h5>Classes</h5>
+                <h5>Please select the class visualization (from the list below) that is most similar to the input visualization</h5>
               </b-col>
             </b-col>
           </b-row>
           {% if iteration_data['method'] == 'table-t' %}
           <b-row v-for="shown_class in data.shown_classes" align-h="center" class="text-center">
               <div class="myRow">
-                <div class="theItem" :id="data.method + '_' + data.dataset + '_' + shown_class.name" style="padding-left: 15px; padding-right: 15px; z-index: 1; position: relative; display: inline-block;" @click="onSelectVisualization($event, shown_class)">
+                <div class="theItem selectableItem" :id="data.method + '_' + data.dataset + '_' + shown_class.name" style="padding-left: 15px; padding-right: 15px; z-index: 1; position: relative; display: inline-block;" @click="onSelectVisualization($event, shown_class)" v-b-hover="handleHover">
                   <div :id="data.method + '_' + data.dataset + '_' + shown_class.name + '_table'" style="position: relative; z-index: -1; display: inline-block;"></div>
                 </div>
                 
@@ -92,12 +111,12 @@
           {% else %}
           <b-row>
             <b-col v-for="shown_class in data.shown_classes" align-h="center" class="text-center">
-                <b-img height="308px" class="theImage theItem" :id="data.method + '_' + data.dataset + '_' + shown_class.name" @click="onSelectVisualization($event, shown_class)" :src="shown_class.class_image_rel_path"/>
+                <b-img height="308px" class="theImage theItem selectableItem" :id="data.method + '_' + data.dataset + '_' + shown_class.name" v-b-hover="handleHover" @click="onSelectVisualization($event, shown_class)" :src="shown_class.class_image_rel_path"/>
             </b-col>
           </b-row>
           {% endif %}
 
-          <b-row align-h="center" class="mt-1 mb-1">
+          <b-row align-h="center" class="mt-3 mb-3">
             <b-col class="text-center">
               <b-col class="centered-content">
                 {% if iteration < n_iterations - 1 %}
@@ -172,6 +191,13 @@
             }
         },
         methods: {
+            handleHover(mouseOver, event) {
+              if (mouseOver) {
+                event.srcElement.classList.add("hovered");
+              } else {
+                event.srcElement.classList.remove("hovered");
+              }
+            },
             onSelectVisualization(event, shownClass) {
                 //console.log("Selected visualization");
                 //console.log(event.srcElement.id);
@@ -196,12 +222,23 @@
             }
         },
         async mounted() {
+            window.addEventListener("load", function(event) {
+              reportLoadedPage(`/utils/loaded-page`, csrfToken, "compare_visualizations", ()=>
+                {
+                    return {
+                        "data": data,
+                        "iteration": "{{iteration}}",
+                        "full_dom_loaded": true
+                    };
+                }
+            );
+            });
             let elem = document.getElementById("sourceDiv");
             if (elem != null) {
               elem.innerHTML = await fetch(`{{url_for('visualrepresentation.table_data_example')}}?name=${data.example.name}`).then(resp => resp.text()).catch(err => null);
             }
-            for (idx in this.data.shown_classes) {
-              let d = this.data.shown_classes[idx];
+            for (idx in data.shown_classes) {
+              let d = data.shown_classes[idx];
               let elem = document.getElementById(data.method + '_' + data.dataset + '_' + d.name + '_table');
               if (elem == null) {
                 continue;
