@@ -1,10 +1,25 @@
 const OBJECTIVE_CHANGE_PERIOD_SECONDS = 1;
 
+const REFINEMENT_LAYOUT_SLIDERS = "0";
+const REFINEMENT_LAYOUT_SHIFTED_SLIDERS = "8";
+const REFINEMENT_LAYOUT_OPTIONS = "4";
+const REFINEMENT_LAYOUT_BUTTONS = "7";
+
+const SLIDER_SHIFT = 0.5;
+
+function isEmpty(obj) {
+    if (obj === undefined || obj === null) {
+        return true;
+    }
+    return Object.keys(obj).length == 0;
+}
+
 window.app = new Vue({
     el: '#app',
     delimiters: ['[[',']]'], // Used to replace double { escaping with double [ escaping (to prevent jinja vs vue inference)
     data: function() {
         const colsPerRow = itemsPerRow;
+        const BUDGET_PER_ITERATION = 10;
 
         var numAlgorithms = Object.keys(movies).length;
         var variantNames = new Array(numAlgorithms);
@@ -48,6 +63,7 @@ window.app = new Vue({
         diversityDelta = [];
         noveltyDelta = [];
         newWeights = [];
+        newSliderState = [];
         newRelevance = [];
         newDiversity = [];
         newNovelty = [];
@@ -71,16 +87,33 @@ window.app = new Vue({
             diversityDelta.push("0");
             noveltyDelta.push("0");
             newWeights.push("");
+            newSliderState.push("");
             newRelevance.push(0);
             newDiversity.push(0);
             newNovelty.push(0);
             middleRelevance.push(0.5);
             middleDiversity.push(0.5);
             middleNovelty.push(0.5);
-            boughtRelevance.push(Math.round(defaultRelevance[algoName] * 10));
-            boughtDiversity.push(Math.round(defaultDiversity[algoName] * 10));
-            boughtNovelty.push(Math.round(defaultNovelty[algoName] * 10));
-            budget.push(5);
+            //boughtRelevance.push(Math.round(defaultRelevance[algoName] * 10));
+            //boughtDiversity.push(Math.round(defaultDiversity[algoName] * 10));
+            //boughtNovelty.push(Math.round(defaultNovelty[algoName] * 10));
+            if (!isEmpty(sliderState["relevance"]) && refinementLayout == REFINEMENT_LAYOUT_BUTTONS) {
+                boughtRelevance.push(sliderState["relevance"][algoName]);
+                boughtDiversity.push(sliderState["diversity"][algoName]);
+                boughtNovelty.push(sliderState["novelty"][algoName]);
+            } else {
+                boughtRelevance.push(0);
+                boughtDiversity.push(0);
+                boughtNovelty.push(0);
+            }
+
+            if (!isEmpty(sliderState["relevance"]) && refinementLayout == REFINEMENT_LAYOUT_SHIFTED_SLIDERS) {
+                relevance[i] = sliderState["relevance"][algoName];
+                diversity[i] = sliderState["diversity"][algoName];
+                novelty[i] = sliderState["novelty"][algoName];
+            }
+
+            budget.push(BUDGET_PER_ITERATION);
         }
 
         console.log(refinementAlgorithms);
@@ -125,6 +158,7 @@ window.app = new Vue({
                 "Full attention"
             ],
             newWeights: newWeights,
+            newSliderState: newSliderState,
             newRelevance: newRelevance,
             newDiversity: newDiversity,
             newNovelty: newNovelty,
@@ -173,7 +207,7 @@ window.app = new Vue({
 
         checkRefinementValidation() {
             console.log(refinementLayout);
-            if (refinementLayout == "4") {
+            if (refinementLayout == REFINEMENT_LAYOUT_OPTIONS) {
                 this.refinementValidated = this.relevanceValue.some(x => x != null) && this.diversityValue.some(x => x != null) && this.noveltyValue.some(x => x != null);
             }
         },
@@ -676,20 +710,36 @@ window.app = new Vue({
                     // console.log("New weights are: " + this.newWeights[i]);
                     
                     switch (refinementLayout) {
-                        case "4":
+                        case REFINEMENT_LAYOUT_OPTIONS:
                             let newRel = this.relevance[i] * this.optionWeights[this.relevanceValue[i]];
                             let newDiv = this.diversity[i] * this.optionWeights[this.diversityValue[i]];
                             let newNov = this.novelty[i] * this.optionWeights[this.noveltyValue[i]];
-                            let s = (newRel + newDiv + newNov);
-                            this.newWeights[i] = `${newRel / s},${newDiv / s},${newNov / s}`;
+                            let sum1 = (newRel + newDiv + newNov);
+                            this.newWeights[i] = `${newRel / sum1},${newDiv / sum1},${newNov / sum1}`;
+                            this.newSliderState[i] = ""; // We do not care about sliderState for LAYOUT_OPTIONS since it does not have any state
                             break;
-                        case "0":
+                        case REFINEMENT_LAYOUT_SLIDERS:
                             this.newWeights[i] = `${this.relevance[i]},${this.diversity[i]},${this.novelty[i]}`;
-                            break
+                            this.newSliderState[i] = ""; // We do not care about sliderState for LAYOUT_SLIDERS since it corresponds to weights itself
+                            break;
+                        case REFINEMENT_LAYOUT_SHIFTED_SLIDERS:
+                            // The weights set by the user are the state
+                            this.newSliderState[i] = `${this.relevance[i]},${this.diversity[i]},${this.novelty[i]}`;
+                            // But the new weights are actually different (relevance shifted by 0.4)
+                            let sum2 = this.relevance[i] + this.diversity[i] + this.novelty[i] + SLIDER_SHIFT;
+                            this.newWeights[i] = `${(this.relevance[i] + SLIDER_SHIFT) / sum2},${this.diversity[i] / sum2},${this.novelty[i] / sum2}`;
+                            break;
+                        case REFINEMENT_LAYOUT_BUTTONS:
+                            // TODO calculate new weights etc.
+                            let sum3 = this.boughtRelevance[i] + this.boughtNovelty[i] + this.boughtDiversity[i];
+                            this.newWeights[i] = `${this.boughtRelevance[i] / sum3},${this.boughtDiversity[i] / sum3},${this.boughtNovelty[i] / sum3}`;
+                            this.newSliderState[i] = `${this.boughtRelevance[i]},${this.boughtDiversity[i]},${this.boughtNovelty[i]}`;    
+                            break;
                     }
                 }
             }
             this.newWeights = this.newWeights.join(";");
+            this.newSliderState = this.newSliderState.join(";");
             //this.$forceUpdate();
             this.$nextTick(() => {
                 event.target.submit(); 

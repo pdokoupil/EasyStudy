@@ -545,6 +545,10 @@ def send_feedback():
 
     prepare_recommendations(weights, recommendations, initial_weights_recommendation, selected_movies, filter_out_movies, k)
     print(f"Recommendations={recommendations}")
+
+    slider_state = {
+        algo_displayed_name: {} for algo_displayed_name in displyed_name_mapping.values()
+    }
     
     session["movies"] = recommendations
     session["initial_weights_recommendation"] = initial_weights_recommendation
@@ -555,6 +559,7 @@ def send_feedback():
     session["nothing"] = []
     session["cmp"] = []
     session["a_r"] = []
+    session["slider_state"] = slider_state
 
     # Build permutation
     p = []
