@@ -189,6 +189,12 @@ def finish_user_study():
         if "footer" in conf["text_overrides"]:
             params["footer_override"] = conf["text_overrides"]["footer"]
 
+    # Prolific stuff
+    if "PROLIFIC_PID" in session:
+        params["prolific_pid"] = session["PROLIFIC_PID"]
+        params["prolific_url"] = f"https://app.prolific.co/submissions/complete?cc={conf['prolific_code']}"
+    else:
+        params["prolific_pid"] = None
 
     iterations = Interaction.query.filter((Interaction.participation == session["participation_id"]) & (Interaction.interaction_type == "iteration-ended")).all()
     n_identified = 0
