@@ -18,6 +18,13 @@
               <b-input type="text" id="prolific_code" v-model="prolificCode" name="prolific_code" placeholder="Please enter prolific code (if needed)"/>
             </b-col>
           </b-row>
+          
+          <b-row align-h="center" class="mb-3">
+            <b-col cols="8">
+              <label for="k">Please select a refinement layout</label>
+              <b-form-select v-model="refinementLayout" :options="refinementLayoutOptions" required="True" type=""/>
+            </b-col>
+          </b-row>
 
           <b-row align-h="center" class="mb-3">
             <b-col class="text-center" cols="8">
@@ -80,7 +87,15 @@
               prolificCode: "",
               overrideComparisonHint: false,
               disableRelativeComparison: false,
-              disableDemographics: false
+              disableDemographics: false,
+              refinementLayoutOptions: [
+                { value: "", text: "Random" },
+                { value: "default", text: "Default" },
+                { value: "default_shifted", text: "Default Shifted" },
+                { value: "buttons", text: "Buttons" },
+                { value: "options", text: "Options" },
+              ],
+              refinementLayout: ""
             }
         },
         methods: {
