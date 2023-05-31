@@ -1,7 +1,7 @@
 import json
 import sys
 
-from plugins.utils.interaction_logging import log_interaction
+from plugins.utils.interaction_logging import log_interaction, study_ended
 from models import Interaction
 
 [sys.path.append(i) for i in ['.', '..']]
@@ -23,6 +23,8 @@ from plugins.visual_representation.utils import build_permutation, dumper
 import functools
 import os
 import numpy as np
+
+
 
 __plugin_name__ = "visualrepresentation"
 __version__ = "0.1.0"
@@ -141,13 +143,6 @@ def iteration_started(iteration, payload):
     data.update(**payload)
     log_interaction(session["participation_id"], "iteration-started", **data)
 
-def study_ended(iteration, payload):
-    data = {
-        "iteration": iteration
-    }
-    data.update(**payload)
-    log_interaction(session["participation_id"], "study-ended", **data)
-
 @bp.route("/compare-visualizations")
 def compare_visualizations():
     iteration_data = json.loads(json.dumps(session["permutation"][session["iteration"]], default=dumper))
@@ -205,7 +200,7 @@ def finish_user_study():
     params["n_identified"] = min(n_identified, len(session["permutation"]))
     params["n_shown"] = len(session["permutation"])
 
-    study_ended(session["iteration"], {})
+    study_ended(session["participation_id"], iteration=session["iteration"])
 
     return render_template("visual_representation_finish.html", **params)
 
