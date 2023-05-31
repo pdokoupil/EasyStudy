@@ -165,23 +165,41 @@ def algorithm_feedback():
 
     # Get new weights
     new_weights = request.args.get("new_weights").split(";") # Get new weights for each algorithm
+    slider_state = request.args.get("state")
+    print(f"Got slider state = {slider_state}")
+    if slider_state:
+        slider_state = slider_state.split(";") # Get slider state for each algorithm
     transformed_weights = []
+    transformed_slider_state = []
     for i, weights in enumerate(new_weights):
         if weights:
             transformed_weights.append([float(x) for x in weights.split(",")])
         else:
             transformed_weights.append([])
+        
+        if slider_state:
+            if slider_state[i]:
+                transformed_slider_state.append([float(x) for x in slider_state[i].split(",")])
+            else:
+                transformed_slider_state.append([])
+
     #new_weights = [float(x) if x else '' for y in new_weights for x in y.split(",")]
     new_weights = transformed_weights
     ordered_weights = {}
+    ordered_slider_state = {}
     for algo_name, idx in order.items():
         ordered_weights[algo_name] = new_weights[idx]
+        ordered_slider_state[algo_name] = transformed_slider_state[idx]
+
     old_weights = session["weights"]
     ordered_weights[displyed_name_mapping["relevance_based"]] = old_weights[displyed_name_mapping["relevance_based"]]
     ordered_weights[not_shown_algorithm] = old_weights[not_shown_algorithm]
     print(f"Old weights = {old_weights}, new weights = {new_weights}")
     print(f"Ordered weights after fixup = {ordered_weights}")
+    print(f"Old slider state = {session['slider_state']}, new state = {transformed_slider_state}")
+    print(f"Ordered slider state = {ordered_slider_state}")
     session["weights"] = ordered_weights # Take first non-empty weights TODO fix and set weights to each algorithm separately
+    session["slider_state"] = ordered_slider_state
 
     # Log end of iteration here
     iteration_ended(
@@ -190,7 +208,8 @@ def algorithm_feedback():
         old_weights = old_weights, new_weights = session["weights"]
     )
 
-    if session["iteration"] >= N_ITERATIONS:
+    n_iterations = len(session["orig_permutation"])
+    if session["iteration"] >= n_iterations:
         # We are done, continue with another step
         # This happens (intentionally) after logging iteration_ended
         return redirect(url_for(f"{__plugin_name__}.compare_done"))
@@ -265,9 +284,10 @@ def prepare_recommendations(weights, recommendations, initial_weights_recommenda
 def compare_done():
     # Prepare questions for final questionnaire
     # All recommended movies
+    n_iterations = len(session["orig_permutation"])
     for recommendations in session["movies"].values():
-        assert len(recommendations) == N_ITERATIONS
-    all_recommended = sum(get_all_recommended_items(N_ITERATIONS, session["movies"]),  [])
+        assert len(recommendations) == n_iterations
+    all_recommended = sum(get_all_recommended_items(n_iterations, session["movies"]),  [])
     all_elicited = [x['movie_idx'] for x in session["elicitation_movies"]]
     all_selected = sum(session["selected_movie_indices"], [])
     
@@ -513,6 +533,11 @@ def compare_and_refine():
             "diversity": {algo_name: round(weights[1], 2) for algo_name, weights in session["weights"].items()},
             "novelty": {algo_name: round(weights[2], 2) for algo_name, weights in session["weights"].items()}
         },
+        "slider_state": {
+            "relevance": {algo_name: round(weights[0], 2) for algo_name, weights in session["slider_state"].items() if len(weights) == 3},
+            "diversity": {algo_name: round(weights[1], 2) for algo_name, weights in session["slider_state"].items() if len(weights) == 3},
+            "novelty": {algo_name: round(weights[2], 2) for algo_name, weights in session["slider_state"].items() if len(weights) == 3}
+        },
         "refinement_algorithms": refinement_algorithms,
         "continuation_url": url_for(f"{__plugin_name__}.algorithm_feedback")
     }
@@ -601,6 +626,10 @@ def send_feedback():
     # However, we allow future recommendation of SHOWN, NOT SELECTED (during elicitation, not comparison) altough these are quite rare
     filter_out_movies = selected_movies
 
+    slider_state = {
+        algo_displayed_name: {} for algo_displayed_name in displyed_name_mapping.values()
+    }
+
     prepare_recommendations(weights, recommendations, initial_weights_recommendation, selected_movies, filter_out_movies, k)
     print(f"Recommendations={recommendations}")
     
@@ -613,6 +642,7 @@ def send_feedback():
     session["nothing"] = []
     session["cmp"] = []
     session["a_r"] = []
+    session["slider_state"] = slider_state
 
     # Build permutation
     assert N_ITERATIONS % 4 == 0 # Since we have 3 algorithms and we show A1, AX then A

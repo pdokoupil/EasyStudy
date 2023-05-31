@@ -646,6 +646,49 @@
                                 </b-col> -->
                             </b-row>
                         </div>
+                        {% elif refinement_layout == "8" %}
+                        <div v-if="refinementAlgorithms[i - 1]">
+                            <b-row class="mb-3">
+                                <b-col class="text-center">You can tweak the recommendation algorithm by fine-tuning the amount of attention it pays to different objectives. This will affect recommendations in the next step. Description of individual objectives is hidden under the questionmark icon.</b-col>
+                            </b-row>
+                            <b-row>
+                                <b-col>
+                                    <b-form method="GET" action="{{ refine_results_url }}">
+                                        <b-row align-v="center">
+                                            <b-icon class="mr-1 h3" :id="'relevance-help'+i" icon="question-circle-fill" variant="primary"></b-icon>
+                                            <b-tooltip :target="'relevance-help'+i" triggers="hover">{{relevance_explanation}}</b-tooltip>
+                                            <label for="range-1">Relevance: [[ relevance[i - 1].toFixed(1) ]]</label>
+                                            <b-form-input :data-idx="i - 1" id="range-1" type="range" v-model.number="relevance[i - 1]" :formatter="onRelevanceChange2" step="0.01" min="0" max="1"></b-form-input>
+                                            <!-- <div class="mt-2">Value: [[ relevance ]]</div> -->
+                                        </b-row>
+                                        <b-row align-v="center" class="mt-3">
+                                            <b-icon class="mr-1 h3" :id="'diversity-help'+i" icon="question-circle-fill" variant="primary"></b-icon>
+                                            <b-tooltip :target="'diversity-help'+i" triggers="hover">{{diversity_explanation}}</b-tooltip>
+                                            <label for="range-2">Diversity: [[ diversity[i - 1].toFixed(1) ]]</label>
+                                            <b-form-input :data-idx="i - 1" id="range-2" type="range" v-model.number="diversity[i - 1]" :formatter="onDiversityChange2" step="0.01" min="0" max="1"></b-form-input>
+                                            <!-- <div class="mt-2">Value: [[ diversity ]]</div> -->
+                                        </b-row>
+                                        <b-row align-v="center" class="mt-3">
+                                            <b-icon class="mr-1 h3" :id="'novelty-help'+i" icon="question-circle-fill" variant="primary"></b-icon>
+                                            <b-tooltip :target="'novelty-help'+i" triggers="hover">{{novelty_explanation}}</b-tooltip>
+                                            <label for="range-3">Novelty: [[ novelty[i - 1].toFixed(1) ]]</label>
+                                            <b-form-input :data-idx="i - 1" id="range-3" type="range" v-model.number="novelty[i - 1]" :formatter="onNoveltyChange2" min="0" step="0.01" max="1"></b-form-input>
+                                            <!-- <div class="mt-2">Value: [[ novelty ]]</div> -->
+                                        </b-row>
+                                    </b-form>
+                                </b-col>
+                            </b-row>
+                        </div>
+                        <div v-else>
+                            <b-row align-v="center" class="mb-3">
+                                <b-col class="text-center">This algorithm does not allow to refine weights. It only considers relevance by showing items based on your past selections.</b-col>
+                            </b-row>
+                            <b-row align-v="center">
+                                <b-col class="text-center">
+                                    The results correspond to setting with relevance 1.0 and diversity with novelty both being 0.0
+                                </b-col>
+                            </b-row>
+                        </div>
                         {% endif %}
                     </b-col>
                 </b-row>
@@ -663,6 +706,7 @@
                 {% if iteration < MIN_ITERATION_TO_CANCEL %}
                 <b-form @submit="onSubmit" method="GET" action="{{ url_for(consuming_plugin + '.algorithm_feedback') }}">
                     <input type="hidden" hidden="true" v-model="newWeights" name="new_weights"/>
+                    <input type="hidden" hidden="true" v-model="newSliderState" name="state"/>
                     <input type="hidden" hidden="true" :value="selectedMovieIndices" name="selected_movies"/>
                     <input type="hidden" hidden="true" :value="selectedMovieVariants" name="selected_movie_variants"/>
                     <input v-for="i in variantsResults.length" type="hidden" hidden="true" :key="i" :value="algorithmRatings[i - 1]" :name="'ar_'.concat(i)"/>
@@ -682,6 +726,7 @@
                 {% else %}
                 <b-form @submit="onSubmit" method="GET" action="{{ continuation_url }}">
                     <input type="hidden" hidden="true" v-model="newWeights" name="new_weights"/>
+                    <input type="hidden" hidden="true" v-model="newSliderState" name="state"/>
                     <input type="hidden" hidden="true" :value="selectedMovieIndices" name="selected_movies"/>
                     <input type="hidden" hidden="true" :value="selectedMovieVariants" name="selected_movie_variants"/>
                     <input v-for="i in variantsResults.length" type="hidden" hidden="true" :key="i" :value="algorithmRatings[i - 1]" :name="'ar_'.concat(i)"/>
@@ -709,7 +754,7 @@
 
 <script type='text/javascript'>
     // Capture JINJA stuff here
-    var movies = {{movies | tojson | safe}}; //JSON.parse({{movies | tojson | safe}});
+    var movies = {{movies | tojson | safe}};
     var resultLayout = "{{result_layout}}";
     var iteration = "{{iteration}}";
     var minIterationToCancel = "{{MIN_ITERATION_TO_CANCEL}}";
@@ -757,7 +802,8 @@
         var defaultNovelty = JSON.parse('{{ metrics["novelty"] | tojson | safe }}');
     }
 
-
+    var sliderState = JSON.parse('{{ slider_state | tojson | safe }}');
+    console.log(sliderState);
     //var refinementLayout = "{{version}}";
 
     var refinementAlgorithms = JSON.parse("{{refinement_algorithms | tojson | safe}}");
