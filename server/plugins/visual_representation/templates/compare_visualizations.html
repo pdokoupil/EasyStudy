@@ -150,6 +150,7 @@
     </div>
     <script src="{{url_for('static', filename='resolution_handling.js')}}"></script>
     <script src="{{url_for('static', filename='interaction_reporting.js')}}"></script>
+    <script src="{{url_for('static', filename='message_reporting.js')}}"></script>
 
     <!-- Start running your app -->
     <script>
@@ -173,7 +174,6 @@
             };
         }
       }
-      
       
       window.app = new Vue({
         el: '#app',
@@ -233,6 +233,17 @@
                 }
             );
             });
+
+            history.pushState(null, document.title, location.href);
+            window.addEventListener('popstate', function (event)
+            {
+              history.pushState(null, document.title, location.href);
+              reportError("/utils/on-message", csrfToken, window.location.href, "Attempt to navigate back", ()=> {
+                  return {"type": "Navigate back", "iteration": "{{iteration}}"};
+                });
+            });
+            
+
             let elem = document.getElementById("sourceDiv");
             if (elem != null) {
               elem.innerHTML = await fetch(`{{url_for('visualrepresentation.table_data_example')}}?name=${data.example.name}`).then(resp => resp.text()).catch(err => null);
