@@ -19,7 +19,8 @@ window.app = new Vue({
     delimiters: ['[[',']]'], // Used to replace double { escaping with double [ escaping (to prevent jinja vs vue inference)
     data: function() {
         const colsPerRow = itemsPerRow;
-        const BUDGET_PER_ITERATION = 10;
+        const BUDGET_PER_ITERATION = 4;
+
 
         var numAlgorithms = Object.keys(movies).length;
         var variantNames = new Array(numAlgorithms);
@@ -101,16 +102,25 @@ window.app = new Vue({
                 boughtRelevance.push(sliderState["relevance"][algoName]);
                 boughtDiversity.push(sliderState["diversity"][algoName]);
                 boughtNovelty.push(sliderState["novelty"][algoName]);
-            } else {
-                boughtRelevance.push(0);
-                boughtDiversity.push(0);
-                boughtNovelty.push(0);
+            } else if (refinementLayout == REFINEMENT_LAYOUT_BUTTONS) {
+                // Initialize with 10 points according to preference elicitation inferred weights
+                let tmpSum = relevance[i] + diversity[i] + novelty[i];
+                boughtRelevance.push(Number(relevance[i] * (10.0 / tmpSum)).toFixed(0));
+                boughtDiversity.push(Number(diversity[i] * (10.0 / tmpSum)).toFixed(0));
+                boughtNovelty.push(Number(novelty[i] * (10.0 / tmpSum)).toFixed(0));
             }
 
             if (!isEmpty(sliderState["relevance"]) && refinementLayout == REFINEMENT_LAYOUT_SHIFTED_SLIDERS) {
                 relevance[i] = sliderState["relevance"][algoName];
                 diversity[i] = sliderState["diversity"][algoName];
                 novelty[i] = sliderState["novelty"][algoName];
+            } else if (refinementLayout == REFINEMENT_LAYOUT_SHIFTED_SLIDERS) {
+                // At the very first iteration when sliderState is empty, we have to do inverse transformation of the weights
+                // because if we just took what resulted from pref. elicitation, did not change it and proceed to next iteration
+                // the shift would actually change the weights which is undesirable (well it will change anyway, but not beyond what was output of elicitaton)
+                // Transformation would be rel * (1 + shift) - shift. Problem is that this will not work since if sliders are initialized to e.g. 0.3, 0.3, 0.3
+                // after elicitation then we cannot do inverse transform because these values are not possible after shift (we would always end up with rel > 0.3 unless we allow negatives)
+
             }
 
             budget.push(BUDGET_PER_ITERATION);
