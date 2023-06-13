@@ -68,5 +68,7 @@
     "moo_create_override_about": "Override 'About' text",
     "moo_create_show_final_statistics": "Show final statistics",
     "moo_create_override_algorithm_comparison_hint": "Override algorithm comparison hint",
-    "moo_create_algorithm_comparison_placeholder": "Enter text with algorithm comparison instructions"
+    "moo_create_algorithm_comparison_placeholder": "Enter text with algorithm comparison instructions",
+    "moo_create_override_informed_consent": "Override Informed Consent",
+    "moo_create_informed_consent_placeholder": "Add informed consent"
 }

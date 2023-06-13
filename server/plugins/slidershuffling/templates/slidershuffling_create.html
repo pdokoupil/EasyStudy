@@ -54,6 +54,16 @@
           </b-row>
           <b-row align-h="center" class="mb-3">
             <b-col class="text-center" cols="8">
+              <b-form-checkbox v-model="overrideInformedConsent">{{override_informed_consent}}</b-form-checkbox>
+            </b-col>
+          </b-row>
+          <b-row :hidden="!overrideInformedConsent" align-h="center" class="mb-3">
+            <b-col cols="8">
+              <textarea placeholder="{{informed_consent_placeholder}}" id="informedConsent"></textarea>
+            </b-col>
+          </b-row>
+          <b-row align-h="center" class="mb-3">
+            <b-col class="text-center" cols="8">
               <b-form-checkbox v-model="overrideComparisonHint">{{override_algorithm_comparison_hint}}</b-form-checkbox>
             </b-col>
           </b-row>
@@ -78,6 +88,10 @@
         plugins: 'lists, advlist, link, image',
       });
       tinymce.init({
+        selector: '#informedConsent',
+        plugins: 'lists, advlist, link, image',
+      });
+      tinymce.init({
         selector: '#comparisonHint',
         plugins: 'lists, advlist, link, image',
       });
@@ -89,6 +103,7 @@
             return {
               kValue: 10,
               overrideAbout: false,
+              overrideInformedConsent: false,
               prolificCode: "",
               overrideComparisonHint: false,
               disableRelativeComparison: false,
@@ -112,6 +127,9 @@
               }
               if (this.overrideAbout) {
                 textOverrides["about"] = tinymce.get("about").getContent();
+              }
+              if (this.overrideInformedConsent) {
+                textOverrides["informed_consent"] = tinymce.get("informedConsent").getContent();
               }
               return textOverrides;
             },

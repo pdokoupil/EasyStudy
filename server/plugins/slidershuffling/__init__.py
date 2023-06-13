@@ -56,10 +56,12 @@ def create():
     params["t1"] = tr("footer_t1")
     params["t2"] = tr("footer_t2")
     params["about_placeholder"] = tr("moo_create_about_placeholder")
+    params["override_informed_consent"] = tr("moo_create_override_informed_consent")
     params["override_about"] = tr("moo_create_override_about")
     params["show_final_statistics"] = tr("moo_create_show_final_statistics")
     params["override_algorithm_comparison_hint"] = tr("moo_create_override_algorithm_comparison_hint")
     params["algorithm_comparison_placeholder"] = tr("moo_create_algorithm_comparison_placeholder")
+    params["informed_consent_placeholder"] = tr("moo_create_informed_consent_placeholder")
 
     # TODO add tr(...) to make it translatable
     params["disable_relative_comparison"] = "Disable relative comparison"
