@@ -108,7 +108,7 @@ def get_all_recommended_items(n_iterations, recommendations):
 def algorithm_feedback():
     # TODO do whatever with the passed parameters and set session variable
 
-    # conf = load_user_study_config(session["user_study_id"])
+    conf = load_user_study_config(session["user_study_id"])
     
     selected_movies = request.args.get("selected_movies")
     selected_movies = selected_movies.split(",") if selected_movies else []
@@ -232,7 +232,25 @@ def algorithm_feedback():
     filter_out_movies = session["elicitation_selected_movies"] + sum(mov_indices[:HIDE_LAST_K], [])
     selected_movies = session["elicitation_selected_movies"] + sum(session["selected_movie_indices"], [])
 
-    prepare_recommendations(ordered_weights, recommendations, initial_weights_recommendation, selected_movies, filter_out_movies, k=session["rec_k"])
+    if "separate_training_data" in conf and conf["separate_training_data"]:
+        selected_movies_per_algorithm = {}
+        all_sel_movies = sum(session["selected_movie_indices"], []) # Assumes across-iteration uniqueness
+
+        for algorithm, algorithm_displayed_name in displyed_name_mapping.items():
+            #print(f"Checking if {algorithm_displayed_name} is in {not_shown_algorithm} result={algorithm_displayed_name in not_shown_algorithm}")
+            if algorithm_displayed_name in not_shown_algorithm:
+                continue
+
+            # Again assumes across-iteration uniqueness
+            algo_shown_movies = [ int(x["movie_idx"]) for x in sum(session["movies"][algorithm_displayed_name], []) ]
+            #print(f"Algo shown movies = {algo_shown_movies}")
+            #print(f"All sel movies = {all_sel_movies}")
+            algo_sel_movies = [x for x in algo_shown_movies if x in all_sel_movies]
+            selected_movies_per_algorithm[algorithm] = session["elicitation_selected_movies"] + algo_sel_movies
+        #print(f"Selected movies per algorithm = {selected_movies_per_algorithm}")
+        prepare_recommendations_separate_training(ordered_weights, recommendations, initial_weights_recommendation, selected_movies_per_algorithm, filter_out_movies, k=session["rec_k"])
+    else:
+        prepare_recommendations(ordered_weights, recommendations, initial_weights_recommendation, selected_movies, filter_out_movies, k=session["rec_k"])
 
     session["movies"] = recommendations
     session["initial_weights_recommendation"] = initial_weights_recommendation
@@ -277,6 +295,31 @@ def prepare_recommendations(weights, recommendations, initial_weights_recommenda
             initial_weights_recommended_items = weighted_average(selected_movies, model, np.array(weights[displyed_name_mapping["relevance_based"]]), filter_out_movies, k=k, include_support=True)
         else:
             assert False
+        recommendations[algorithm_displayed_name][-1] = recommended_items
+        initial_weights_recommendation[algorithm_displayed_name][-1] = initial_weights_recommended_items
+
+# Similar to prepare_recommendations, but each algorithm is fine-tuned only using selections originating from itself
+def prepare_recommendations_separate_training(weights, recommendations, initial_weights_recommendation, selected_movies_per_algorithm, filter_out_movies, k):
+    # Only contains those that were actually displayed (so we save some computation time)
+    print(f"Called Prepare recommendations separate training")
+    for algorithm, selected_movies in selected_movies_per_algorithm.items():
+        algorithm_displayed_name = displyed_name_mapping[algorithm]
+        
+        # In any case, we need to prepare baseline since it is used by both MOO
+        recommended_items, model = recommend_2_3(selected_movies, filter_out_movies, return_model=True, k=k)
+        initial_weights_recommended_items = recommended_items
+
+        if algorithm == "relevance_based":
+            pass
+        elif algorithm == "rlprop":
+            recommended_items = rlprop(selected_movies, model, np.array(weights[algorithm_displayed_name]), filter_out_movies, k=k, include_support=True)
+            initial_weights_recommended_items = rlprop(selected_movies, model, np.array(weights[displyed_name_mapping["relevance_based"]]), filter_out_movies, k=k, include_support=True)
+        elif algorithm == "weighted_average":
+            recommended_items = weighted_average(selected_movies, model, np.array(weights[algorithm_displayed_name]), filter_out_movies, k=k, include_support=True)
+            initial_weights_recommended_items = weighted_average(selected_movies, model, np.array(weights[displyed_name_mapping["relevance_based"]]), filter_out_movies, k=k, include_support=True)
+        else:
+            assert False
+
         recommendations[algorithm_displayed_name][-1] = recommended_items
         initial_weights_recommendation[algorithm_displayed_name][-1] = initial_weights_recommended_items
 
@@ -630,6 +673,7 @@ def send_feedback():
         algo_displayed_name: {} for algo_displayed_name in displyed_name_mapping.values()
     }
 
+    # No need to check for separate training after elicitation
     prepare_recommendations(weights, recommendations, initial_weights_recommendation, selected_movies, filter_out_movies, k)
     print(f"Recommendations={recommendations}")
     
