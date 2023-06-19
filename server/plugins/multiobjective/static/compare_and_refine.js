@@ -105,9 +105,9 @@ window.app = new Vue({
             } else if (refinementLayout == REFINEMENT_LAYOUT_BUTTONS) {
                 // Initialize with 10 points according to preference elicitation inferred weights
                 let tmpSum = relevance[i] + diversity[i] + novelty[i];
-                boughtRelevance.push(Number(relevance[i] * (10.0 / tmpSum)).toFixed(0));
-                boughtDiversity.push(Number(diversity[i] * (10.0 / tmpSum)).toFixed(0));
-                boughtNovelty.push(Number(novelty[i] * (10.0 / tmpSum)).toFixed(0));
+                boughtRelevance.push(Number((relevance[i] * (10.0 / tmpSum)).toFixed(0)));
+                boughtDiversity.push(Number((diversity[i] * (10.0 / tmpSum)).toFixed(0)));
+                boughtNovelty.push(Number((novelty[i] * (10.0 / tmpSum)).toFixed(0)));
             }
 
             if (!isEmpty(sliderState["relevance"]) && refinementLayout == REFINEMENT_LAYOUT_SHIFTED_SLIDERS) {
