@@ -653,4 +653,12 @@
     var attentionMovies = {{attention_movies | tojson | safe}};
 </script>
 {{ emit_assets('multiobjective','final_questionnaire.js') }}     
+{% if footer_override is defined and footer_override is not none %}
+<div class="footerDiv mt-3">
+  {{ footer_override|safe }}
+</div>
+</body>
+</html>
+{% else %}
 {% include 'footer.html' %}
+{% endif %}
