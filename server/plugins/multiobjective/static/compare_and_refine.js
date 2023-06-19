@@ -107,7 +107,9 @@ window.app = new Vue({
                 let tmpSum = relevance[i] + diversity[i] + novelty[i];
                 boughtRelevance.push(Number((relevance[i] * (10.0 / tmpSum)).toFixed(0)));
                 boughtDiversity.push(Number((diversity[i] * (10.0 / tmpSum)).toFixed(0)));
-                boughtNovelty.push(Number((novelty[i] * (10.0 / tmpSum)).toFixed(0)));
+                // Subtract from 10 to ensure they always sum to 10 and not less (due to possible rounding issues)
+                boughtNovelty.push(10 - boughtRelevance.slice(-1) - boughtDiversity.slice(-1));
+                //boughtNovelty.push(Number((novelty[i] * (10.0 / tmpSum)).toFixed(0)));
             }
 
             if (!isEmpty(sliderState["relevance"]) && refinementLayout == REFINEMENT_LAYOUT_SHIFTED_SLIDERS) {
