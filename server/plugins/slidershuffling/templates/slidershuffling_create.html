@@ -72,6 +72,17 @@
               <textarea placeholder="{{algorithm_comparison_placeholder}}" id="comparisonHint"></textarea>
             </b-col>
           </b-row>
+          <b-row align-h="center" class="mb-3">
+            <b-col class="text-center" cols="8">
+              <!-- TODO translatable parametrization via string -->
+              <b-form-checkbox v-model="overrideFooter">Override footer</b-form-checkbox>
+            </b-col>
+          </b-row>
+          <b-row :hidden="!overrideFooter" align-h="center" class="mb-3">
+            <b-col cols="8">
+              <textarea placeholder="Custom footer" id="footer"></textarea>
+            </b-col>
+          </b-row>
           <b-row align-h="center">
             <b-col cols="8" class="text-right" align-h="end">
               <b-btn variant="warning" v-on:click="cancelCreateUserStudy">Cancel</b-btn>
@@ -95,6 +106,10 @@
         selector: '#comparisonHint',
         plugins: 'lists, advlist, link, image',
       });
+      tinymce.init({
+        selector: '#footer',
+        plugins: 'lists, advlist, link, image',
+      });
 
       window.app = new Vue({
         el: '#app',
@@ -106,6 +121,7 @@
               overrideInformedConsent: false,
               prolificCode: "",
               overrideComparisonHint: false,
+              overrideFooter: false,
               disableRelativeComparison: false,
               disableDemographics: false,
               separateTrainingData: false,
@@ -130,6 +146,9 @@
               }
               if (this.overrideInformedConsent) {
                 textOverrides["informed_consent"] = tinymce.get("informedConsent").getContent();
+              }
+              if (this.overrideFooter) {
+                textOverrides["footer"] = tinymce.get("footer").getContent();
               }
               return textOverrides;
             },

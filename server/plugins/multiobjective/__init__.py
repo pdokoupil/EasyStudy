@@ -414,6 +414,13 @@ def final_questionnaire():
 
     params["attention_movies"] = session["attention_check"]   
 
+    conf = load_user_study_config(session["user_study_id"])
+    params["footer_override"] = None
+    if "text_overrides" in conf:
+        if "footer" in conf["text_overrides"]:
+            params["footer_override"] = conf["text_overrides"]["footer"]
+
+
     return render_template("final_questionnaire.html", **params)
 
 @bp.route("/finish-user-study")
