@@ -792,6 +792,15 @@ window.app = new Vue({
         }
     },
     async mounted() {
+        history.pushState(null, document.title, location.href);
+        window.addEventListener('popstate', function (event)
+        {
+            history.pushState(null, document.title, location.href);
+            reportError("/utils/on-message", csrfToken, window.location.href, "Attempt to navigate back", ()=> {
+                return {"type": "Navigate back", "iteration": iteration};
+            });
+        });
+        
         const btns = document.querySelectorAll(".btn");
         const chckbxs = document.querySelectorAll("input[type=checkbox]");
         const radios = document.querySelectorAll("input[type=radio]");
