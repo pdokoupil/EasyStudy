@@ -85,17 +85,30 @@ def existing_user_studies():
             "participants": c,
             "join_url": gen_user_study_invitation_url(x.parent_plugin, x.guid),
             "active": x.active,
-            "initialized": x.initialized
+            "initialized": x.initialized,
+            "results": gen_user_study_results_url(x.parent_plugin, x.guid)
         } for x, c in result if filter_cond(x)])
 
 def gen_user_study_url(guid):
     return f"/user-study/{guid}"
+
+def gen_user_study_results_url(parent_plugin, guid):
+    return f"/results/{parent_plugin}/{guid}"
 
 def gen_user_study_invitation_url(parent_plugin, guid):
     return f"{gen_url_prefix()}/{parent_plugin}/join?guid={guid}"
 
 def get_vars(x):
     return {name: value for name, value in vars(x).items() if not name.startswith("_")}
+
+@main.route("/results/<parent_plugin>/<guid>", methods=["GET"])
+def get_results(parent_plugin, guid):
+    try:
+        url = flask.url_for(f"{parent_plugin}.results", guid=guid)
+    except:
+        # Failed, fallback to default results
+        url = flask.url_for("utils.results", guid=guid)
+    return flask.redirect(url)
 
 @main.route("/user-study", methods=["GET"])
 def get_user_study():

@@ -41,6 +41,10 @@ def get_lang():
         return flask.session["lang"]
     return default_lang
 
+@bp.route("/results", methods=["GET"])
+def results():
+    return "Default results implementation"
+
 # Shared implementation of "/join" phase of the user study
 # Expected input is continuation_url
 # Expected output is 
