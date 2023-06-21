@@ -102,6 +102,15 @@
                       <!-- <span v-b-tooltip.hover :title=data.value>[[ data.value ]]</span> -->
                   </template>
 
+                  <template #cell(results)="data">
+                    <div style="min-width: 60px;">
+                      <a target="_blank" :href="[[ data.value ]]">Results</a>
+                    </div>
+
+                    
+                    <!-- <b-button v-on:click="notify(existingUserStudies.indexOf(data.item))" class="ml-2" size="sm" variant="primary" v-b-tooltip.hover title="Select users to notify via e-mail">Notify</b-button> -->
+                      <!-- <span v-b-tooltip.hover :title=data.value>[[ data.value ]]</span> -->
+                  </template>
 
                   <template align-h="center" #cell(initialized)="data">
                     <p style="text-transform:uppercase;">

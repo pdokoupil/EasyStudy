@@ -8,7 +8,7 @@ import plugins
 
 [sys.path.append(i) for i in ['.', '..']]
 [sys.path.append(i) for i in ['../.', '../..', '../../.']]
-from plugins.fastcompare.algo.algorithm_base import AlgorithmBase, PreferenceElicitationBase, DataLoaderBase
+from plugins.fastcompare.algo.algorithm_base import AlgorithmBase, PreferenceElicitationBase, DataLoaderBase, EvaluationMetricBase
 
 def is_abstract(cls):
     return bool(getattr(cls, "__abstractmethods__", False))
@@ -22,6 +22,9 @@ def is_preference_elicitation(cls):
 
 def is_data_loader(cls):
     return hasattr(cls, "_my_id") and cls._my_id == DataLoaderBase._my_id and not is_abstract(cls)
+
+def is_evaluation_metric(cls):
+    return hasattr(cls, "_my_id") and cls._my_id == EvaluationMetricBase._my_id and not is_abstract(cls)
 
 @functools.lru_cache(maxsize=None)
 def load_algorithms():
@@ -58,3 +61,15 @@ def load_data_loaders():
             if is_data_loader(cls) and cls.name() not in data_loaders: # We need unique names of data loaders!
                 data_loaders[cls.name()] = cls
     return data_loaders
+
+
+@functools.lru_cache(maxsize=None)
+def load_evaluation_metrics():
+    evaluation_metrics = {}
+    for mod in pkgutil.walk_packages(plugins.__path__, prefix=plugins.__name__ + ".", onerror=lambda x: print("##########")):
+        imported_module = __import__(mod.name, fromlist="dummy")
+        members = inspect.getmembers(imported_module, inspect.isclass)
+        for _, cls in members:
+            if is_evaluation_metric(cls) and cls.name() not in evaluation_metrics: # We need unique names of evaluation metrics!
+                evaluation_metrics[cls.name()] = cls
+    return evaluation_metrics
