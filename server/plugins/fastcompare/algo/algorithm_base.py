@@ -232,6 +232,19 @@ class DataLoaderBase(ABC):
         with open(instance_cache_path, "wb") as f:
             pickle.dump(self.__dict__, f)
 
+
+class EvaluationMetricBase(ABC):
+    _my_id = "02afcb1d17b8eb52a4ac71f722badf5a" # MD5 hash of "EvaluationMetricBase"
+
+    @abstractmethod
+    def evaluate(shown_items, selected_items):
+        pass
+
+    @classmethod
+    @abstractmethod
+    def name():
+        pass
+
 class Algo1:
     pass
 

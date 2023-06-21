@@ -7,6 +7,7 @@
 import json
 from pathlib import Path
 import sys
+import time
 
 
 import numpy as np
@@ -14,17 +15,17 @@ import numpy as np
 [sys.path.append(i) for i in ['../.', '../..', '../../.']]
 
 from plugins.utils.preference_elicitation import load_data, enrich_results
-from plugins.fastcompare.loading import load_algorithms, load_preference_elicitations, load_data_loaders
+from plugins.fastcompare.loading import load_algorithms, load_preference_elicitations, load_data_loaders, load_evaluation_metrics
 from plugins.utils.interaction_logging import log_interaction, study_ended
 
-from models import UserStudy
+from models import UserStudy, Participation, Interaction
 
 
 import os
 from flask import Blueprint, jsonify, request, redirect, url_for, make_response, render_template, session
 
 from common import get_tr, load_languages, multi_lang, load_user_study_config
-
+from scipy.spatial.distance import squareform, pdist
 
 __plugin_name__ = "fastcompare"
 __version__ = "0.1.0"
@@ -641,6 +642,73 @@ def finish_user_study():
     # Last iteration has ended here
     iteration_ended(session["iteration"], session["selected_movie_indices"], session["selected_variants"], session["nothing"], session["cmp"], session["a_r"])
     return redirect(url_for("utils.finish"))
+
+@bp.route("/results")
+def results():
+    guid = request.args.get("guid")
+    return render_template("fastcompare_results.html", guid=guid, fetch_results_url=url_for("fastcompare.fetch_results", guid=guid))
+
+@bp.route("/fetch-results/<guid>")
+def fetch_results(guid):
+    metrics = load_evaluation_metrics()
+    evaluated_metrics = []
+
+    
+    user_study = UserStudy.query.filter(UserStudy.guid == guid).first()
+    participants = Participation.query.filter((Participation.time_finished != None) & (Participation.user_study_id == user_study.id)).all()
+    
+    # Load the data loader to get item features and other information possibly needed for metric evaluation
+    conf = load_user_study_config(user_study.id)
+    loader_factory = load_data_loaders()[conf["selected_data_loader"]]
+    loader = loader_factory(**filter_params(conf["data_loader_parameters"], loader_factory))
+    load_data_loader(loader, guid, loader_factory.name())
+    
+    rating_matrix = loader.ratings_df.pivot(index='user', columns='item', values="rating").fillna(0).values
+    similarity_matrix = 1.0 - np.float32(squareform(pdist(rating_matrix.T, "cosine")))
+    
+    # print(f"Called, len={len(participants)}")
+    for p in participants:
+        iter_starts = Interaction.query.filter((Interaction.participation == p.id) & (Interaction.interaction_type == "iteration-started")).order_by(Interaction.id.asc()).all()
+        iter_ends = Interaction.query.filter((Interaction.participation == p.id) & (Interaction.interaction_type == "iteration-ended")).order_by(Interaction.id.asc()).all()
+
+        iteration_to_iter_start = dict()
+        iteration_to_iter_end = dict()
+
+        for it in iter_starts:
+            iteration_to_iter_start[json.loads(it.data)["iteration"]] = it
+        
+        for it in iter_ends:
+            iteration_to_iter_end[json.loads(it.data)["iteration"]] = it
+
+        for iteration, interaction in iteration_to_iter_end.items():
+            if iteration not in iteration_to_iter_start:
+                continue
+
+            start_data = json.loads(iteration_to_iter_start[iteration].data)
+            end_data = json.loads(interaction.data)
+
+            algorithm_assignment = start_data["algorithm_assignment"]
+            algo_name_to_variant = dict()
+            for _, mapping in algorithm_assignment.items():
+                algo_name_to_variant[mapping["name"]] = mapping["order"]
+
+            for algo, items in start_data["movies"].items():
+                shown_items = [int(mov["movie_idx"]) for mov in items["movies"]]
+                selected_items = end_data["selected"][-1]
+                selected_variants = end_data["selected_variants"][-1]
+                # Only selections from given algorithm
+                selected_items = [y for x, y in zip(selected_variants, selected_items) if x == algo_name_to_variant[algo]]
+                
+                for m_name, m_cls in metrics.items():
+                    evaluated_metrics.append({
+                        "metric_name": m_name,
+                        "value": m_cls(rating_matrix=rating_matrix, similarity_matrix=similarity_matrix).evaluate(shown_items, selected_items),
+                        "algorithm": algo,
+                        "iteration": iteration
+                    })
+
+
+    return evaluated_metrics
 
 def register():
     return {
