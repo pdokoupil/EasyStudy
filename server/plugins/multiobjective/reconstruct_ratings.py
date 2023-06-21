@@ -1363,17 +1363,17 @@ def show_differences(df_interaction, df_elicitation_selections, df_impressions, 
     #return df_ratings
     return results, results2
 
-parser = argparse.ArgumentParser()
-parser.add_argument("--reranking", action="store_true", default=False)
-parser.add_argument("--gen-ratings", action="store_true", default=False)
-parser.add_argument("--gen-beta-supports", action="store_true", default=False)
-parser.add_argument("--precalculate-normalizations", action="store_true", default=False)
-parser.add_argument("--lmbda", type=float)
-parser.add_argument("--participation-path", type=str, default="C:/Users/PD/Documents/MFF/beyinterecsys/data/18-4-2023 19-18/participation-export.json")
-parser.add_argument("--interaction-path", type=str, default="C:/Users/PD/Documents/MFF/beyinterecsys/data/18-4-2023 19-18/interaction-export.json")
-args = parser.parse_args()
-
 if __name__ == "__main__":
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--reranking", action="store_true", default=False)
+    parser.add_argument("--gen-ratings", action="store_true", default=False)
+    parser.add_argument("--gen-beta-supports", action="store_true", default=False)
+    parser.add_argument("--precalculate-normalizations", action="store_true", default=False)
+    parser.add_argument("--lmbda", type=float)
+    parser.add_argument("--participation-path", type=str, default="C:/Users/PD/Documents/MFF/beyinterecsys/data/18-4-2023 19-18/participation-export.json")
+    parser.add_argument("--interaction-path", type=str, default="C:/Users/PD/Documents/MFF/beyinterecsys/data/18-4-2023 19-18/interaction-export.json")
+    args = parser.parse_args()
 
     df_interaction = pd.read_json(args.interaction_path, encoding='utf-8')
     df_interaction_raw = df_interaction.copy()
