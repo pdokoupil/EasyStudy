@@ -28,7 +28,7 @@ import functools
 
 from sklearn.metrics import ndcg_score
 
-N_ITERATIONS = 8
+N_ITERATIONS = 6
 K = 10
 
 def predict_ratings(selected_movies, filter_out_movies = [], k = 10, return_model = False):
@@ -114,6 +114,8 @@ def create_selections_csv(df_interaction):
     df_selections = df_interaction[df_interaction.interaction_type == "selected-item"]
     for _, row in df_selections.iterrows():
         d = json.loads(row.data)
+        if not "movie_idx" in d["selected_item"]:
+            continue # Possibly messed by elicitation
         new_row = [
             row.participation,
             d["selected_item"]["movie_idx"],
@@ -241,10 +243,37 @@ def calc_ratings(df_interaction, df_elicitation_selections, df_impressions, df_i
         df_impressions_user = df_impressions[df_impressions.userId == participation]
         df_impressions_beta_user = df_impressions_beta[df_impressions_beta.userId == participation]
 
+        df_selections_user = df_selections[df_selections.userId == participation]
+
         for i in range(n_iterations):
             already_seen = df_impressions_user[df_impressions_user.iteration < i + 1].movieId.values.astype(int).tolist()
             filter_out_movies = elicitation_selected + already_seen
-            selected_movies = elicitation_selected + sum(d["selected"][:i], [])
+            
+            # Single-objective (BETA) selections
+            beta_selections = df_selections_user[(df_selections_user.session < i + 1) & (df_selections_user.mo == False)].movieId.values.astype(int).tolist()
+            print(f"Beta selections before: {beta_selections}")
+            beta_selections = list(set(sum(d["selected"][:i], [])).intersection(beta_selections)) ## Getting rid of deselections
+            print(f"Beta selections after: {beta_selections}")
+            selected_movies = elicitation_selected + beta_selections
+            
+            movie_titles, scores = predict_ratings(selected_movies, filter_out_movies)
+            movie_indices = [movie_title_to_idx[t] for t in movie_titles]
+            
+            df_ratings_user = pd.DataFrame({
+                "userId": np.repeat(participation, scores.size),
+                "movieId": movie_indices,
+                "rawRating": scores,
+                "session": np.repeat(i + 1, scores.size),
+                "mo": False
+            })
+
+            df_ratings = pd.concat([df_ratings, df_ratings_user], axis=0)
+            
+
+            # Multi-objective (DELTA) selections
+            mo_selections = df_selections_user[(df_selections_user.session < i + 1) & (df_selections_user.mo == True)].movieId.values.astype(int).tolist()
+            mo_selections = list(set(sum(d["selected"][:i], [])).intersection(mo_selections)) ## Getting rid of deselections
+            selected_movies = elicitation_selected + mo_selections
 
             movie_titles, scores = predict_ratings(selected_movies, filter_out_movies)
             movie_indices = [movie_title_to_idx[t] for t in movie_titles]
@@ -253,23 +282,11 @@ def calc_ratings(df_interaction, df_elicitation_selections, df_impressions, df_i
                 "userId": np.repeat(participation, scores.size),
                 "movieId": movie_indices,
                 "rawRating": scores,
-                "session": np.repeat(i + 1, scores.size)    
+                "session": np.repeat(i + 1, scores.size),
+                "mo": True
             })
-            
-            #print(df_ratings_user.head())
-            df_ratings = pd.concat([df_ratings, df_ratings_user], axis=0)
-            #print("DF_ratings =")
-            #print(df_ratings.head())
 
-            #real = df_impressions_beta_user[df_impressions_beta_user.iteration == i + 1].movieId.values.astype(int).tolist()
-            
-            #print(f"@@ i={i}, real={real}, participation={participation}")
-            #print(f"@@ predicted={x}, already_seen={already_seen}, elicitation_selected={elicitation_selected}, rest={sum(d['selected'][:i], [])}")
-            
-            
-            #print(f"For iteration = {i + 1} we assume following recommendation: {x}, real was: {real}")
-            #assert x == real
-            # 
+            df_ratings = pd.concat([df_ratings, df_ratings_user], axis=0)
 
     return df_ratings
 
@@ -298,10 +315,17 @@ def calc_beta_supports(df_interaction, df_elicitation_selections, df_impressions
         df_impressions_beta_user = df_impressions_beta[df_impressions_beta.userId == participation]
         print(df_impressions_beta_user)
 
+        df_selections_user = df_selections[df_selections.userId == participation]
+
         for i in range(n_iterations):
             already_seen = df_impressions_user[df_impressions_user.iteration < i + 1].movieId.values.astype(int).tolist()
             filter_out_movies = elicitation_selected + already_seen
-            selected_movies = elicitation_selected + sum(d["selected"][:i], [])
+            #selected_movies = elicitation_selected + sum(d["selected"][:i], [])
+            beta_selections = df_selections_user[(df_selections_user.session < i + 1) & (df_selections_user.mo == False)].movieId.values.astype(int).tolist()
+            print(f"Beta selections before: {beta_selections}")
+            beta_selections = list(set(sum(d["selected"][:i], [])).intersection(beta_selections)) ## Getting rid of deselections
+            print(f"Beta selections after: {beta_selections}")
+            selected_movies = elicitation_selected + beta_selections
 
             movie_titles, scores, model = predict_ratings(selected_movies, filter_out_movies, return_model = True)
             movie_indices = [movie_title_to_idx[t] for t in movie_titles]
@@ -1370,11 +1394,11 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--reranking", action="store_true", default=False)
     parser.add_argument("--gen-ratings", action="store_true", default=False)
-    parser.add_argument("--gen-beta-supports", action="store_true", default=False)
+    parser.add_argument("--gen-beta-supports", action="store_true", default=True)
     parser.add_argument("--precalculate-normalizations", action="store_true", default=False)
     parser.add_argument("--lmbda", type=float)
-    parser.add_argument("--participation-path", type=str, default="C:/Users/PD/Documents/MFF/beyinterecsys/data/18-4-2023 19-18/participation-export.json")
-    parser.add_argument("--interaction-path", type=str, default="C:/Users/PD/Documents/MFF/beyinterecsys/data/18-4-2023 19-18/interaction-export.json")
+    parser.add_argument("--participation-path", type=str, default="C:/Users/PD/Documents/MFF/slider-shuffling/data/21-6-2023 10-50/participation-export.json")
+    parser.add_argument("--interaction-path", type=str, default="C:/Users/PD/Documents/MFF/slider-shuffling/data/21-6-2023 10-50/interaction-export.json")
     parser.add_argument("--n-iterations", type=int, default=N_ITERATIONS)
     args = parser.parse_args()
 
@@ -1440,6 +1464,6 @@ if __name__ == "__main__":
     #np.save("./rating_matrix_backup.npy", loader.rating_matrix)
     
 
-    r1, r2 = show_differences(df_interaction, df_elicitation_selections, df_impressions, df_impressions_beta, movie_title_to_idx, df_selections, args.n_iterations)
-    r1.to_csv("./ft_no_ft_comparison.csv", index=False)
-    r2.to_csv("./ft_no_ft_recommendations.csv", index=False)
+    # r1, r2 = show_differences(df_interaction, df_elicitation_selections, df_impressions, df_impressions_beta, movie_title_to_idx, df_selections, args.n_iterations)
+    # r1.to_csv("./ft_no_ft_comparison.csv", index=False)
+    # r2.to_csv("./ft_no_ft_recommendations.csv", index=False)
