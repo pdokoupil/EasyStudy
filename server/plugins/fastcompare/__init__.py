@@ -6,6 +6,7 @@
 
 import json
 from pathlib import Path
+import shutil
 import sys
 import time
 
@@ -95,6 +96,8 @@ def create():
         "displayed_name": tr("fastcompare_create_displayed_name"),
         "displayed_name_help": tr("fastcompare_create_displayed_name_help"),
         "override_about": tr("fastcompare_create_override_about"),
+        "select_questionnaire": tr("fastcompare_create_select_questionnaire"),
+        "add_questionnaire": tr("fastcompare_create_add_questionnaire"),
         "override_informed_consent": tr("fastcompare_create_override_informed_consent"),
         "override_preference_elicitation_hint": tr("fastcompare_create_override_preference_elicitation_hint"),
         "override_algorithm_comparison_hint": tr("fastcompare_create_override_algorithm_comparison_hint"),
@@ -443,6 +446,9 @@ def compare_algorithms():
         if "footer" in conf["text_overrides"]:
             params["footer_override"] = conf["text_overrides"]["footer"]
 
+    if questionnaire_exists(conf):
+        params["finish"] = tr("continue_to_questionnaire")
+
     return render_template("compare_algorithms.html", **params)
 
 
@@ -616,12 +622,19 @@ def long_initialization(guid):
         # Save the algorithm
         algorithm.save(get_cache_path(guid, algorithm_displayed_name), get_cache_path("", algorithm_displayed_name))
 
+
+    # Move the questionnaire file if present
+    if "questionnaire_file" in conf:
+        q_path = os.path.join("cache", __plugin_name__, "uploads", conf['questionnaire_file'])
+        if os.path.exists(q_path):
+            # TODO sanitize
+            shutil.move(q_path, get_cache_path(guid, conf['questionnaire_file']))
+
     q.initialized = True
     q.active = True
     session.commit()
     session.expunge_all()
     session.close()
-
 
 @bp.route("/initialize", methods=["GET"])
 def initialize():
@@ -634,13 +647,27 @@ def initialize():
     )
     heavy_process.start()
     print("Going to redirect back")
-    return redirect(request.args.get("continuation_url"))
+    return redirect(request.args.get("continuation_url"), Response={"guid": "ABC"})
+
+def questionnaire_exists(conf):
+    if "questionnaire_file" in conf:
+        q_path = get_cache_path(session["user_study_guid"], conf['questionnaire_file'])
+        if os.path.exists(q_path):
+            return True
+
 
 @bp.route("/finish-user-study")
 @multi_lang
 def finish_user_study():
     # Last iteration has ended here
     iteration_ended(session["iteration"], session["selected_movie_indices"], session["selected_variants"], session["nothing"], session["cmp"], session["a_r"])
+    
+    conf = load_user_study_config(session["user_study_id"])
+    if questionnaire_exists(conf):
+        # There is an final questionnaire, show it to the participant
+        return redirect(url_for("utils.final_questionnaire", continuation_url=url_for("utils.finish")))
+
+    # Otherwise just finish
     return redirect(url_for("utils.finish"))
 
 @bp.route("/results")

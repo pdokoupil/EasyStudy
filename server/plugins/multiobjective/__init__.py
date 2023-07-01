@@ -421,7 +421,7 @@ def final_questionnaire():
             params["footer_override"] = conf["text_overrides"]["footer"]
 
 
-    return render_template("final_questionnaire.html", **params)
+    return render_template("moo_final_questionnaire.html", **params)
 
 @bp.route("/finish-user-study")
 def finish_user_study():
