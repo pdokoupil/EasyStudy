@@ -194,7 +194,7 @@
 
 <script type='text/javascript'>
     // Capture JINJA stuff here
-    var movies = JSON.parse('{{ movies | tojson | safe}}');
+    var movies = {{movies | tojson | safe}};
     var resultLayout = "{{result_layout}}";
     var iteration = "{{iteration}}";
     var minIterationToCancel = "{{MIN_ITERATION_TO_CANCEL}}";
