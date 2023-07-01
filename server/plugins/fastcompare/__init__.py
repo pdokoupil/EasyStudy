@@ -30,8 +30,8 @@ from scipy.spatial.distance import squareform, pdist
 
 __plugin_name__ = "fastcompare"
 __version__ = "0.1.0"
-__author__ = "Patrik Dokoupil"
-__author_contact__ = "Patrik.Dokoupil@matfyz.cuni.cz"
+__author__ = "Anonymous Author"
+__author_contact__ = "Anonymous@Author.com"
 __description__ = "Fast and easy comparison of 2 or 3 RS algorithms on implicit feedback datasets."
 
 bp = Blueprint(__plugin_name__, __plugin_name__, url_prefix=f"/{__plugin_name__}")
@@ -416,8 +416,6 @@ def compare_algorithms():
    
     params["contacts"] = tr("footer_contacts")
     params["contact"] = tr("footer_contact")
-    params["charles_university"] = tr("footer_charles_university")
-    params["cagliari_university"] = tr("footer_cagliari_university")
     params["t1"] = tr("footer_t1")
     params["t2"] = tr("footer_t2")
     params["title"] = tr("compare_title")

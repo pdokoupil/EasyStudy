@@ -13,8 +13,8 @@ from flask import Blueprint, request, redirect, render_template
 
 __plugin_name__ = "emptytemplate"
 __version__ = "0.1.0"
-__author__ = "Patrik Dokoupil"
-__author_contact__ = "Patrik.Dokoupil@matfyz.cuni.cz"
+__author__ = "Anonymous Author"
+__author_contact__ = "Anonymous@Author.com"
 __description__ = "Empty template, can be used as a starting point for creating plugins."
 
 bp = Blueprint(__plugin_name__, __plugin_name__, url_prefix=f"/{__plugin_name__}")
