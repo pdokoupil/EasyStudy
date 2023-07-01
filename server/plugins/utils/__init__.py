@@ -22,8 +22,8 @@ from .interaction_logging import study_ended, log_message, log_interaction
 __plugin_name__ = "utils"
 __description__ = "Plugin containing common, shared functionality that can be used from other plugins."
 __version__ = "0.1.0"
-__author__ = "Patrik Dokoupil"
-__author_contact__ = "Patrik.Dokoupil@matfyz.cuni.cz"
+__author__ = "Anonymous Author"
+__author_contact__ = "Anonymous@Author.com"
 
 bp = Blueprint(__plugin_name__, __plugin_name__, url_prefix=f"/{__plugin_name__}")
 
@@ -75,8 +75,6 @@ def join():
     params["title"] = tr("join_title")
     params["contacts"] = tr("footer_contacts")
     params["contact"] = tr("footer_contact")
-    params["charles_university"] = tr("footer_charles_university")
-    params["cagliari_university"] = tr("footer_cagliari_university")
     params["t1"] = tr("footer_t1")
     params["t2"] = tr("footer_t2")
     params["participant_details"] = tr("join_participant_details")
@@ -118,7 +116,6 @@ def join():
     params["guid_not_found"] = tr("join_guid_not_found")
     params["server_error"] = tr("join_server_error")
     params["min_resolution_error"] = tr("join_min_resolution_error")
-    params["czech"] = tr("join_czech")
     params["english"] = tr("join_english")
 
     study = UserStudy.query.filter(UserStudy.guid == request.args.get("guid")).first()
@@ -193,8 +190,6 @@ def preference_elicitation():
     tr = get_tr(languages, get_lang())
     params["contacts"] = tr("footer_contacts")
     params["contact"] = tr("footer_contact")
-    params["charles_university"] = tr("footer_charles_university")
-    params["cagliari_university"] = tr("footer_cagliari_university")
     params["t1"] = tr("footer_t1")
     params["t2"] = tr("footer_t2")
     params["load_more"] = tr("elicitation_load_more")
@@ -389,8 +384,6 @@ def finish():
     tr = get_tr(languages, get_lang())
     params["contacts"] = tr("footer_contacts")
     params["contact"] = tr("footer_contact")
-    params["charles_university"] = tr("footer_charles_university")
-    params["cagliari_university"] = tr("footer_cagliari_university")
     params["t1"] = tr("footer_t1")
     params["t2"] = tr("footer_t2")
     params["title"] = tr("finish_title")
@@ -478,8 +471,6 @@ def final_questionnaire():
     tr = get_tr(languages, get_lang())
     params["contacts"] = tr("footer_contacts")
     params["contact"] = tr("footer_contact")
-    params["charles_university"] = tr("footer_charles_university")
-    params["cagliari_university"] = tr("footer_cagliari_university")
     params["t1"] = tr("footer_t1")
     params["t2"] = tr("footer_t2")
     params["title"] = tr("questionnaire_title")
