@@ -1,28 +1,17 @@
-import os
 from tempfile import TemporaryDirectory
 import time
 import numpy as np
-import pandas as pd
-import torch
-from plugins.fastcompare.algo.algorithm_base import AlgorithmBase, PreferenceElicitationBase, DataLoaderBase, Parameter, ParameterType
+from plugins.fastcompare.algo.algorithm_base import AlgorithmBase, Parameter, ParameterType
 
 # Tensorflow setting
 import tensorflow as tf
 
 
-
-# Microsoft Recommenders includes
-from recommenders.utils.timer import Timer
-from recommenders.datasets import movielens
-from recommenders.datasets.split_utils import min_rating_filter_pandas
-from recommenders.datasets.python_splitters import numpy_stratified_split
-from recommenders.evaluation.python_evaluation import map_at_k, ndcg_at_k, precision_at_k, recall_at_k
-from recommenders.utils.constants import SEED as DEFAULT_SEED
-
 from recommenders.datasets.sparse import AffinityMatrix
 from recommenders.utils.python_utils import binarize
 from recommenders.models.vae.standard_vae import StandardVAE
 from recommenders.models.vae.multinomial_vae import Mult_VAE
+from recommenders.models.rbm.rbm import RBM
 
 
 class StandardVaeWrapper(AlgorithmBase):
@@ -248,12 +237,6 @@ class MultVaeWrapper(AlgorithmBase):
         self.model.model.load_weights(instance_cache_path)
 
 
-#RBM 
-from recommenders.models.rbm.rbm import RBM
-from recommenders.datasets.python_splitters import numpy_stratified_split
-from recommenders.datasets.sparse import AffinityMatrix
-from recommenders.utils.timer import Timer
-from recommenders.utils.plot import line_graph
 
 class RbmWrapper(AlgorithmBase):
     
