@@ -14,4 +14,3 @@ pillow
 gunicorn
 cinemagoer
 boto3
-recommenders
