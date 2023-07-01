@@ -85,7 +85,7 @@ class SimpleMatrixFactorization(TFRecommendersWrapper):
         self.items = tf.data.Dataset.from_tensor_slices(dict(self.loader.items_df.rename(columns={"title": "item_title"})[["item_title"]])).map(lambda x: x["item_title"])
         self.item_titles = self.items.batch(1_000)
         self.unique_user_ids = np.concatenate([self.loader.ratings_df.user.astype(str).unique(), np.array([new_user])])
-        self.unique_item_titles = np.unique(np.concatenate(list(self.item_titles)))
+        self.unique_item_titles = np.unique(np.concatenate(list(self.item_titles))) # self.loader.items_df.title.str.encode("utf-8").unique()
 
         model = get_model_mf(self.unique_user_ids, self.unique_item_titles, self.items, self.embedding_dimension, self.learning_rate)
         super().__init__(loader, model, epochs, **kwargs)
