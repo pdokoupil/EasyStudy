@@ -4,21 +4,17 @@ FROM continuumio/miniconda3:4.12.0
 WORKDIR /app
 #ENV HOME=/app
 
-COPY requirements.txt requirements.txt
+COPY conda_requirements.txt conda_requirements.txt
+COPY pip_requirements.txt pip_requirements.txt
 
 RUN conda update conda --yes \ 
     && conda config --add channels conda-forge \
     && conda create --name app_env python=3.9 \
-    && conda install --yes --file requirements.txt
+    && conda install --yes --file conda_requirements.txt
 
 # Some packages are not available in conda
 RUN pip install --upgrade pip
-RUN pip install Flask-PluginKit
-RUN pip install Flask-Session
-RUN pip install is-safe-url
-RUN pip install tensorflow
-RUN pip install tensorflow-recommenders
-RUN pip install recommenders
+RUN pip install -r pip_requirements.txt
 
 EXPOSE 5555
 
