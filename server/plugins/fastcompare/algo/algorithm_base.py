@@ -85,7 +85,8 @@ class AlgorithmBase(ABC):
     # When in doubt, just use instance_cache_path and ignore class_cache_path
     def save(self, instance_cache_path, class_cache_path):
         with open(instance_cache_path, "wb") as f:
-            pickle.dump(self.__dict__, f)
+            # Filter out "private" (starts with _) members
+            pickle.dump({a: b for a, b in self.__dict__.items() if not a.startswith("_")}, f)
 
 # Base classes must take **kwargs in __init__
 class PreferenceElicitationBase(ABC):
@@ -133,7 +134,8 @@ class PreferenceElicitationBase(ABC):
     # When in doubt, just use instance_cache_path and ignore class_cache_path
     def save(self, instance_cache_path, class_cache_path):
         with open(instance_cache_path, "wb") as f:
-            pickle.dump(self.__dict__, f)
+            # Filter out "private" (starts with _) members
+            pickle.dump({a: b for a, b in self.__dict__.items() if not a.startswith("_")}, f)
 
 # Base classes must take **kwargs in __init__
 # there should be user, item columns in the ratings_df
@@ -230,7 +232,8 @@ class DataLoaderBase(ABC):
     # When in doubt, just use instance_cache_path and ignore class_cache_path
     def save(self, instance_cache_path, class_cache_path):
         with open(instance_cache_path, "wb") as f:
-            pickle.dump(self.__dict__, f)
+            # Filter out "private" (starts with _) members
+            pickle.dump({a: b for a, b in self.__dict__.items() if not a.startswith("_")}, f)
 
 
 class EvaluationMetricBase(ABC):
