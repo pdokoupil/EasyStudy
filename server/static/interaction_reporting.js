@@ -169,6 +169,19 @@ function registerClickedRadioReporting(endpoint, csrfToken, radios, extraCtxLamb
     });
 }
 
+function registerChangedSelectionReporting(endpoint, csrfToken, selects, extraCtxLambda=()=>"") {
+    selects.forEach(select => {
+        select.addEventListener('change', event => {
+            let data = {
+                "id": event.target.id,
+                "value": event.target.value,
+                "name": event.target.name
+            };
+            reportOnInput(endpoint, csrfToken, "select", data, extraCtxLambda);
+        });
+    });
+}
+
 function reportLoadedPage(endpoint, csrfToken, pageName, extraCtxLambda=()=>"") {
     let data = {
         "page": pageName,

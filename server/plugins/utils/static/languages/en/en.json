@@ -74,5 +74,9 @@
     "finish_table_n_selected": "Number of Selected Items",
     "finish_table_n_shown": "Number of Shown Items",
     "finish_table_avg_rating": "Average Rating",
-    "finish_finish_user_study": "Finish user study"
+    "finish_finish_user_study": "Finish user study",
+    "questionnaire_hint": "Answer all the questions below",
+    "questionnaire_title": "Final questionnaire",
+    "questionnaire_header": "Final questionnaire",
+    "questionnaire_finish": "Finish user study"
 }
