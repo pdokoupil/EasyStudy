@@ -108,8 +108,8 @@ def prepare_tf_data(loader):
     movie_titles = movies.batch(1_000)
     user_ids = ratings.batch(1_000_000).map(lambda x: x["user_id"])
 
-    unique_movie_titles = np.unique(np.concatenate(list(movie_titles)))
-    unique_user_ids = np.unique(np.concatenate(list(user_ids)))
+    unique_movie_titles = np.unique(np.concatenate(list(movie_titles))) # loader.movies_df.title.str.encode("utf-8").unique()
+    unique_user_ids = np.unique(np.concatenate(list(user_ids))) # ratings_df.user_id.str.encode("utf-8").unique()
 
     new_user = str(max([int(x) for x in unique_user_ids]) + 1)
     unique_user_ids = np.concatenate([unique_user_ids, np.array([new_user])])
