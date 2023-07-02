@@ -372,6 +372,9 @@ def iteration_ended(iteration, selected, selected_variants, new_weights, dont_li
     }
     log_interaction(session["participation_id"], "iteration-ended", **data)
 
+@bp.route("/results", methods=["GET"])
+def results():
+    return "Unlike FASTCOMPARE, layoutshuffling is here only for illustration purposes as it was one our plugins we used to create an internal study. As such, it does not provide custom evaluation component since we did all our paper evaluations on raw data from the database."
 
 @bp.route("/finish-user-study")
 @multi_lang
