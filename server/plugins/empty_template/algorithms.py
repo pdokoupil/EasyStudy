@@ -11,7 +11,6 @@ from recommenders.datasets.sparse import AffinityMatrix
 from recommenders.utils.python_utils import binarize
 from recommenders.models.vae.standard_vae import StandardVAE
 from recommenders.models.vae.multinomial_vae import Mult_VAE
-from recommenders.models.rbm.rbm import RBM
 
 
 class StandardVaeWrapper(AlgorithmBase):
@@ -236,66 +235,3 @@ class MultVaeWrapper(AlgorithmBase):
         self.model.save_path = instance_cache_path
         self.model.model.load_weights(instance_cache_path)
 
-
-
-class RbmWrapper(AlgorithmBase):
-    
-    BATCH_SIZE = 350
-
-    def __init__(self, loader, epochs, hidden_units, **kwargs):
-        self.epochs = epochs
-        
-        self.am_train = AffinityMatrix(df=loader.ratings_df.rename(columns={"user": "userID", "item": "itemID"}), items_list=loader.ratings_df.item.unique())
-        self.rating_matrix, _, _ = self.am_train.gen_affinity_matrix()
-
-        self.model = RBM(
-            possible_ratings=np.setdiff1d(np.unique(self.rating_matrix), np.array([0])),
-            visible_units=self.rating_matrix.shape[1],
-            hidden_units=hidden_units,
-            training_epoch=epochs,
-            minibatch_size=RbmWrapper.BATCH_SIZE,
-            with_metrics=False
-        )
-
-    def fit(self):
-        start_time = time.perf_counter()
-        self.model.fit(self.rating_matrix)
-        print(f"Fitting took: {time.perf_counter() - start_time}")
-
-
-    def predict(self, selected_items, filter_out_items, k):
-        x = np.zeros(shape=(len(self.am_train.map_items), ), dtype=np.int32)
-        x[np.unique(list(map(lambda y: self.am_train.map_items[y], selected_items + filter_out_items)))] = self.rating_matrix.max()
-        x = np.expand_dims(x, axis=0)
-
-        v_, pvh_ = self.model.eval_out()
-        vp, pvh = self.model.sess.run([v_, pvh_], feed_dict={self.model.vu: x})
-        pv = np.max(pvh, axis=2)
-
-        # evaluate the score
-        score = np.multiply(vp, pv)
-        # Remove seen
-        seen_mask = np.not_equal(x, 0)
-        vp[seen_mask] = 0
-        pv[seen_mask] = 0
-        score[seen_mask] = 0
-
-        return [self.am_train.map_back_items[z] for z in np.argpartition(-score, range(k), axis=1)[0, :k]]
-
-    @classmethod
-    def name(cls):
-        return "RBM"
-
-    @classmethod
-    def parameters(cls):
-        return [
-            Parameter("epochs", ParameterType.INT, 30, help="Number of epochs"),
-            Parameter("hidden_units", ParameterType.INT, 1200, help="Number of hidden units")
-        ]
-    
-    def save(self, instance_cache_path, class_cache_path):
-        self.model.save(instance_cache_path)
-
-    def load(self, instance_cache_path, class_cache_path):
-        self.model.load(instance_cache_path)
-        self.model.init_training_session(self.rating_matrix)
