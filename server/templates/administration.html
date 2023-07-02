@@ -104,7 +104,7 @@
 
                   <template #cell(results)="data">
                     <div style="min-width: 60px;">
-                      <a target="_blank" :href="[[ data.value ]]">Results</a>
+                      <a v-if="data.item.initialized" target="_blank" :href="[[ data.value ]]">Results</a>
                     </div>
 
                     
