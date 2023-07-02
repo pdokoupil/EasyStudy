@@ -236,13 +236,18 @@ class DataLoaderBase(ABC):
             pickle.dump({a: b for a, b in self.__dict__.items() if not a.startswith("_thread.")}, f)
 
 
+# Base class for evaluation metrics
 class EvaluationMetricBase(ABC):
     _my_id = "02afcb1d17b8eb52a4ac71f722badf5a" # MD5 hash of "EvaluationMetricBase"
 
+    # Abstract method that has to be implemented by actual implementations
+    # It takes shown_items (list of item indexes) and selected_items (list of item indexes)
+    # at the input and should return numeric evaluation result
     @abstractmethod
     def evaluate(shown_items, selected_items):
         pass
 
+    # Abstract method that should return UNIQUE name of the given metric
     @classmethod
     @abstractmethod
     def name():

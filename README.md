@@ -9,15 +9,16 @@ Hidden due to anonymization
 
 # Links
 **If you want to try the framework on your own, please use the following links**.
-- [Administration](https://tinyurl.com/EasyStudyAdmin)
-- [Database](https://tinyurl.com/EasyStudyDb)
+- [Administration](https://bit.ly/EasyStudyAdmin)
+- [Database](https://bit.ly/EasyStudyDb)
 
-You can find multiple existing studies there and you can also create new studies as well.<br>
+You can find multiple (example) existing studies there and you can also create new studies as well.
+<br>
 
-***Access details are in the paper**
+***Access details (username and password) are in the paper**
 
 Alternatively we have prepared a recording that shows a quick walkthrough of the framework, where we first show the "researcher view" to use Administration in order to create a simple user study, then show participant view (pass through the study itself) and briefly explain where the interactions can be found.
-- [Quick walkthrough recording](https://tinyurl.com/EasyStudyDemo)
+- [Quick walkthrough recording](https://bit.ly/EasyStudyDemo)
 
 
 # Setup
@@ -33,13 +34,13 @@ Datasets itself (csv files) can be downloaded from official links:
 [goodbooks-10k](https://github.com/zygmuntz/goodbooks-10k/archive/refs/heads/master.zip)
 and the csv files should be extracted to [static/datasets/ml-latest/*.csv](./server/static/datasets/ml-latest/) and [static/datasets/goodbooks-10k/*.csv](./server/static/datasets/goodbooks-10k/) respectively.
 
-Alternatively you can run the server without the docker container, by just relying on Flask and using `flask --debug run` or `flask run` from the [server](./server/) directory. However, in that case, you have to ensure to have all the dependencies installed on your system (you can try to mimick what the [`Dockerfile`](./server/Dockerfile) does with dependencies). Running the serveer this way is especially useful during development of new functionality.
+Alternatively you can run the server without the docker container, by just relying on Flask and using `flask --debug run` or `flask run` from the [server](./server/) directory. However, in that case, you have to ensure to have all the dependencies installed on your system (you can try to mimick what the [`Dockerfile`](./server/Dockerfile) does with dependencies). Running the server this way is especially useful during development of new functionality.
 
 
 
 # Development
 ## Extending fastcompare
-The *fastcompare* plugin itself can be extended with new data loaders, recommendation algorithms or preference elicitation methods. The extension is done by adding new implementation as a class that is subclassing appropriate base classe. **The new class can be put either directly into `plugins/fastcompare/algo/*.py` or into separate plugins, e.g. `plugins/newplugin/*.py`**
+The *fastcompare* plugin itself can be extended with new data loaders, recommendation algorithms, preference elicitation methods, or evaluation metrics. The extension is done by adding new implementation as a class that is subclassing appropriate base classe. **The new class can be put either directly into `plugins/fastcompare/algo/*.py` or into separate plugins, e.g. `plugins/newplugin/*.py`**
 ### Adding new datasets
 Subclass the `DataLoaderBase` and implement all the abstract methods and properties, those are described in the code comments (you can get inspired by e.g. `GoodbooksDataLoader`)
 
@@ -57,10 +58,14 @@ Subclass the `AlgorithmBase` base class and implement it. All abstract methods a
 ### Adding new preference elicitation methods
 Subclass the `PreferenceElicitationBase` and implement it. All abstract methods and properties are described in the code comments.
 
+### Adding new evaluation metrics
+Subclass the `EvaluationMetricBase` and implement it. All abstract methods and properties are described in the code comments. 
+
 ## Extending EasyStudy (adding plugins)
 Adding new plugin is done by adding new folder under server/plugins directory. This directory has several requirements (see Flask-PluginKit's documentation) and the plugin itself should expose the following endpoints in order to become a valid plugin:
 - `/create` (typically renders some HTML page where user enters parameters) and in the end, it MUST invoke `/create-user-study` endpoint
 - `/initialize` this will be invoked after `/create-user-study` has been called and this is the place where the plugin should perform its initialization. Any long running initialization should be done in the background daemon process, without blocking the request. Once the initialization is done, the plugin is responsible for marking the particular user study as `initialized=True` and `active=True`
 - `/join` will be called when user attempts to join the user study, by following the generated URL link. This is where full control is passed to the plugin and plugin should decide future steps.
+- `/results` (optional) is called upon clicking on "Results" in administration UI. If the implementation is not provided, fallback endpoint from the `utils` plugin is used. Being able to hook custom `/results` endpoint is very useful because plugins with specific flow may require very individual and customized evaluation strategies that cannot by captured easily by common interfaces (e.g. `EvaluationMetricBase`).
 
 We have prepared a [minimal working plugin template](./server/plugins/empty_template) that you can use as a starting point when developing new plugins.
