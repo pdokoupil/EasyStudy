@@ -2,14 +2,6 @@ from abc import ABC, abstractmethod
 import pickle
 
 
-algorithm_registry = []
-
-def register_algorithm(algo_class):
-    assert issubclass(algo_class, AlgorithmBase)
-    if not algo_class in algorithm_registry:
-        algorithm_registry.append(algo_class)
-    print(f"Successfully registered")
-
 # Class for hyperparamters/configurable parameters of the algorithms
 class ParameterType:
     STRING = "string"
@@ -252,52 +244,3 @@ class EvaluationMetricBase(ABC):
     @abstractmethod
     def name():
         pass
-
-class Algo1:
-    pass
-
-class Algo2(AlgorithmBase):
-
-    def fit():
-        pass
-
-    def predict(self, selected_items, filter_out_items, k):
-        pass
-
-class Algo3(Algo1):
-    pass
-
-def get_functions_and_methods(path):
-    """
-    Given a .py file path - returns a list with all functions and methods in it.
-
-    Source: https://stackoverflow.com/q/73239026/256662
-    """
-    import ast
-
-    with open(path) as file:
-        node = ast.parse(file.read())
-
-    def show_info(functionNode):
-        function_rep = ''
-        function_rep = functionNode.name + '('
-
-        for arg in functionNode.args.args:
-            function_rep += arg.arg + ','
-
-        function_rep = function_rep.rstrip(function_rep[-1])
-        function_rep += ')'
-        return function_rep
-
-    result = []
-    functions = [n for n in node.body if isinstance(n, ast.FunctionDef)]
-    classes = [n for n in node.body if isinstance(n, ast.ClassDef)]
-    print(classes)
-    for function in functions:
-        result.append(show_info(function))
-
-    for class_ in classes:
-        methods = [n for n in class_.body if isinstance(n, ast.FunctionDef)]
-        for method in methods:
-            result.append((class_.name + '.' + show_info(method)))
-
