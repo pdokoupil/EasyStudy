@@ -20,6 +20,13 @@ You can find multiple (example) existing studies there and you can also create n
 Alternatively we have prepared a recording that shows a quick walkthrough of the framework, where we first show the "researcher view" to use Administration in order to create a simple user study, then show participant view (pass through the study itself) and briefly explain where the interactions can be found.
 - [Quick walkthrough recording](https://bit.ly/EasyStudyDemo)
 
+# Plugins
+**See the paper for detailed description of existing plugins and their functionality.**
+- [fastcompare](./server/plugins/fastcompare/) allows comparison of 2-3 algorithms on implicit feedback dataset. Is further extensible by providing classes implementing predefined baseclass (for pref. elicitation, algorithms, data loaders).
+- [utils](./server/plugins/utils/) contains only shared functionality, does not serve as "plugin template".
+- [layoutshuffling](./server/plugins/layoutshuffling/) a plugin that we have used for our internal user study. Is kept here for illustrational purposes.
+- [vae](./server/plugins/vae/) plugin providing MultVAE and StandardVAE algorithm implementations for the *fastcompare* plugin. Similarly to *utils* this plugin only contains shared functionality and cannot be used to create new user study. Note that these algorithms are itentionaly separated from *fastcompare* plugin itself since they have extra dependencies that only have to be installed when this plugin is going to be used.
+- [empty_template](./server/plugins/empty_template/) i.e. the minimal working plugin, see below.
 
 # Setup
 If you want to quickly try the framework, feel free to use the links above. If you need to have a local deployment of the framework, details are given in this section:
