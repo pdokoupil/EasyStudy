@@ -64,6 +64,9 @@ Adding new plugin is done by adding new folder under server/plugins directory. T
 
 We have prepared a [minimal working plugin template](./server/plugins/empty_template) that you can use as a starting point when developing new plugins.
 
+## Additional data ##
+The [data](./data) directory contains an example of [(dummy) final questionnaire](./data/sample_questionnaire.html) that can be uploaded and used during study creation. This particular example was used in the demo video recording at ACM RecSys 2025.
+
 # Possible issues
 
 ## Git clone
