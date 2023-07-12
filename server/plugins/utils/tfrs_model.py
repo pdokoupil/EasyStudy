@@ -22,7 +22,7 @@ class MFRetrievalModel(tfrs.models.Model):
         # The task computes the loss and the metrics.
         return self.task(user_embeddings, positive_item_embeddings, compute_metrics=False)
 
-    def predict_for_user(self, user, seen_items_tensor, k=10, shuffle=True):
+    def predict_for_user(self, user, seen_items_tensor, k=10, shuffle=False):
         # Generate prediction
         if tf.equal(tf.size(seen_items_tensor), 0):
             unseen_items = self.items

@@ -6,7 +6,9 @@
 
 import json
 from pathlib import Path
+import shutil
 import sys
+import time
 
 
 import numpy as np
@@ -14,22 +16,22 @@ import numpy as np
 [sys.path.append(i) for i in ['../.', '../..', '../../.']]
 
 from plugins.utils.preference_elicitation import load_data, enrich_results
-from plugins.fastcompare.loading import load_algorithms, load_preference_elicitations, load_data_loaders
+from plugins.fastcompare.loading import load_algorithms, load_preference_elicitations, load_data_loaders, load_evaluation_metrics
 from plugins.utils.interaction_logging import log_interaction, study_ended
 
-from models import UserStudy
+from models import UserStudy, Participation, Interaction
 
 
 import os
 from flask import Blueprint, jsonify, request, redirect, url_for, make_response, render_template, session
 
 from common import get_tr, load_languages, multi_lang, load_user_study_config
-
+from scipy.spatial.distance import squareform, pdist
 
 __plugin_name__ = "fastcompare"
 __version__ = "0.1.0"
-__author__ = "Patrik Dokoupil"
-__author_contact__ = "Patrik.Dokoupil@matfyz.cuni.cz"
+__author__ = "Anonymous Author"
+__author_contact__ = "Anonymous@Author.com"
 __description__ = "Fast and easy comparison of 2 or 3 RS algorithms on implicit feedback datasets."
 
 bp = Blueprint(__plugin_name__, __plugin_name__, url_prefix=f"/{__plugin_name__}")
@@ -94,6 +96,8 @@ def create():
         "displayed_name": tr("fastcompare_create_displayed_name"),
         "displayed_name_help": tr("fastcompare_create_displayed_name_help"),
         "override_about": tr("fastcompare_create_override_about"),
+        "select_questionnaire": tr("fastcompare_create_select_questionnaire"),
+        "add_questionnaire": tr("fastcompare_create_add_questionnaire"),
         "override_informed_consent": tr("fastcompare_create_override_informed_consent"),
         "override_preference_elicitation_hint": tr("fastcompare_create_override_preference_elicitation_hint"),
         "override_algorithm_comparison_hint": tr("fastcompare_create_override_algorithm_comparison_hint"),
@@ -324,14 +328,15 @@ def send_feedback():
     session["orig_permutation"] = p
     return redirect(url_for(f"{__plugin_name__}.compare_algorithms"))
 
-def elicitation_ended(elicitation_movies, elicitation_selected_movies):
+def elicitation_ended(elicitation_movies, elicitation_selected_movies, **kwargs):
     data = {
         "elicitation_movies": elicitation_movies,
         "elicitation_selected_movies": elicitation_selected_movies
     }
+    data.update(**kwargs)
     log_interaction(session["participation_id"], "elicitation-ended", **data)
 
-def iteration_started(iteration, movies, algorithm_assignment, result_layout, shown_movie_indices):
+def iteration_started(iteration, movies, algorithm_assignment, result_layout, shown_movie_indices, **kwargs):
     data = {
         "iteration": iteration,
         "movies": movies,
@@ -339,9 +344,10 @@ def iteration_started(iteration, movies, algorithm_assignment, result_layout, sh
         "result_layout": result_layout,
         "shown": shown_movie_indices
     }
+    data.update(**kwargs)
     log_interaction(session["participation_id"], "iteration-started", **data)
 
-def iteration_ended(iteration, selected, selected_variants, dont_like_anything, algorithm_comparison, ordered_ratings):
+def iteration_ended(iteration, selected, selected_variants, dont_like_anything, algorithm_comparison, ordered_ratings, **kwargs):
     data = {
         "iteration": iteration,
         "selected": selected,
@@ -350,6 +356,7 @@ def iteration_ended(iteration, selected, selected_variants, dont_like_anything, 
         "algorithm_comparison": algorithm_comparison,
         "ratings": ordered_ratings
     }
+    data.update(**kwargs)
     log_interaction(session["participation_id"], "iteration-ended", **data)
 
 @bp.route("/compare-algorithms", methods=["GET"])
@@ -409,8 +416,6 @@ def compare_algorithms():
    
     params["contacts"] = tr("footer_contacts")
     params["contact"] = tr("footer_contact")
-    params["charles_university"] = tr("footer_charles_university")
-    params["cagliari_university"] = tr("footer_cagliari_university")
     params["t1"] = tr("footer_t1")
     params["t2"] = tr("footer_t2")
     params["title"] = tr("compare_title")
@@ -438,6 +443,9 @@ def compare_algorithms():
 
         if "footer" in conf["text_overrides"]:
             params["footer_override"] = conf["text_overrides"]["footer"]
+
+    if questionnaire_exists(conf):
+        params["finish"] = tr("continue_to_questionnaire")
 
     return render_template("compare_algorithms.html", **params)
 
@@ -612,12 +620,19 @@ def long_initialization(guid):
         # Save the algorithm
         algorithm.save(get_cache_path(guid, algorithm_displayed_name), get_cache_path("", algorithm_displayed_name))
 
+
+    # Move the questionnaire file if present
+    if "questionnaire_file" in conf:
+        q_path = os.path.join("cache", __plugin_name__, "uploads", conf['questionnaire_file'])
+        if os.path.exists(q_path):
+            # TODO sanitize
+            shutil.move(q_path, get_cache_path(guid, conf['questionnaire_file']))
+
     q.initialized = True
     q.active = True
     session.commit()
     session.expunge_all()
     session.close()
-
 
 @bp.route("/initialize", methods=["GET"])
 def initialize():
@@ -630,14 +645,95 @@ def initialize():
     )
     heavy_process.start()
     print("Going to redirect back")
-    return redirect(request.args.get("continuation_url"))
+    return redirect(request.args.get("continuation_url"), Response={"guid": "ABC"})
+
+def questionnaire_exists(conf):
+    if "questionnaire_file" in conf:
+        q_path = get_cache_path(session["user_study_guid"], conf['questionnaire_file'])
+        if os.path.exists(q_path):
+            return True
+
 
 @bp.route("/finish-user-study")
 @multi_lang
 def finish_user_study():
     # Last iteration has ended here
     iteration_ended(session["iteration"], session["selected_movie_indices"], session["selected_variants"], session["nothing"], session["cmp"], session["a_r"])
+    
+    conf = load_user_study_config(session["user_study_id"])
+    if questionnaire_exists(conf):
+        # There is an final questionnaire, show it to the participant
+        return redirect(url_for("utils.final_questionnaire", continuation_url=url_for("utils.finish")))
+
+    # Otherwise just finish
     return redirect(url_for("utils.finish"))
+
+@bp.route("/results")
+def results():
+    guid = request.args.get("guid")
+    return render_template("fastcompare_results.html", guid=guid, fetch_results_url=url_for("fastcompare.fetch_results", guid=guid))
+
+@bp.route("/fetch-results/<guid>")
+def fetch_results(guid):
+    metrics = load_evaluation_metrics()
+    evaluated_metrics = []
+
+    
+    user_study = UserStudy.query.filter(UserStudy.guid == guid).first()
+    participants = Participation.query.filter((Participation.time_finished != None) & (Participation.user_study_id == user_study.id)).all()
+    
+    # Load the data loader to get item features and other information possibly needed for metric evaluation
+    conf = load_user_study_config(user_study.id)
+    loader_factory = load_data_loaders()[conf["selected_data_loader"]]
+    loader = loader_factory(**filter_params(conf["data_loader_parameters"], loader_factory))
+    load_data_loader(loader, guid, loader_factory.name())
+    
+    rating_matrix = loader.ratings_df.pivot(index='user', columns='item', values="rating").fillna(0).values
+    similarity_matrix = 1.0 - np.float32(squareform(pdist(rating_matrix.T, "cosine")))
+    
+    # print(f"Called, len={len(participants)}")
+    for p in participants:
+        iter_starts = Interaction.query.filter((Interaction.participation == p.id) & (Interaction.interaction_type == "iteration-started")).order_by(Interaction.id.asc()).all()
+        iter_ends = Interaction.query.filter((Interaction.participation == p.id) & (Interaction.interaction_type == "iteration-ended")).order_by(Interaction.id.asc()).all()
+
+        iteration_to_iter_start = dict()
+        iteration_to_iter_end = dict()
+
+        for it in iter_starts:
+            iteration_to_iter_start[json.loads(it.data)["iteration"]] = it
+        
+        for it in iter_ends:
+            iteration_to_iter_end[json.loads(it.data)["iteration"]] = it
+
+        for iteration, interaction in iteration_to_iter_end.items():
+            if iteration not in iteration_to_iter_start:
+                continue
+
+            start_data = json.loads(iteration_to_iter_start[iteration].data)
+            end_data = json.loads(interaction.data)
+
+            algorithm_assignment = start_data["algorithm_assignment"]
+            algo_name_to_variant = dict()
+            for _, mapping in algorithm_assignment.items():
+                algo_name_to_variant[mapping["name"]] = mapping["order"]
+
+            for algo, items in start_data["movies"].items():
+                shown_items = [int(mov["movie_idx"]) for mov in items["movies"]]
+                selected_items = end_data["selected"][-1]
+                selected_variants = end_data["selected_variants"][-1]
+                # Only selections from given algorithm
+                selected_items = [y for x, y in zip(selected_variants, selected_items) if x == algo_name_to_variant[algo]]
+                
+                for m_name, m_cls in metrics.items():
+                    evaluated_metrics.append({
+                        "metric_name": m_name,
+                        "value": m_cls(rating_matrix=rating_matrix, similarity_matrix=similarity_matrix).evaluate(shown_items, selected_items),
+                        "algorithm": algo,
+                        "iteration": iteration
+                    })
+
+
+    return evaluated_metrics
 
 def register():
     return {

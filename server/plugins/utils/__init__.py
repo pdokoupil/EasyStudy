@@ -1,9 +1,12 @@
 # -*- coding: utf-8 -*-
 
 import os
+from pathlib import Path
 import secrets
 from flask import Blueprint, jsonify, request, url_for, make_response, render_template
 from flask_login import current_user
+from jinja2 import Environment, FileSystemLoader
+from markupsafe import Markup
 from common import get_tr, load_languages, multi_lang, load_user_study_config, load_user_study_config_by_guid
 import flask
 import json
@@ -11,15 +14,16 @@ import json
 import datetime
 
 from models import Interaction, Participation, Message, UserStudy
+from werkzeug.utils import secure_filename
 from app import db
 
-from .interaction_logging import study_ended
+from .interaction_logging import study_ended, log_message, log_interaction
 
 __plugin_name__ = "utils"
 __description__ = "Plugin containing common, shared functionality that can be used from other plugins."
 __version__ = "0.1.0"
-__author__ = "Patrik Dokoupil"
-__author_contact__ = "Patrik.Dokoupil@matfyz.cuni.cz"
+__author__ = "Anonymous Author"
+__author_contact__ = "Anonymous@Author.com"
 
 bp = Blueprint(__plugin_name__, __plugin_name__, url_prefix=f"/{__plugin_name__}")
 
@@ -27,10 +31,19 @@ from .preference_elicitation import load_data_1, load_data_2, load_data_3, recom
 
 NUM_TO_SELECT = 5
 
+loader = FileSystemLoader('./')
+
+def include_file(name):
+    return Markup(loader.get_source(env, name)[0])
+
+env = Environment(loader=loader)
+env.globals['include_file'] = include_file
+
 @bp.context_processor
 def plugin_name():
     return {
-        "plugin_name": __plugin_name__
+        "plugin_name": __plugin_name__,
+        "include_file": include_file
     }
 
 languages = load_languages(os.path.dirname(__file__))
@@ -40,6 +53,10 @@ def get_lang():
     if "lang" in flask.session and flask.session["lang"] and flask.session["lang"] in languages:
         return flask.session["lang"]
     return default_lang
+
+@bp.route("/results", methods=["GET"])
+def results():
+    return "Default results implementation"
 
 # Shared implementation of "/join" phase of the user study
 # Expected input is continuation_url
@@ -58,8 +75,6 @@ def join():
     params["title"] = tr("join_title")
     params["contacts"] = tr("footer_contacts")
     params["contact"] = tr("footer_contact")
-    params["charles_university"] = tr("footer_charles_university")
-    params["cagliari_university"] = tr("footer_cagliari_university")
     params["t1"] = tr("footer_t1")
     params["t2"] = tr("footer_t2")
     params["participant_details"] = tr("join_participant_details")
@@ -101,7 +116,6 @@ def join():
     params["guid_not_found"] = tr("join_guid_not_found")
     params["server_error"] = tr("join_server_error")
     params["min_resolution_error"] = tr("join_min_resolution_error")
-    params["czech"] = tr("join_czech")
     params["english"] = tr("join_english")
 
     study = UserStudy.query.filter(UserStudy.guid == request.args.get("guid")).first()
@@ -148,7 +162,10 @@ def join():
 
         if "footer" in config["text_overrides"]:
             params["footer_override"] = config["text_overrides"]["footer"]
-    
+
+    if "disable_demographics" in config:
+        params["disable_demographics"] = config["disable_demographics"]
+
     return render_template("join.html", **params)
 
 @bp.route("/preference-elicitation", methods=["GET", "POST"])
@@ -173,8 +190,6 @@ def preference_elicitation():
     tr = get_tr(languages, get_lang())
     params["contacts"] = tr("footer_contacts")
     params["contact"] = tr("footer_contact")
-    params["charles_university"] = tr("footer_charles_university")
-    params["cagliari_university"] = tr("footer_cagliari_university")
     params["t1"] = tr("footer_t1")
     params["t2"] = tr("footer_t2")
     params["load_more"] = tr("elicitation_load_more")
@@ -309,16 +324,12 @@ def on_input():
 
 @bp.route("/on-message", methods=["POST"])
 def on_message():
-    x = Message(
-        time = datetime.datetime.utcnow(),
-        data = json.dumps(request.get_json(), ensure_ascii=False)
-    )
-
     if "participation_id" in flask.session:
-        x.participation = Participation.query.filter(Participation.id == flask.session["participation_id"]).first().id
+        participation = Participation.query.filter(Participation.id == flask.session["participation_id"]).first().id
+    else:
+        participation = None
 
-    db.session.add(x)
-    db.session.commit()
+    log_message(participation, **request.get_json())
     return "OK"
 
 # TODO use from layoutshuffling statistics implementation as well
@@ -355,6 +366,17 @@ def prepare_basic_statistics(n_algorithms, algorithm_names):
 # Shared implementation of "/finish" phase of the user study
 @bp.route("/finish", methods=["GET", "POST"])
 def finish():
+
+    if "final_questionnaire_data" in request.form and request.form.get("final_questionnaire_data") == "final_questionnaire_data":
+        # We received data for final questionnaire, store it in db
+        data = {}
+        for x, y in request.form.items():
+            if x == "final_questionnaire_data" or x == "csrf_token":
+                continue
+            data[x] = y
+        log_interaction(flask.session["participation_id"], "final-questionnaire", **data)
+
+
     conf = load_user_study_config(flask.session["user_study_id"])
     study_ended(flask.session["participation_id"], iteration=flask.session["iteration"])
 
@@ -362,8 +384,6 @@ def finish():
     tr = get_tr(languages, get_lang())
     params["contacts"] = tr("footer_contacts")
     params["contact"] = tr("footer_contact")
-    params["charles_university"] = tr("footer_charles_university")
-    params["cagliari_university"] = tr("footer_cagliari_university")
     params["t1"] = tr("footer_t1")
     params["t2"] = tr("footer_t2")
     params["title"] = tr("finish_title")
@@ -379,6 +399,7 @@ def finish():
     params["table_n_selected"] = tr("finish_table_n_selected")
     params["table_n_shown"] = tr("finish_table_n_shown")
     params["table_avg_rating"] = tr("finish_table_avg_rating")
+    params["finish_user_study"] = tr("finish_finish_user_study")
 
     # Prolific stuff
     if "PROLIFIC_PID" in flask.session:
@@ -398,11 +419,13 @@ def finish():
             params["footer_override"] = conf["text_overrides"]["footer"]
 
     # Handle statistics
-    params["show_final_statistics"] = conf["show_final_statistics"]
-    if conf["show_final_statistics"]:
+    if "show_final_statistics" in conf and conf["show_final_statistics"]:
+        params["show_final_statistics"] = True
         # Prepare statistics
         algorithm_names = [x["displayed_name"] for x in conf["algorithm_parameters"]]
         params.update(prepare_basic_statistics(conf["n_algorithms_to_compare"], algorithm_names))
+    else:
+        params["show_final_statistics"] = False
 
     return render_template("finish.html", **params)
     
@@ -423,6 +446,46 @@ def movie_search():
     res = search_for_movie(attrib, pattern, tr)
 
     return flask.jsonify(res)
+
+@bp.route("/upload", methods=["POST"])
+def upload():
+    # TODO limit size of the file somehow
+    f = request.files['file']
+    # Upload via some "random" name
+    sec_file = secure_filename(f.filename)
+    cache_path = os.path.join("cache", request.form.get("plugin_name") or __plugin_name__, "uploads")
+    Path(cache_path).mkdir(parents=True, exist_ok=True)
+    f_name = secrets.token_urlsafe(16) + "_" + sec_file
+    full_path = os.path.join(cache_path, f_name)
+    f.save(full_path)
+    return {"upload_name": f_name}
+
+
+@bp.route("/final-questionnaire")
+def final_questionnaire():
+    #conf = load_user_study_config(flask.session["user_study_id"])
+    user_study = UserStudy.query.filter(UserStudy.id == flask.session["user_study_id"]).first()
+    conf = json.loads(user_study.settings)
+
+    params = {}
+    tr = get_tr(languages, get_lang())
+    params["contacts"] = tr("footer_contacts")
+    params["contact"] = tr("footer_contact")
+    params["t1"] = tr("footer_t1")
+    params["t2"] = tr("footer_t2")
+    params["title"] = tr("questionnaire_title")
+    params["header"] = tr("questionnaire_header")
+    params["hint"] = tr("questionnaire_hint")
+    params["continuation_url"] = request.args.get("continuation_url")
+    params["finish"] = tr("questionnaire_finish")
+    params["questionnaire_file"] =  f"cache/{user_study.parent_plugin}/{user_study.guid}/{conf['questionnaire_file']}"
+
+    # Handle overrides
+    params["footer_override"] = None
+    if "text_overrides" in conf:
+        if "footer" in conf["text_overrides"]:
+            params["footer_override"] = conf["text_overrides"]["footer"]
+    return render_template("final_questionnaire.html", **params)
 
 def register():
     return {
