@@ -76,3 +76,6 @@ Adding new plugin is done by adding new folder under server/plugins directory. T
 - `/results` (optional) is called upon clicking on "Results" in administration UI. If the implementation is not provided, fallback endpoint from the `utils` plugin is used. Being able to hook custom `/results` endpoint is very useful because plugins with specific flow may require very individual and customized evaluation strategies that cannot by captured easily by common interfaces (e.g. `EvaluationMetricBase`).
 
 We have prepared a [minimal working plugin template](./server/plugins/empty_template) that you can use as a starting point when developing new plugins.
+
+## Additional data ##
+The [data](./data) directory contains an example of [(dummy) final questionnaire](./data/sample_questionnaire.html) that can be uploaded and used during study creation. This particular example was used in the demo video recording.
