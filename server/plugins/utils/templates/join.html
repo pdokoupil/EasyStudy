@@ -11,13 +11,6 @@
     <b-jumbotron class="smallJumbotron" header="{{about_study}}">
       <b-row align-v="center">
         <b-col cols="10">{{study_details}}</b-col>
-        <!-- {% if lang == "cs" %}
-        <b-col align-h="end" align-v="center"><b-button @click="selectLanguage('en')">{{english}}</b-button></b-col>
-        <b-col align-h="end" align-v="center"><b-button @click="selectLanguage('cs')" disabled>{{czech}}</b-button></b-col>
-        {% else %}
-        <b-col align-h="end" align-v="center"><b-button @click="selectLanguage('en')" disabled>{{english}}</b-button></b-col>
-        <b-col align-h="end" align-v="center"><b-button @click="selectLanguage('cs')">{{czech}}</b-button></b-col>
-        {% endif %} -->
       </b-row>
     </b-jumbotron>
     {% endif %}
@@ -28,11 +21,12 @@
           <b-form-group
             horizontal
           >
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />    
+              {% if disable_demographics != True %}
               <b-row class="mb-1 mt-3" align-h="center">
                 <h4>{{participant_details}}</h4>
               </b-row>
               <!-- csrf_token is only needed for POST -->
-              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
               <b-alert :show="showAlert" variant="danger">[[ alertText ]]</b-alert>
               <b-row class="mb-3">
                 <b-col class="mr-3 mt-2" sm="1">
@@ -80,6 +74,7 @@
                   <b-form-select v-model="mlFamiliar" :options="mlFamiliarOptions" name="mlFamiliar" :state="mlFamiliar != null" required="True" type=""></b-form-select>
                 </b-col>
               </b-row>
+              {% endif %}
               {% if informed_consent_override is defined and informed_consent_override is not none  %}
               <!-- <b-row class="mt-5"> -->
               <div>

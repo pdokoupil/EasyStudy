@@ -228,6 +228,17 @@
             </b-col>
           </b-row>
           <b-row align-h="center" class="mb-3">
+            <b-col class="text-center" cols="8">
+              <b-form-checkbox v-model="addQuestionnaire">{{add_questionnaire}}</b-form-checkbox>
+            </b-col>
+          </b-row>
+          <b-row :hidden="!addQuestionnaire" align-h="center" class="mb-3">
+            <b-col class="text-center" cols="8">
+              <label>{{select_questionnaire}}</label>
+              <input type="file"/>
+            </b-col>
+          </b-row>
+          <b-row align-h="center" class="mb-3">
             <b-col cols="8">
               <textarea placeholder="{{footer_placeholder}}" id="footer"></textarea>
             </b-col>
@@ -403,6 +414,7 @@
               resultLayout: null,
               shuffleAlgorithms: true,
               shuffleRecommendations: true,
+              addQuestionnaire: false,
               selectedAlgorithms: [null, null, null],
               selectedAlgorithmsParameters: [null, null, null],
               displayedNameState: [null, null, null],
@@ -607,6 +619,28 @@
                     "parent_plugin": pluginName,
                     "config": userStudyConfiguration
                 };
+
+                var input = document.querySelector('input[type="file"]');
+                
+                let uploadResult = null;
+                if (this.addQuestionnaire === true) {
+                  if (input.files && input.files.length === 1) {
+                    
+                    // Upload the file
+                    var data = new FormData();
+                    data.append('file', input.files[0]);
+                    data.append('plugin_name', pluginName);
+                    
+                    uploadResult = await fetch("{{url_for('utils.upload')}}", {
+                      method: 'POST',
+                      body: data,
+                      headers: {
+                            'X-CSRFToken': '{{ csrf_token() }}'
+                      },
+                    }).then(resp => resp.json());
+                    userStudyData["config"]["questionnaire_file"] = uploadResult["upload_name"];
+                  }
+                }
 
                 let res = await fetch("/create-user-study",
                     {

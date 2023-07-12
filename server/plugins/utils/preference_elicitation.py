@@ -108,8 +108,8 @@ def prepare_tf_data(loader):
     movie_titles = movies.batch(1_000)
     user_ids = ratings.batch(1_000_000).map(lambda x: x["user_id"])
 
-    unique_movie_titles = np.unique(np.concatenate(list(movie_titles)))
-    unique_user_ids = np.unique(np.concatenate(list(user_ids)))
+    unique_movie_titles = loader.movies_df.title.str.encode("utf-8").unique() # np.unique(np.concatenate(list(movie_titles)))
+    unique_user_ids = ratings_df.user_id.str.encode("utf-8").unique() # np.unique(np.concatenate(list(user_ids)))
 
     new_user = str(max([int(x) for x in unique_user_ids]) + 1)
     unique_user_ids = np.concatenate([unique_user_ids, np.array([new_user])])
@@ -149,16 +149,10 @@ def load_data_1(elicitation_movies):
     ).get_initial_data([int(x["movie_idx"]) for x in elicitation_movies])
 
     # TODO user enrich_results instead
-    movie_ids = [loader.movie_index_to_id[movie_idx] for movie_idx in data]
-    res = [loader.movies_df_indexed.loc[movie_id].title for movie_id in movie_ids]
-    res_genres = [loader.movies_df_indexed.loc[movie_id].genres.split("|") for movie_id in movie_ids]
-    res_genres = [x if x != ["(no genres listed)"] else [] for x in res_genres]
     
-    res_url = [loader.get_image(movie_idx) for movie_idx in data]
-    result = [{"movie": movie, "url": url, "movie_idx": str(movie_idx), "genres": genres, "movie_id": movie_id} for movie, url, movie_idx, genres, movie_id in zip(res, res_url, data, res_genres, movie_ids)]
 
     # Result is a list of movies, each movie being a dict (JSON object)
-    return result
+    return enrich_results(data, loader)
 
 def load_data_2(elicitation_movies):
     
@@ -185,10 +179,10 @@ def load_data_3(elicitation_movies):
     # Result is a list of movies, each movie being a dict (JSON object)
     return result
 
-def calculate_weight_estimate(selected_movies, elicitation_movies):
+def calculate_weight_estimate(selected_movies, elicitation_movies, return_supports=False):
     if not selected_movies:
         x = np.array([1.0, 1.0, 1.0])
-        return x / x.sum()
+        return x / x.sum(), {}
 
     loader = load_ml_dataset()
 
@@ -211,6 +205,7 @@ def calculate_weight_estimate(selected_movies, elicitation_movies):
         assert False
 
     diversities = distance_matrix[np.ix_(movie_indices, movie_indices)]
+    raw_diversities = diversities
     #diversities = diversities[np.triu_indices(diversities.shape[0])].reshape((-1, 1)) # Train diversity on this
     diversities = (diversities.sum(axis=0) / (diversities.shape[0] - 1)).reshape(-1,1)
 
@@ -219,26 +214,35 @@ def calculate_weight_estimate(selected_movies, elicitation_movies):
     relevances = relevances.mean(axis=0)
     # relevances = relevances[relevances > 0.0]
     relevances = relevances.reshape((-1, 1))
-    novelties = 1.0 - (loader.rating_matrix.astype(bool).sum(axis=0) / loader.rating_matrix.shape[0])
+    users_viewed_item = loader.rating_matrix.astype(bool).sum(axis=0)
+    novelties = 1.0 - (users_viewed_item / loader.rating_matrix.shape[0])
     novelties = novelties[movie_indices].reshape((-1, 1))
 
+    # for movie_idx in movie_indices:
+    #     if movie_idx in selected_movies:
+    #         r = loader.rating_matrix[:, movie_idx]
+    #         #r = r[r > 0.0]
+    #         r = r.mean(axis=0)
+    #         #r = r.mean()
+    #         selected_relevances.append(r) # TODO try without transposition
+    #         # selected_diversities.append(distance_matrix[movie_idx][movie_indices].mean())
+    #         d = distance_matrix[movie_idx][movie_indices].sum() / (len(movie_indices) - 1)
+    #         selected_diversities.append(d[d > 0].reshape(-1, 1))
+    #         selected_novelties.append(1.0 - (loader.rating_matrix[:, movie_idx].astype(bool).sum() / loader.rating_matrix.shape[0]))
 
-    for movie_idx in movie_indices:
-        if movie_idx in selected_movies:
-            r = loader.rating_matrix[:, movie_idx]
-            #r = r[r > 0.0]
-            r = r.mean(axis=0)
-            #r = r.mean()
-            selected_relevances.append(r) # TODO try without transposition
-            # selected_diversities.append(distance_matrix[movie_idx][movie_indices].mean())
-            d = distance_matrix[movie_idx][movie_indices].sum() / (len(movie_indices) - 1)
-            selected_diversities.append(d[d > 0].reshape(-1, 1))
-            selected_novelties.append(1.0 - (loader.rating_matrix[:, movie_idx].astype(bool).sum() / loader.rating_matrix.shape[0]))
+    for movie_idx in selected_movies:
+        r = loader.rating_matrix[:, movie_idx]
+        r = r.mean(axis=0)
+        selected_relevances.append(r)
+        d = distance_matrix[movie_idx][movie_indices].sum() / (len(movie_indices) - 1)
+        selected_diversities.append(d[d > 0].reshape(-1, 1))
+        selected_novelties.append(1.0 - (loader.rating_matrix[:, movie_idx].astype(bool).sum() / loader.rating_matrix.shape[0]))
+
     
     if (not selected_relevances) or (not selected_diversities) or (not selected_novelties):
         print(f"Something weird again: {movie_indices}, {selected_movies}")
         x = np.array([1.0, 1.0, 1.0])
-        return x / x.sum()
+        return x / x.sum(), {}
 
     # Take relevance values of all items and train CDF on it
     # Calculate CDF for relevances of all selected items and take their average
@@ -261,6 +265,23 @@ def calculate_weight_estimate(selected_movies, elicitation_movies):
     nov = np.mean(nov_cdf.transform(np.stack(selected_novelties).reshape(-1, 1)))
 
     result = np.array([rel, div, nov])
+
+    if return_supports:
+        supports = {
+            "elicitation_movies": np.squeeze(movie_indices),
+            "relevances": np.squeeze(relevances),
+            "diversities": np.squeeze(diversities),
+            "novelties": np.squeeze(novelties),
+            "normalized_relevances": np.squeeze(rel_cdf.transform(relevances)),
+            "normalized_diversities": np.squeeze(div_cdf.transform(diversities)),
+            "normalized_novelties": np.squeeze(nov_cdf.transform(novelties)),
+            "raw_rating": np.squeeze(relevances),
+            "raw_distance": np.squeeze(raw_diversities.flatten()),
+            "raw_users_viewed_item": np.squeeze(users_viewed_item[movie_indices]),
+            "rating_matrix_shape": np.array(loader.rating_matrix.shape)
+        }
+        return result / result.sum(), supports
+
     return result / result.sum()
 
 
@@ -280,7 +301,8 @@ def prepare_wrapper_once():
     return loader, items, distance_matrix, users_viewed_item, movie_title_to_idx#, algo, ratings_df
 
 # Define enrich_results on each loader?
-def enrich_results(top_k, loader):
+# TODO make this to be custom implementation in multiobjective plugin
+def enrich_results(top_k, loader, support=None):
     print(loader)
     if type(loader) is MLDataLoader:
         top_k_ids = [loader.movie_index_to_id[movie_idx] for movie_idx in top_k]
@@ -288,6 +310,8 @@ def enrich_results(top_k, loader):
         top_k_genres = [loader.movies_df_indexed.loc[movie_id].genres.split("|") for movie_id in top_k_ids]
         top_k_genres = [x if x != ["(no genres listed)"] else [] for x in top_k_genres]
         top_k_url = [loader.get_image(movie_idx) for movie_idx in top_k]
+        top_k_trailers = [loader.get_trailer_url(movie_idx) for movie_idx in top_k]
+        top_k_plots = [loader.get_plot(movie_idx) for movie_idx in top_k]
     else:
         top_k_ids = [loader.get_item_id(movie_idx) for movie_idx in top_k]
         top_k_description = [loader.items_df_indexed.loc[movie_id].title for movie_id in top_k_ids]
@@ -297,10 +321,52 @@ def enrich_results(top_k, loader):
             top_k_genres = ['' for movie_id in top_k_ids]
         top_k_genres = [x if x != ["(no genres listed)"] else [] for x in top_k_genres]
         top_k_url = [loader.get_item_index_image_url(movie_idx) for movie_idx in top_k]
-    
-    return [{"movie": movie, "url": url, "movie_idx": str(movie_idx), "movie_id": movie_id, "genres": genres} for movie, url, movie_idx, movie_id, genres in zip(top_k_description, top_k_url, top_k, top_k_ids, top_k_genres)]
+        top_k_trailers = [""] * len(top_k)
+        top_k_plots = [""] * len(top_k)
+        
+    if support:
+        top_k_supports = [
+            {
+                "relevance": np.round(support["relevance"][i], 4),
+                "diversity": np.round(support["diversity"][i], 4),
+                "novelty": np.round(support["novelty"][i], 4),
+                "raw_rating": np.round(support["raw_rating"][i], 4),
+                "raw_distance": np.squeeze(np.round(support["raw_distance"][i], 4)).tolist(),
+                "raw_users_viewed_item": support["raw_users_viewed_item"][i],
+            }
+            for i in range(len(top_k))
+        ]
+        return [
+            {
+            "movie": movie,
+            "url": url,
+            "movie_idx": str(movie_idx),
+            "movie_id": movie_id,
+            "genres": genres,
+            "support": support,
+            "trailer_url": trailer_url,
+            "plot": plot,
+            "rank": rank
+            }
+            for movie, url, movie_idx, movie_id, genres, support, trailer_url, plot, rank in
+                zip(top_k_description, top_k_url, top_k, top_k_ids, top_k_genres, top_k_supports, top_k_trailers, top_k_plots, range(len(top_k_ids)))
+        ]
+    return [
+        {
+            "movie": movie,
+            "url": url,
+            "movie_idx": str(movie_idx),
+            "movie_id": movie_id,
+            "genres": genres,
+            "trailer_url": trailer_url,
+            "plot": plot,
+            "rank": rank
+        }
+        for movie, url, movie_idx, movie_id, genres, trailer_url, plot, rank in
+            zip(top_k_description, top_k_url, top_k, top_k_ids, top_k_genres, top_k_trailers, top_k_plots, range(len(top_k_ids)))
+    ]
 
-def prepare_wrapper(selected_movies, model, mandate_allocation_factory, obj_weights, filter_out_movies = [], k=10):
+def prepare_wrapper(selected_movies, model, mandate_allocation_factory, obj_weights, filter_out_movies = [], k=10, norm_f=cdf):
     loader, items, distance_matrix, users_viewed_item, movie_title_to_idx = prepare_wrapper_once()
 
     max_user = loader.ratings_df.userId.max()
@@ -326,7 +392,7 @@ def prepare_wrapper(selected_movies, model, mandate_allocation_factory, obj_weig
     rating_vector = np.expand_dims(rating_vector, axis=0) # Convert it to 1xN rating matrix
     extended_rating_matrix = rating_vector #loader.rating_matrix[:1] #rating_vector
 
-    normalization_factory = cdf
+    normalization_factory = norm_f
     cache_dir = None #"."
 
     mandate_allocation = mandate_allocation_factory(obj_weights, -1e6)
@@ -340,15 +406,18 @@ def prepare_wrapper(selected_movies, model, mandate_allocation_factory, obj_weig
     n_users = loader.rating_matrix.shape[0] # Calculate number of users on the full rating matrix not just on the single user vector
     return loader, RLPropWrapper(items, extended_rating_matrix, distance_matrix, users_viewed_item, normalization_factory, mandate_allocation, unseen_items_mask, cache_dir, discount_sequences, n_users)
 
-def rlprop(selected_movies, model, weights, filter_out_movies = [], k=10):
+def rlprop(selected_movies, model, weights, filter_out_movies = [], k=10, norm_f=cdf, include_support=False):
     obj_weights = weights
     obj_weights /= obj_weights.sum()
-    
 
-    loader, wrapper = prepare_wrapper(selected_movies, model, exactly_proportional_fuzzy_dhondt_2, obj_weights, filter_out_movies, k)
+    loader, wrapper = prepare_wrapper(selected_movies, model, exactly_proportional_fuzzy_dhondt_2, obj_weights, filter_out_movies, k, norm_f)
     wrapper.init()
-    x = wrapper(k)
 
+    if include_support:
+        x, support = wrapper(k, return_support=include_support)
+        return enrich_results(x[0], loader, {key: value for key,value in support.items()})
+
+    x = wrapper(k, return_support=include_support)
     return enrich_results(x[0], loader)
 
 def get_objective_importance(selected_movie_indices, shown_movies):
@@ -361,14 +430,18 @@ def get_objective_importance(selected_movie_indices, shown_movies):
         "novelty": importances[2]
     }
 
-def weighted_average(selected_movies, model, weights, filter_out_movies = [], k=10):
+def weighted_average(selected_movies, model, weights, filter_out_movies = [], k=10, norm_f=cdf, include_support=False):
     obj_weights = weights
     obj_weights /= obj_weights.sum()
-    
-    loader, wrapper = prepare_wrapper(selected_movies, model, weighted_average_strategy, obj_weights, filter_out_movies, k)
-    wrapper.init()
-    x = wrapper(k)
 
+    loader, wrapper = prepare_wrapper(selected_movies, model, weighted_average_strategy, obj_weights, filter_out_movies, k, norm_f)
+    wrapper.init()
+
+    if include_support:
+        x, support = wrapper(k, return_support=include_support)
+        return enrich_results(x[0], loader, {key: value for key,value in support.items()})
+
+    x = wrapper(k, return_support=include_support)
     return enrich_results(x[0], loader)
 
 

@@ -11,32 +11,24 @@ from sqlalchemy.orm import Session
 
 from flask import Blueprint, request, redirect, render_template
 
-__plugin_name__ = "emptytemplate"
+__plugin_name__ = "vae"
 __version__ = "0.1.0"
 __author__ = "Anonymous Author"
 __author_contact__ = "Anonymous@Author.com"
-__description__ = "Empty template, can be used as a starting point for creating plugins."
+__description__ = "Plugin with VAE algorithm implementations (wrappers) for the fastcompare plugin."
 
 bp = Blueprint(__plugin_name__, __plugin_name__, url_prefix=f"/{__plugin_name__}")
-
-# Uncomment this endpoint to make plugin visible in the administration
-# @bp.route("/create")
-# def create():
-#     return render_template("empty_template_create.html")
 
 # Public facing endpoint
 @bp.route("/join", methods=["GET"])
 def join():
-    assert "guid" in request.args, "guid must be available in arguments"
-    return render_template("empty_template_join.html")
+    return "Not supported"
 
 ### Long running initialization is here ####
 def long_initialization(guid):
     engine = create_engine('sqlite:///instance/db.sqlite')
     session = Session(engine)
     q = session.query(UserStudy).filter(UserStudy.guid == guid).first()
-    
-    # TODO long running initialization
 
     q.initialized = True
     q.active = True
@@ -54,7 +46,6 @@ def initialize():
         args=(guid, )
     )
     p.start()
-    print("Going to redirect back")
     return redirect(request.args.get("continuation_url"))
 
 def register():

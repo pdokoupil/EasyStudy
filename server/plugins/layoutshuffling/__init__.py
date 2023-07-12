@@ -17,8 +17,8 @@ import numpy as np
 
 __plugin_name__ = "layoutshuffling"
 __version__ = "0.1.0"
-__author__ = "Patrik Dokoupil"
-__author_contact__ = "Patrik.Dokoupil@matfyz.cuni.cz"
+__author__ = "Anonymous Author"
+__author_contact__ = "Anonymous@Author.com"
 __description__ = "Simple plugin comparing RLprop with Matrix Factorization while shuffling result layouts (for illustration purposes only)."
 
 bp = Blueprint(__plugin_name__, __plugin_name__, url_prefix=f"/{__plugin_name__}")
@@ -151,8 +151,6 @@ def compare_algorithms():
    
     params["contacts"] = tr("footer_contacts")
     params["contact"] = tr("footer_contact")
-    params["charles_university"] = tr("footer_charles_university")
-    params["cagliari_university"] = tr("footer_cagliari_university")
     params["t1"] = tr("footer_t1")
     params["t2"] = tr("footer_t2")
     params["title"] = tr("compare_title")
@@ -343,31 +341,6 @@ def refine_results():
 
     return redirect(url_for("layoutshuffling.compare_algorithms"))
 
-@bp.route("/final-questionare")
-@multi_lang
-def final_questionare():
-    params = {
-        "iteration": session["iteration"]
-    }
-
-    tr = get_tr(languages, get_lang())
-    params["contacts"] = tr("footer_contacts")
-    params["contact"] = tr("footer_contact")
-    params["charles_university"] = tr("footer_charles_university")
-    params["cagliari_university"] = tr("footer_cagliari_university")
-    params["t1"] = tr("footer_t1")
-    params["t2"] = tr("footer_t2")
-    params["title"] = tr("final_title")
-    params["header"] = tr("final_header")
-    params["finish"] = tr("final_finish")
-    params["hint"] = tr("final_hint")
-
-    params["premature"] = False
-    if session["iteration"] < TOTAL_ITERATIONS:
-        params["premature"] = True
-
-    return render_template("final_questionare.html", **params)
-
 def elicitation_ended(elicitation_movies, elicitation_selected_movies):
     data = {
         "elicitation_movies": elicitation_movies,
@@ -399,6 +372,9 @@ def iteration_ended(iteration, selected, selected_variants, new_weights, dont_li
     }
     log_interaction(session["participation_id"], "iteration-ended", **data)
 
+@bp.route("/results", methods=["GET"])
+def results():
+    return "Unlike FASTCOMPARE, layoutshuffling is here only for illustration purposes as it was one our plugins we used to create an internal study. As such, it does not provide custom evaluation component since we did all our paper evaluations on raw data from the database."
 
 @bp.route("/finish-user-study")
 @multi_lang
@@ -411,8 +387,6 @@ def finish_user_study():
     tr = get_tr(languages, get_lang())
     params["contacts"] = tr("footer_contacts")
     params["contact"] = tr("footer_contact")
-    params["charles_university"] = tr("footer_charles_university")
-    params["cagliari_university"] = tr("footer_cagliari_university")
     params["t1"] = tr("footer_t1")
     params["t2"] = tr("footer_t2")
     params["title"] = tr("finish_title")

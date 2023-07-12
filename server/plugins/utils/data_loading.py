@@ -30,6 +30,7 @@ def load_ml_dataset(ml_variant="ml-latest"):
         movies_path = os.path.join(basedir, f"{ml_variant}/movies.csv")
         tags_path = os.path.join(basedir, f"{ml_variant}/tags.csv")
         links_path = os.path.join(basedir, f"{ml_variant}/links.csv")
+        descriptions_path = os.path.join(basedir, f"{ml_variant}/descriptions.json")
         img_dir_path = os.path.join(basedir, ml_variant, "img")
         # Ensure img dir path exists
         Path(img_dir_path).mkdir(parents=True, exist_ok=True)
@@ -37,7 +38,7 @@ def load_ml_dataset(ml_variant="ml-latest"):
         start_time = time.perf_counter()
         loader = MLDataLoader(ratings_path, movies_path, tags_path, links_path,
             [RatingLowFilter(4.0), MovieFilterByYear(1990), RatingFilterOld(2010), RatingsPerYearFilter(50.0), RatingUserFilter(100), RatedMovieFilter(), LinkFilter()],
-            img_dir_path=img_dir_path
+            img_dir_path=img_dir_path, descriptions_path=descriptions_path
         )
         loader.load()
         print(f"## Loading took: {time.perf_counter() - start_time}")

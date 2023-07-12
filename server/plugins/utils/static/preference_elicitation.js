@@ -75,25 +75,30 @@ window.app = new Vue({
             let foundMovies = await fetch(search_item_url + "?attrib=movie&pattern="+movieName).then(resp => resp.json());
             return foundMovies;
         },
-        prepareTable(data) {
+        makeItem(dat) {
+            return {
+                "movieName": dat["movie"],
+                "movie": {
+                    "idx": dat["movie_idx"],
+                    "url": dat["url"]
+                }
+            };
+        },
+        prepareTable(data, fromSearch=false) {
             let row = [];
             let rows = [];
             let items = [];
             for (var k in data) {
-                items.push({
-                    "movieName": data[k]["movie"],
-                    "movie": {
-                        "idx": data[k]["movie_idx"],
-                        "url": data[k]["url"]
-                    }
-                });
-                row.push({
-                    "movieName": data[k]["movie"],
-                    "movie": {
-                        "idx": data[k]["movie_idx"],
-                        "url": data[k]["url"]
-                    }
-                });
+                let it = this.makeItem(data[k]);
+                let rw = this.makeItem(data[k]);
+                
+                if (fromSearch === true) {
+                    it["_fromSearch"] = true;
+                    rw["_fromSearch"] = true;
+                }
+                
+                items.push(it);
+                row.push(rw);
                 if (row.length >= this.itemsPerRow) {
                     rows.push(row);
                     row = [];
@@ -106,10 +111,10 @@ window.app = new Vue({
             return {"rows": rows, "items": items };
         },
         async onClickSearch(event) {
-            reportOnInput("/utils/on-input", csrfToken, "search", {"search_text_box_value": this.searchMovieName});
             let data = await this.handlePrefixSearch(this.searchMovieName);
-            let res = this.prepareTable(data);
-            
+            let res = this.prepareTable(data, true);
+            reportOnInput("/utils/on-input", csrfToken, "search", {"search_text_box_value": this.searchMovieName, "search_result": res});
+
             // Do not overwrite backups when doing repeated search
             if (this.itemsBackup === null) {
                 this.itemsBackup = this.items;

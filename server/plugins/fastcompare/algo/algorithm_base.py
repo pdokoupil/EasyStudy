@@ -2,14 +2,6 @@ from abc import ABC, abstractmethod
 import pickle
 
 
-algorithm_registry = []
-
-def register_algorithm(algo_class):
-    assert issubclass(algo_class, AlgorithmBase)
-    if not algo_class in algorithm_registry:
-        algorithm_registry.append(algo_class)
-    print(f"Successfully registered")
-
 # Class for hyperparamters/configurable parameters of the algorithms
 class ParameterType:
     STRING = "string"
@@ -85,7 +77,8 @@ class AlgorithmBase(ABC):
     # When in doubt, just use instance_cache_path and ignore class_cache_path
     def save(self, instance_cache_path, class_cache_path):
         with open(instance_cache_path, "wb") as f:
-            pickle.dump(self.__dict__, f)
+            # Filter out "private" (starts with _) members
+            pickle.dump({a: b for a, b in self.__dict__.items() if not a.startswith("_thread.")}, f)
 
 # Base classes must take **kwargs in __init__
 class PreferenceElicitationBase(ABC):
@@ -133,7 +126,8 @@ class PreferenceElicitationBase(ABC):
     # When in doubt, just use instance_cache_path and ignore class_cache_path
     def save(self, instance_cache_path, class_cache_path):
         with open(instance_cache_path, "wb") as f:
-            pickle.dump(self.__dict__, f)
+            # Filter out "private" (starts with _) members
+            pickle.dump({a: b for a, b in self.__dict__.items() if not a.startswith("_thread.")}, f)
 
 # Base classes must take **kwargs in __init__
 # there should be user, item columns in the ratings_df
@@ -230,53 +224,23 @@ class DataLoaderBase(ABC):
     # When in doubt, just use instance_cache_path and ignore class_cache_path
     def save(self, instance_cache_path, class_cache_path):
         with open(instance_cache_path, "wb") as f:
-            pickle.dump(self.__dict__, f)
+            # Filter out "private" (starts with _) members
+            pickle.dump({a: b for a, b in self.__dict__.items() if not a.startswith("_thread.")}, f)
 
-class Algo1:
-    pass
 
-class Algo2(AlgorithmBase):
+# Base class for evaluation metrics
+class EvaluationMetricBase(ABC):
+    _my_id = "02afcb1d17b8eb52a4ac71f722badf5a" # MD5 hash of "EvaluationMetricBase"
 
-    def fit():
+    # Abstract method that has to be implemented by actual implementations
+    # It takes shown_items (list of item indexes) and selected_items (list of item indexes)
+    # at the input and should return numeric evaluation result
+    @abstractmethod
+    def evaluate(shown_items, selected_items):
         pass
 
-    def predict(self, selected_items, filter_out_items, k):
+    # Abstract method that should return UNIQUE name of the given metric
+    @classmethod
+    @abstractmethod
+    def name():
         pass
-
-class Algo3(Algo1):
-    pass
-
-def get_functions_and_methods(path):
-    """
-    Given a .py file path - returns a list with all functions and methods in it.
-
-    Source: https://stackoverflow.com/q/73239026/256662
-    """
-    import ast
-
-    with open(path) as file:
-        node = ast.parse(file.read())
-
-    def show_info(functionNode):
-        function_rep = ''
-        function_rep = functionNode.name + '('
-
-        for arg in functionNode.args.args:
-            function_rep += arg.arg + ','
-
-        function_rep = function_rep.rstrip(function_rep[-1])
-        function_rep += ')'
-        return function_rep
-
-    result = []
-    functions = [n for n in node.body if isinstance(n, ast.FunctionDef)]
-    classes = [n for n in node.body if isinstance(n, ast.ClassDef)]
-    print(classes)
-    for function in functions:
-        result.append(show_info(function))
-
-    for class_ in classes:
-        methods = [n for n in class_.body if isinstance(n, ast.FunctionDef)]
-        for method in methods:
-            result.append((class_.name + '.' + show_info(method)))
-
