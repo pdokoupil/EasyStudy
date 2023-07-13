@@ -1,0 +1,120 @@
+{% include 'header.html' %}
+
+<div id="app">
+    <b-container fluid>
+        <b-jumbotron class="smallJumbotron" header="{{header}}" lead="">
+            {{hint}}
+        </b-jumbotron>
+        
+        {% if show_final_statistics == True %}
+        <b-row class="mt-3" align-h="center">
+            <b-col class="text-center" align-h="center" cols="10">
+                <h4>{{statistics}}</h4>
+            </b-col>
+        </b-row>
+        <b-row class="mt-3 mb-3" align-h="center">
+            <b-col class="text-center" align-h="center" cols="8">
+                <table role="table" aria-busy="false" aria-colcount="3" class="table b-table table-striped table-hover" id="__BVID__1046">
+                    <thead role="rowgroup" class="">
+                        <tr role="row" class="">
+                            <th role="columnheader" scope="col" aria-colindex="1" class="">
+                                <div>{{table_algo_name}}</div>
+                            </th>
+                            <th role="columnheader" scope="col" aria-colindex="2" class="">
+                                <div>{{table_n_selected}}</div>
+                            </th>
+                            <th role="columnheader" scope="col" aria-colindex="2" class="">
+                                <div>{{table_n_shown}}</div>
+                            </th>
+                            <th role="columnheader" scope="col" aria-colindex="3" class="">
+                                <div>{{table_avg_rating}}</div>
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody role="rowgroup">
+                        {% for key, value in n_selected_per_algorithm.items() %}
+                        <tr role="row" class="">
+                            <td aria-colindex="1" role="cell" class="">{{key}}</td>
+                            <td aria-colindex="2" role="cell" class="">{{value}}</td>
+                            <td aria-colindex="3" role="cell" class="">{{(n_recommended / (n_selected_per_algorithm|length))|int}}</td>
+                            <td aria-colindex="4" role="cell" class="">{{n_avg_rating_per_algorithm[key]}}</td>
+                        </tr>
+                        {% endfor %}
+                        <tr role="row" class="">
+                            <td aria-colindex="1" role="cell" class=""><strong>TOTAL:</strong></td>
+                            <td aria-colindex="2" role="cell" class="">{{n_selected_per_algorithm.values()|sum}}</td>
+                            <td aria-colindex="3" role="cell" class="">{{n_recommended}}</td>
+                            <td aria-colindex="4" role="cell" class="">{{(n_avg_rating_per_algorithm.values()|sum) / (n_avg_rating_per_algorithm|length)}}</td>
+                        </tr>
+                        <tr role="row" class="">
+                            <td aria-colindex="1" role="cell" class="">Preference Elicitation</td>
+                            <td aria-colindex="2" role="cell" class="">{{n_selected_elicitation}}</td>
+                            <td aria-colindex="3" role="cell" class="">{{n_total_elicitation}}</td>
+                            <td aria-colindex="4" role="cell" class=""></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </b-col>
+        </b-row>
+        {% endif %}
+
+        {% if finished_text_override is defined and finished_text_override is not none %}
+        <div>
+            {{ finished_text_override | safe }}
+        </div>
+        {% endif %}
+
+        {% if prolific_pid is defined and prolific_pid is not none %}
+        <b-row align-h="center">
+            <b-col class="text-center" align-h="center" cols="6">
+                <p>{{auto_redirect}}.</p>
+                <b-btn @click="prolificRedirect" variant="success" type="submit">{{finish_user_study}}</b-btn>
+            </b-col>
+        </b-row>
+        {% endif %}
+    </b-container>
+</div>
+
+<script src="{{url_for('static', filename='resolution_handling.js')}}"></script>
+<script src="{{url_for('static', filename='interaction_reporting.js')}}"></script>
+
+{% if prolific_pid is defined and prolific_pid is not none %}
+<script>
+    console.log("Redirecting in 15 seconds");
+    window.setTimeout(function (){
+        window.location = "{{prolific_url}}";
+    }, 15000);
+</script>
+{% endif %}
+
+<script>
+    window.app = new Vue({
+    el: '#app',
+    delimiters: ['[[',']]'], // Used to replace double { escaping with double [ escaping (to prevent jinja vs vue inference)
+    data: function() {
+        
+        return {
+            
+        };
+    },
+    methods: {
+        prolificRedirect() {
+            window.location = "{{prolific_url}}";
+        }
+    },
+    mounted() {
+        startViewportChangeReportingWithLimit(`/utils/changed-viewport`, "{{ csrf_token() }}", 1.0, true);
+        reportLoadedPage(`/utils/loaded-page`, "{{ csrf_token() }}", "finished_user_study");
+    }
+})
+</script>
+
+{% if footer_override is defined and footer_override is not none %}
+  <div class="footerDiv mt-3">
+    {{ footer_override | safe}}
+  </div>
+</body>
+</html>
+{% else %}
+{% include 'footer.html' %}
+{% endif %}

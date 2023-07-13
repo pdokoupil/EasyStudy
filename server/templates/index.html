@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <!-- Required meta tags -->
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
+    <meta http-equiv="content-type" content="text/html; charset=UTF-8" />
+
+    <title>Administration</title>
+
+    <!-- Required Stylesheets -->
+    <link
+      type="text/css"
+      rel="stylesheet"
+      href="https://unpkg.com/bootstrap@4.6.2/dist/css/bootstrap.min.css"
+    />
+    <link
+      type="text/css"
+      rel="stylesheet"
+      href="https://unpkg.com/bootstrap-vue@2.22.0/dist/bootstrap-vue.css"
+    />
+
+    <!-- Required scripts -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/vue/2.6.12/vue.min.js"></script>
+
+    
+    <!-- Load polyfills to support older browsers -->
+    <script src="https://unpkg.com/babel-polyfill@6.26.0/dist/polyfill.min.js"></script>
+    
+    <!-- Required scripts -->
+    <script src="https://unpkg.com/bootstrap-vue@2.22.0/dist/bootstrap-vue.js"></script>
+    <script src="https://unpkg.com/bootstrap-vue@2.22.0/dist/bootstrap-vue-icons.js"></script> <!-- Needed just for the Icons -->
+  </head>
+  <body>
+    <!-- Our application root element -->
+    <div id="app">
+      <b-container fluid align-h="center">
+        <b-jumbotron header="EasyStudy" lead="A framework for Easy Deployment of User Studies on Recommender Systems">
+            <b-row>
+              <b-col cols="10">
+                <p>Contact information: Hidden due to <strong>Anonymization</strong></p>
+                <b-btn variant="primary" href="https://bit.ly/EasyStudyRepo">Github repository</b-btn>
+              </b-col>
+              <b-col cols="2" class="text-center">
+                {% if is_authenticated %}
+                <p>
+                  <strong>
+                    Signed in as {{ current_user }}
+                  </strong>
+                </p>
+                <b-form action="/logout">
+                  <b-button variant="warning" type="submit">Logout</b-button>
+                </form>
+                {% endif %}
+                
+              </b-col>
+            </b-row>
+          </b-jumbotron>
+      
+          {% if is_authenticated %}
+          <b-row align-h="center">
+            <b-col class="text-center" cols="8">
+              Continue to <a href="/administration">administration</a>
+            </b-col>
+          </b-row>
+          {% else %}
+          <b-row align-h="center">
+            <b-col class="text-center" cols="8">
+              Please <a href="/login">login</a> to continue
+            </b-col>
+          </b-row>
+          {% endif %}
+          
+      </b-container>
+    </div>
+
+    <!-- Start running your app -->
+    <script>
+
+      window.app = new Vue({
+        el: '#app',
+        delimiters: ['[[',']]'], // Used to replace double { escaping with double [ escaping (to prevent jinja vs vue inference)
+        data: function() {
+            return {
+                
+            }
+        },
+        async mounted() {
+          
+        },
+        methods: {
+          
+        }
+      })
+    </script>
+  </body>
+</html>

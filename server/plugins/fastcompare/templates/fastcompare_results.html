@@ -1,0 +1,130 @@
+{% include 'header.html' %}
+    <!-- Our application root element -->
+    <script src="../static/tinymce/tinymce.min.js" referrerpolicy="origin"></script>
+    <div id="app">
+      <b-container align-h="center" fluid>
+        <b-jumbotron class="smallJumbotron" header-level="4" header="{{plugin_name}} Results" lead="Results of the user study: {{guid}}.">
+            
+        </b-jumbotron>
+          
+
+        <b-row>
+          <b-col>
+            <b-table responsive show-empty :items="newResults" :fields="resultsFields">
+              <template #cell()="data">
+                  <i>[[ data.value ]]</i>
+              </template>
+
+              <template #cell(create_url)="data">
+                  <b-btn variant="primary" :href="data.value">Create</b-btn>
+              </template>
+              
+            </b-table>
+          </b-col>
+        </b-row>
+
+        <b-row align-h="center">
+          <b-col>
+            <b-progress :value="progressValue" :max="100" class="mb-3" :hidden="progressValue >= 100"></b-progress>
+          </b-col>
+        </b-row>
+
+      </b-container>
+    </div>
+
+    <!-- Start running your app -->
+    <script>
+
+      // let algorithms = [];
+      // for (let x in evaluatedMetrics) {
+      //   let algoName = evaluatedMetrics[x]["algorithm"];
+      //   algorithms.push(algoName);
+      //   resultsFields.push({key: algoName, label: algoName});
+      // }
+      // console.log(algorithms);
+
+      let fetchResultsUrl = "{{fetch_results_url}}";
+
+      window.app = new Vue({
+        el: '#app',
+        delimiters: ['[[',']]'], // Used to replace double { escaping with double [ escaping (to prevent jinja vs vue inference)
+        data: function() {
+            return {
+              resultsFields: [
+                  {key: "metric_name", label: "Metric Name"}
+              ],
+              newResults: [], // Query server for loaded plugins
+              progressValue: 0
+            }
+        },
+        methods: {
+          updateProgress() {
+            this.progressValue++;
+          }
+        },
+        async mounted() {
+            let updt = this.updateProgress;
+            window.setInterval(function() {
+              updt();
+            }, 1000);
+
+            let evaluatedMetrics = await fetch(fetchResultsUrl).then(resp => resp.json()); 
+            window.clearInterval();
+            this.progressValue = 100;
+          
+            console.log(evaluatedMetrics);
+
+            let perMetricPerAlgorithmCount = [];
+            
+            let algorithms = new Set();
+
+
+            for (let x in evaluatedMetrics) {
+            
+              
+              let idx = this.newResults.findIndex(y => y["metric_name"] == evaluatedMetrics[x]["metric_name"]);
+              if (idx === -1) {
+                let d = {
+                  "metric_name": evaluatedMetrics[x]["metric_name"],
+                }
+                d[evaluatedMetrics[x]["algorithm"]] = parseFloat(evaluatedMetrics[x]["value"]);
+                this.newResults.push(d);
+                
+                let cnt = {};
+                cnt[evaluatedMetrics[x]["algorithm"]] = 1
+                perMetricPerAlgorithmCount.push(cnt);
+              } else {
+                if (!(evaluatedMetrics[x]["algorithm"] in this.newResults[idx])) {
+                  this.newResults[idx][evaluatedMetrics[x]["algorithm"]] = parseFloat(evaluatedMetrics[x]["value"]);
+                  perMetricPerAlgorithmCount[idx][evaluatedMetrics[x]["algorithm"]] = 1;
+                } else {
+                  this.newResults[idx][evaluatedMetrics[x]["algorithm"]] += parseFloat(evaluatedMetrics[x]["value"]);
+                  perMetricPerAlgorithmCount[idx][evaluatedMetrics[x]["algorithm"]] += 1;
+                }
+              }
+
+              let idx2 = this.resultsFields.findIndex(y => y["key"] == evaluatedMetrics[x]["algorithm"]);
+              if (idx2 === -1) {
+                this.resultsFields.push({key: evaluatedMetrics[x]["algorithm"], label: evaluatedMetrics[x]["algorithm"]});
+              }
+
+              algorithms.add(evaluatedMetrics[x]["algorithm"]);
+            }
+
+            algorithms = Array.from(algorithms);
+            for (let idx in this.newResults) {
+              for (let algo in algorithms) {
+                this.newResults[idx][algorithms[algo]] /= perMetricPerAlgorithmCount[idx][algorithms[algo]];
+              }
+            }
+
+            console.log("New results");
+            console.log(this.newResults);
+            console.log("Per metric count");
+            console.log(perMetricPerAlgorithmCount);
+            this.$forceUpdate();
+          }
+      })
+    </script>
+</body>
+</html>

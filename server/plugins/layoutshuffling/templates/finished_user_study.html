@@ -1,0 +1,128 @@
+{% include 'header.html' %}
+
+<div id="app">
+    <b-container fluid>
+        <b-jumbotron class="smallJumbotron" header="{{header}}" lead="">
+            {{hint}}
+        </b-jumbotron>
+        <b-row align-h="center">
+            <b-col class="text-center" align-h="center" cols="10">
+                <h4>{{statistics}}</h4>
+            </b-col>
+        </b-row>
+        <b-row align-h="center">
+            <b-col class="text-center" align-h="center" cols="10">
+                <p>
+                    {{in_total}} <strong>{{n_selected}}</strong> {{movies_out_of}} <strong>{{n_recommended}}</strong> {{rec_to_you}}
+                </p>
+            </b-col>
+        </b-row>
+        <b-row align-h="center">
+            <b-col class="text-center" align-h="center" cols="10">
+                <p>
+                    {{out_of_the}} <strong>{{n_selected}}</strong> {{you_have_selected}}, <strong>{{n_gamma}}</strong> {{were_rec_by}} Gamma {{and}} <strong>{{n_delta}}</strong> {{were_rec_by}} Delta.
+                </p>
+            </b-col>
+        </b-row>
+        <b-row align-h="center">
+            <b-col class="text-center" align-h="center" cols="10">
+                <p>
+                    {{on_avg}} Gamma {{by}} <strong>{{avg_rating_gamma}}</strong> {{out_of}} 5 {{stars}} {{and}} {{rec_from_algo}} Delta {{by}} <strong>{{avg_rating_delta}}</strong> {{out_of}} 5 {{stars}}.
+                    {% if avg_rating_gamma > avg_rating_delta %}
+                    {{therefore_you_liked}} <strong>Gamma</strong> <u>{{more}}</u> {{than_those}} <strong>Delta</strong>.
+                    {% elif avg_rating_gamma < avg_rating_delta %}
+                    {{therefore_you_liked}} <strong>Delta</strong> <u>{{more}}</u> {{than_those}} <strong>Gamma</strong>.
+                    {% else %}
+                    {{therefore_same}}
+                    {% endif %}
+                </p>
+            </b-col>
+        </b-row>
+        <b-row align-h="center">
+            <b-col class="text-center" align-h="center" cols="10">
+                <p>
+                    {{during_pref}} <strong>{{n_selected_elicitation}}</strong> {{movies_out_of}} <strong>{{n_shown_elicitation}}</strong> {{movies_that_were}}
+                </p>
+            </b-col>
+        </b-row>
+        {% if show_extra_statistics == True %}
+        <b-row align-h="center">
+            <b-col class="text-center" align-h="center" cols="10">
+                <p>
+                    {{gave_importance}} <strong>{{relevance}}</strong> {{to_rel}}
+                    <b-icon id="relevance-help" icon="question-circle-fill" variant="primary"></b-icon>
+                    <b-tooltip target="relevance-help" triggers="hover">{{relevance_explanation}}</b-tooltip>
+                    
+                    , {{importance_of}} <strong>{{diversity}}</strong> {{to_div}}
+                    <b-icon id="diversity-help" icon="question-circle-fill" variant="primary"></b-icon>
+                    <b-tooltip target="diversity-help" triggers="hover">{{diversity_explanation}}</b-tooltip>
+                    
+                    {{and}} {{importance_of}} <strong>{{novelty}}</strong> {{to_nov}}
+                    <b-icon id="novelty-help" icon="question-circle-fill" variant="primary"></b-icon>
+                    <b-tooltip target="novelty-help" triggers="hover">{{novelty_explanation}}</b-tooltip>
+                    .
+                </p>
+            </b-col>
+        </b-row>
+        <b-row align-h="center">
+            <b-col class="text-center" align-h="center" cols="10">
+                <p>
+                    {{rel_more}} <strong>{{relevance_percent}}%</strong> {{of_other}}. {{for_div_nov}} <strong>{{diversity_percent}}%</strong>, {{and}} <strong>{{novelty_percent}}%</strong>.
+                </p>
+            </b-col>
+        </b-row>
+        <b-row align-h="center">
+            <b-col class="text-center" align-h="center" cols="10">
+                <p>
+                    {{avg_importance}} <strong>{{avg_relevance}}</strong>, <strong>{{avg_diversity}}</strong> {{and}} <strong>{{avg_novelty}}</strong> {{for_rel_div_nov}}.
+                </p>
+            </b-col>
+        </b-row>
+        {% endif %}
+
+        {% if prolific_pid is defined and prolific_pid is not none %}
+        <b-row align-h="center">
+            <b-col class="text-center" align-h="center" cols="6">
+                <p>{{auto_redirect}}.</p>
+                <b-btn @click="prolificRedirect" variant="success" type="submit">{{finish_user_study}}</b-btn>
+            </b-col>
+        </b-row>
+        {% endif %}
+    </b-container>
+</div>
+
+<script src="{{url_for('static', filename='resolution_handling.js')}}"></script>
+<script src="{{url_for('static', filename='interaction_reporting.js')}}"></script>
+
+{% if prolific_pid is defined and prolific_pid is not none %}
+<script>
+    console.log("Redirecting in 15 seconds");
+    window.setTimeout(function (){
+        window.location = "{{prolific_url}}";
+    }, 15000);
+</script>
+{% endif %}
+
+<script>
+    window.app = new Vue({
+    el: '#app',
+    delimiters: ['[[',']]'], // Used to replace double { escaping with double [ escaping (to prevent jinja vs vue inference)
+    data: function() {
+        
+        return {
+            
+        };
+    },
+    methods: {
+        prolificRedirect() {
+            window.location = "{{prolific_url}}";
+        }
+    },
+    mounted() {
+        startViewportChangeReportingWithLimit(`/utils/changed-viewport`, "{{ csrf_token() }}", 1.0, true);
+        reportLoadedPage(`/utils/loaded-page`, "{{ csrf_token() }}", "finished_user_study");
+    }
+})
+</script>
+
+{% include 'footer.html' %}

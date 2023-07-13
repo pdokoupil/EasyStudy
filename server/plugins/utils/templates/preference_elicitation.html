@@ -1,0 +1,102 @@
+{% include 'header.html' %}
+<div id="app">
+<b-container fluid>
+    {% if elicitation_hint_override is defined and elicitation_hint_override is not none  %}
+    <div class="jumbotron smallJumbotron">
+      {{ elicitation_hint_override | safe }}
+    </div>
+    {% else %}
+    <b-jumbotron lead="{{hint_lead}}" class="smallJumbotron" header="{{header}}">
+      {{hint}}
+    </b-jumbotron>
+    {% endif %}
+    <!-- <i class="{{impl}}" id="impl"></i> -->
+    <!-- <b-form method="POST" action="{{continuation_url}}"> -->
+    <b-form name="theForm" method="GET" action="{{continuation_url}}">
+      <b-form-group
+        horizontal
+      >
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+          <!-- <input type="hidden" name="impl" value="{{ impl }}" /> -->
+          <b-row>
+            
+          </b-row>
+      </b-form-group>
+    </b-form>
+
+    <b-row class="mb-3" align-h="center">
+      <b-col>
+        
+      </b-col>
+      <b-col align-h="center">
+        <b-row>
+          <b-col><b-input @update="onUpdateSearchMovieName" @keydown="onKeyDownSearchMovieName" v-model="searchMovieName" type="search" placeholder="{{enter_name}}"></b-input></b-col>
+        </b-row>
+      </b-col>
+      <b-col align-h="start">
+        <b-row>
+          <div class="mr-1">
+            <b-btn name="search" v-on:click="onClickSearch" variant="secondary">{{search}}</b-btn>
+          </div>
+          <div class="mr-5">
+            <b-btn name="cancel_search" :disabled="!itemsBackup" v-on:click="onClickCancelSearch" variant="warning">{{cancel_search}}</b-btn>
+          </div>
+        </b-row>
+      </b-col>
+    </b-row>
+
+    <!-- Row and col based implementation -->
+    <!-- Important: setting key prevents vue from aggresively reuse DOM elements
+    See https://stackoverflow.com/questions/46758441/preventing-vue-from-aggresively-reusing-dom-elements -->
+    <b-row class="mb-3" align-h="center" align-content="center" v-for="row in rows">
+      <b-col class="mb-3" class="align-middle" v-for="col in row">
+        <b-img :key="col.movie.idx" class="mb-3" style="width: 175px; height: auto;" center :src="col.movie.url" v-on:click="onSelectMovie($event, col)" :id="col.movie.idx" :alt="col.movieName" v-b-tooltip.hover :title="col.movieName" />
+      </b-col>
+    </b-row>
+    <b-row align-h="center">
+      <b-col cols="2" align-h="start">
+        <div>
+          <b-btn name="load_more" :disabled="itemsBackup" v-on:click="onClickLoadMore" variant="secondary">{{load_more}}</b-btn>
+        </div>
+      </b-col>
+      <b-col cols="3" align-h="center">
+        <b-overlay
+          :show="busy"
+          rounded
+          opacity="0.6"
+          spinner-small
+          spinner-variant="primary"
+          class="d-inline-block"
+        >
+          <b-btn name="finish_elicitation" block v-on:Click="onElicitationFinish(theForm)" :disabled="disableNextStep" variant="primary">{{finish}}</b-btn>
+        </b-overlay>
+      </b-col>
+    </b-row>
+    <!-- <b-row>
+      [[ selected ]]
+    </b-row> -->
+</b-container>
+</div>
+
+<script type='text/javascript'>
+  // Capture JINJA stuff here
+  var csrfToken = "{{csrf_token()}}";
+  var consumingPlugin = "{{consuming_plugin}}";
+  var impl = "{{impl}}";
+  var initial_data_url = "{{initial_data_url}}";
+  var search_item_url = "{{search_item_url}}";
+  
+</script>
+<script src="{{url_for('static', filename='resolution_handling.js')}}"></script>
+<script src="{{url_for('static', filename='interaction_reporting.js')}}"></script>
+{{ emit_assets('utils','preference_elicitation.js') }}        
+<script src="{{url_for('static', filename='common.js')}}"></script>
+{% if footer_override is defined and footer_override is not none %}
+  <div class="footerDiv mt-3">
+    {{ footer_override|safe }}
+  </div>
+</body>
+</html>
+{% else %}
+{% include 'footer.html' %}
+{% endif %}

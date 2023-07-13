@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <!-- Required meta tags -->
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
+    <meta http-equiv="content-type" content="text/html; charset=UTF-8" />
+
+    <title>EasyStudy Administration</title>
+
+    <!-- Required Stylesheets -->
+    <link
+      type="text/css"
+      rel="stylesheet"
+      href="https://unpkg.com/bootstrap@4.6.2/dist/css/bootstrap.min.css"
+    />
+    <link
+      type="text/css"
+      rel="stylesheet"
+      href="https://unpkg.com/bootstrap-vue@2.22.0/dist/bootstrap-vue.css"
+    />
+
+    <!-- Required scripts -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/vue/2.6.12/vue.min.js"></script>
+
+    
+    <!-- Load polyfills to support older browsers -->
+    <script src="https://unpkg.com/babel-polyfill@6.26.0/dist/polyfill.min.js"></script>
+    
+    <!-- Required scripts -->
+    <script src="https://unpkg.com/bootstrap-vue@2.22.0/dist/bootstrap-vue.js"></script>
+    <script src="https://unpkg.com/bootstrap-vue@2.22.0/dist/bootstrap-vue-icons.js"></script> <!-- Needed just for the Icons -->
+  </head>
+  <body>
+    <!-- Our application root element -->
+    <div id="app">
+      <b-container fluid align-h="center">
+        <b-jumbotron header="EasyStudy Administration" lead="Manage templates and user studies.">
+          <b-row>
+            <b-col cols="10">
+              <p>A framework for Easy Deployment of User Studies on Recommender Systems</p>
+              <p>Contact information: Hidden due to <strong>Anonymization</strong></p>
+              <b-btn variant="primary" href="https://bit.ly/EasyStudyRepo">Github repository</b-btn>
+            </b-col>
+            <b-col cols="2" class="text-center">
+              <p>
+                <strong>
+                  Signed in as {{ current_user }}
+                </strong>
+              </p>
+              <b-form action="/logout">
+                <b-button variant="warning" type="submit">Logout</b-button>
+              </form>
+            </b-col>
+          </b-row>
+          </b-jumbotron>
+      
+
+        <div>
+          <b-row align-h="center">
+              <h1>Available templates</h1>
+          </b-row>
+          <b-row align-h="center">
+              <b-col cols="8">
+                <b-table responsive show-empty :items="availableTemplates" :fields="availableTemplatesFields">
+                  <template #cell()="data">
+                      <i>[[ data.value ]]</i>
+                  </template>
+
+                  <template #cell(create_url)="data">
+                      <b-btn variant="primary" :href="data.value">Create</b-btn>
+                  </template>
+                  
+                </b-table>
+              </b-col>
+          </b-row>
+          <b-row align-h="center">
+              <h1>Existing user studies</h1>
+          </b-row>
+          <b-row align-h="center">
+              <b-col cols="8">
+                <b-table responsive show-empty :items="existingUserStudies">
+                  <template #cell()="data">
+                    <!-- [[ data.value.url ]] -->
+                    <p>
+                      <i>[[ data.value ]]</i>
+                    </p>
+                    <!-- <img width="60" height="60" v-on:click="handleRecommendationClick($event)" :id="data.value.id" :src="data.value.url"/> -->
+                  </template>
+
+                  <template #cell(join_url)="data">
+                    <div style="min-width: 60px;">
+                      <a :href="[[ data.value ]]">Link</a>
+                      <b-icon class="ml-2" :id=data.value v-on:click="copyClipboard($event, existingUserStudies.indexOf(data.item))" :icon="icons[existingUserStudies.indexOf(data.item)]"></b-icon>
+                      <b-tooltip :target=data.value triggers="hover">
+                        [[ tooltipTexts[existingUserStudies.indexOf(data.item)] ]]
+                      </b-tooltip>
+                    </div>
+
+                    
+                    <!-- <b-button v-on:click="notify(existingUserStudies.indexOf(data.item))" class="ml-2" size="sm" variant="primary" v-b-tooltip.hover title="Select users to notify via e-mail">Notify</b-button> -->
+                      <!-- <span v-b-tooltip.hover :title=data.value>[[ data.value ]]</span> -->
+                  </template>
+
+                  <template #cell(results)="data">
+                    <div style="min-width: 60px;">
+                      <a v-if="data.item.initialized" target="_blank" :href="[[ data.value ]]">Results</a>
+                    </div>
+
+                    
+                    <!-- <b-button v-on:click="notify(existingUserStudies.indexOf(data.item))" class="ml-2" size="sm" variant="primary" v-b-tooltip.hover title="Select users to notify via e-mail">Notify</b-button> -->
+                      <!-- <span v-b-tooltip.hover :title=data.value>[[ data.value ]]</span> -->
+                  </template>
+
+                  <template align-h="center" #cell(initialized)="data">
+                    <p style="text-transform:uppercase;">
+                      <strong>[[data.value]]</strong>
+                    </p>
+                  </template>
+
+                  <template align-h="center" #cell(active)="data">
+                    <p style="text-transform:uppercase;">
+                      <strong>[[data.value]]</strong>
+                    </p>
+
+                    <b-overlay class="d-inline-block ml-1" :show="aboutToDelete">
+                      <div :hidden="!data.item.initialized">
+                        <b-row>
+                          <b-button v-if="data.value" @click="onDeactivate(existingUserStudies.indexOf(data.item))" variant="warning">
+                            Deactivate
+                          </b-button>
+                        </b-row>
+                        <b-row>
+                          <b-button style="min-width: 100px" @click="onActivate(existingUserStudies.indexOf(data.item))" v-else="data.value" variant="success">
+                            Activate
+                          </b-button>
+                        </b-row>
+                        <b-row>
+                          <b-button @click="onDelete(existingUserStudies.indexOf(data.item))" class="mt-3" style="min-width: 100px" variant="danger">
+                            Delete
+                          </b-button>
+                        </b-row>
+                      </div>
+                      <template #overlay>
+                        <div
+                          v-if="existingUserStudies.indexOf(data.item) == deletingIndex"
+                          ref="dialog"
+                          tabindex="-1"
+                          role="dialog"
+                          aria-modal="false"
+                          aria-labelledby="form-confirm-label"
+                          class="text-center p-3"
+                        >
+                          <p><strong id="form-confirm-label">Are you sure?</strong></p>
+                          <div class="d-flex">
+                            <b-button variant="outline-danger" class="mr-3" @click="onCancel">
+                              Cancel
+                            </b-button>
+                            <b-button variant="outline-success" @click="onOK">OK</b-button>
+                          </div>
+                        </div>
+                      </template>
+                    </b-overlay>
+                    
+                  </template>                  
+
+              </b-table>
+              </b-col>
+          </b-row>
+        </div>
+      </b-container>
+    </div>
+
+    <!-- Start running your app -->
+    <script>
+      const TOOLTIP_COPY_TEXT = "Copy to clipboard";
+      const TOOLTIP_COPIED_TEXT = "Copied";
+      const TOOLTIP_STICKIES_ICON = "stickies";
+      const TOOLTIP_CHECK_ICON = "check-square-fill";
+
+      window.app = new Vue({
+        el: '#app',
+        delimiters: ['[[',']]'], // Used to replace double { escaping with double [ escaping (to prevent jinja vs vue inference)
+        data: function() {
+            return {
+                availableTemplatesFields: [
+                    {key: "plugin_name", label: "Name"},
+                    {key: "plugin_description", label: "Description"},
+                    {key: "plugin_version", label: "Version"},
+                    {key: "plugin_author", label: "Author"},
+                    {key: "create_url", label: "Create"}
+                ],
+                availableTemplates: {}, // Query server for loaded plugins
+                existingUserStudies: {}, // Query (-> server -> database) for existing user studies,
+                tooltipTexts: [],
+                icons: [],
+                aboutToDelete: false,
+                deletingIndex: null
+            }
+        },
+        async mounted() {
+          this.availableTemplates = await fetch("/loaded-plugins").then((resp) => resp.json());
+          this.updateExistingUserStudies();
+          let updt = this.updateExistingUserStudies;
+          setInterval(function() {
+            console.log("Updating");
+            updt();
+          }, 15000); // Every 15 seconds we check for newly activated user studies
+        },
+        methods: {
+          copyClipboard(event, idx) {
+            navigator.clipboard.writeText(this.existingUserStudies[idx]["join_url"]);
+            this.tooltipTexts[idx] = TOOLTIP_COPIED_TEXT;
+            this.icons[idx] = TOOLTIP_CHECK_ICON;
+            let self = this;  
+            this.icons = this.icons.slice(); // Force DOM redraw
+            window.setTimeout(function() {
+              console.log(self.tooltipText);
+              self.tooltipTexts[idx] = TOOLTIP_COPY_TEXT;
+              self.icons[idx] = TOOLTIP_STICKIES_ICON;
+              console.log("Done");
+              self.icons = self.icons.slice(); // Force DOM redraw
+            }, 1000);
+          },
+          notify(idx) {
+            window.location.href = "/notify?guid=" + this.existingUserStudies[idx]["guid"];
+          },
+          onDelete(idx) {
+            this.aboutToDelete = true;
+            this.deletingIndex = idx;
+          },
+          onCancel() {
+            this.aboutToDelete = false;
+            this.deletingIndex = null;
+          },
+          async onOK() {
+            // Actually delete the user study
+            let userStudyId = this.existingUserStudies[this.deletingIndex]["id"];
+            await fetch("/user-study/" + userStudyId, {
+              method: 'DELETE',
+              headers: {
+                  'Content-Type': 'application/json',
+                  'X-CSRFToken': '{{ csrf_token() }}'
+              },
+            }).then(resp => resp.text());
+            this.aboutToDelete = false;
+            this.deletingIndex = null;
+            await this.updateExistingUserStudies();
+          },
+          async onActivate(idx) {
+            let userStudyId = this.existingUserStudies[idx]["id"];
+            await this.setActiveState(userStudyId, true);
+            await this.updateExistingUserStudies();
+          },
+          async onDeactivate(idx) {
+            let userStudyId = this.existingUserStudies[idx]["id"];
+            await this.setActiveState(userStudyId, false);
+            await this.updateExistingUserStudies();
+          },
+          async setActiveState(userStudyId, active) {
+            await fetch("/user-study-active", {
+              method: "POST",
+              headers: {
+                  'Content-Type': 'application/json',
+                  'X-CSRFToken': '{{ csrf_token() }}'
+              },
+              body: JSON.stringify({"user_study_id": userStudyId, "active": active}),
+              redirect: "follow"
+            }).then(resp => resp.text());
+          },
+          async updateExistingUserStudies() {
+            this.existingUserStudies = await fetch("/existing-user-studies").then((resp) => resp.json());
+            this.icons = [];
+            this.tooltipTexts = [];
+            for (i in this.existingUserStudies) {
+              this.icons.push(TOOLTIP_STICKIES_ICON);
+              this.tooltipTexts.push(TOOLTIP_COPY_TEXT);
+              if (this.existingUserStudies[i].initialized == false) {
+                this.existingUserStudies[i]._rowVariant = "warning";
+              }
+              else if (this.existingUserStudies[i].active == false) {
+                this.existingUserStudies[i]._rowVariant = "secondary";
+              }
+            }
+          }
+        }
+      })
+    </script>
+  </body>
+</html>

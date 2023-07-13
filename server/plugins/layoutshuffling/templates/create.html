@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <!-- Required meta tags -->
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
+    <meta http-equiv="content-type" content="text/html; charset=UTF-8" />
+
+    <title>Administration</title>
+
+    <!-- Required Stylesheets -->
+    <link
+      type="text/css"
+      rel="stylesheet"
+      href="https://unpkg.com/bootstrap@4.6.2/dist/css/bootstrap.min.css"
+    />
+    <link
+      type="text/css"
+      rel="stylesheet"
+      href="https://unpkg.com/bootstrap-vue@2.22.0/dist/bootstrap-vue.css"
+    />
+
+    <!-- Required scripts -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/vue/2.6.12/vue.min.js"></script>
+
+    
+    <!-- Load polyfills to support older browsers -->
+    <script src="https://unpkg.com/babel-polyfill@6.26.0/dist/polyfill.min.js"></script>
+    
+    <!-- Required scripts -->
+    <script src="https://unpkg.com/bootstrap-vue@2.22.0/dist/bootstrap-vue.js"></script>
+    <script src="https://unpkg.com/bootstrap-vue@2.22.0/dist/bootstrap-vue-icons.js"></script> <!-- Needed just for the Icons -->
+  </head>
+  <body>
+    <!-- Our application root element -->
+    <div id="app">
+      <b-container align-h="center" fluid>
+        <b-jumbotron header-level="4" header="layoutshuffling Create" lead="Create user study.">
+            Specify value of K (recommendation length) and prolific code (if needed).
+        </b-jumbotron>
+          <b-row align-h="center" class="mb-3">
+            <b-col cols="8">
+              <label for="k">Please select a value of K (recommendation length)</label>
+              <b-form-input v-model="kValue" type="range" min="1" max="20"></b-form-input>
+              <div class="mb-2">Value: [[ kValue ]]</div>
+            </b-col>
+          </b-row>
+          <b-row align-h="center" class="mb-3">
+            <b-col cols="8">
+              <b-input type="text" id="prolific_code" name="prolific_code" placeholder="Please enter prolific code (if needed)"/>
+            </b-col>
+          </b-row>
+          <b-row align-h="center">
+            <b-col cols="8" class="text-right" align-h="end">
+              <b-btn variant="warning" v-on:click="cancelCreateUserStudy">Cancel</b-btn>
+              <b-btn variant="primary" v-on:click="onCreateUserStudy">Create</b-btn>
+            </b-col>
+          </b-row>
+      </b-container>
+    </div>
+
+    <!-- Start running your app -->
+    <script>
+      window.app = new Vue({
+        el: '#app',
+        delimiters: ['[[',']]'], // Used to replace double { escaping with double [ escaping (to prevent jinja vs vue inference)
+        data: function() {
+            return {
+              kValue: 10
+            }
+        },
+        methods: {
+            async onCreateUserStudy() {
+                let pluginName = "{{plugin_name}}";
+                console.log("Creating user study for plugin: " + pluginName);
+                
+                //let k = document.getElementById("k").value;
+                let prolific_code = document.getElementById("prolific_code").value;
+
+                let userStudyConfiguration = {
+                    "k": parseInt(this.kValue),
+                    "prolific_code": prolific_code
+                };
+
+                let userStudyData = {
+                    "parent_plugin": pluginName,
+                    "config": userStudyConfiguration
+                };
+
+                let res = await fetch("/create-user-study",
+                    {
+                        method: "POST",
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRFToken': '{{ csrf_token() }}'
+                        },
+                        body: JSON.stringify(userStudyData),
+                        redirect: "follow"
+                    }
+                ).then(response => {
+                    if (response.redirected) {
+                        console.log(response);
+                        window.location.href = response.url;
+                    } else {
+                        return response.text()
+                    }
+                });
+                console.log(res);
+            },
+            
+            cancelCreateUserStudy() {
+                window.location.href = "{{ url_for('main.administration') }}"
+            }
+        }
+      })
+    </script>
+  </body>
+</html>

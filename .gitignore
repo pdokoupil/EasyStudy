@@ -1,0 +1,12 @@
+__pycache__
+.DS_Store
+*.pyc
+*.pckl
+*.csv
+*.npy
+flask_session
+server/cache/
+server/instance/
+*.sqlite
+img
+cache

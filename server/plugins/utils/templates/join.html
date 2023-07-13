@@ -1,0 +1,367 @@
+{% include 'header.html' %}
+<!-- Our application root element -->
+<div id="app">
+  <b-container fluid>
+
+    {% if about_override is defined and about_override is not none  %}
+    <div class="jumbotron smallJumbotron">
+      {{ about_override | safe }}
+    </div>
+    {% else %}
+    <b-jumbotron class="smallJumbotron" header="{{about_study}}">
+      <b-row align-v="center">
+        <b-col cols="10">{{study_details}}</b-col>
+      </b-row>
+    </b-jumbotron>
+    {% endif %}
+    <b-row align-h="center">
+      <b-col align-h="center" sm="5" class="mr-3 ml-3">
+        <!-- <b-form method="POST" action="{{continuation_url}}"> -->
+        <b-form method="POST" @submit="onSubmit" action="{{continuation_url}}">
+          <b-form-group
+            horizontal
+          >
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />    
+              {% if disable_demographics != True %}
+              <b-row class="mb-1 mt-3" align-h="center">
+                <h4>{{participant_details}}</h4>
+              </b-row>
+              <!-- csrf_token is only needed for POST -->
+              <b-alert :show="showAlert" variant="danger">[[ alertText ]]</b-alert>
+              <b-row class="mb-3">
+                <b-col class="mr-3 mt-2" sm="1">
+                  <b-icon id="email-help" class="h2 mr-2" icon="question-circle-fill" variant="primary"></b-icon>
+                  <b-tooltip target="email-help" triggers="hover">{{enter_email_hint}}</b-tooltip>
+                </b-col>
+                <b-col>
+                  <b-form-input name="email" type="email" placeholder="{{enter_email}}" v-model="userEmail"/>
+                </b-col>
+              </b-row>
+              <b-row class="mb-3">
+                <b-col class="mr-3 mt-2" sm="1">
+                  <b-icon id="gender-help" class="h2 mr-2" icon="question-circle-fill" variant="primary"></b-icon>
+                  <b-tooltip target="gender-help" triggers="hover">{{enter_gender_hint}}</b-tooltip>
+                </b-col>
+                <b-col>
+                  <b-form-select v-model="gender" :options="genders" name="gender" :state="gender != null" required="True" type=""></b-form-select>
+                </b-col>
+              </b-row>
+              <b-row class="mb-3">
+                <b-col class="mr-3 mt-2" sm="1">
+                  <b-icon id="ageGroup-help" class="h2 mr-2" icon="question-circle-fill" variant="primary"></b-icon>
+                  <b-tooltip target="ageGroup-help" triggers="hover">{{enter_age_hint}}</b-tooltip>
+                </b-col>
+                <b-col>
+                  <b-form-select v-model="ageGroup" :options="ageGroups" name="ageGroup" :state="ageGroup!= null" required="True" type=""></b-form-select>
+                </b-col>
+              </b-row>
+              <b-row class="mb-3">
+                <b-col class="mr-3 mt-2" sm="1">
+                  <b-icon id="education-help" class="h2 mr-2" icon="question-circle-fill" variant="primary"></b-icon>
+                  <b-tooltip target="education-help" triggers="hover">{{enter_education_hint}}</b-tooltip>
+                </b-col>
+                <b-col>
+                  <b-form-select v-model="education" :options="educations" name="education" :state="education != null" required="True" type=""></b-form-select>
+                </b-col>
+              </b-row>
+              <b-row align-v="center" class="mb-3">
+                <b-col align-v="center" class="mr-3 mt-2" sm="1">
+                  <b-icon id="mlFamiliar-help" class="h2 mr-2" icon="question-circle-fill" variant="primary"></b-icon>
+                  <b-tooltip target="mlFamiliar-help" triggers="hover">{{enter_ml_familiar}}</b-tooltip>
+                  
+                </b-col>
+                <b-col align-h="end">
+                  <b-form-select v-model="mlFamiliar" :options="mlFamiliarOptions" name="mlFamiliar" :state="mlFamiliar != null" required="True" type=""></b-form-select>
+                </b-col>
+              </b-row>
+              {% endif %}
+              {% if informed_consent_override is defined and informed_consent_override is not none  %}
+              <!-- <b-row class="mt-5"> -->
+              <div>
+                {{ informed_consent_override | safe }}
+              </div>
+              <!-- </b-row> -->
+              {% else %}
+              <b-row class="mt-5" align-h="center">
+                <h4>{{informed_consent_header}}</h4>
+              </b-row>
+              <b-row align-h="start">
+                <p>
+                  {{informed_consent_p1}}
+                </p>
+                <ul>
+                  <li>
+                    <p>
+                      {{informed_consent_p2}}
+                    </p>
+                  </li>
+                  <li>
+                    <p>
+                      {{informed_consent_p3}}
+                      <ul>
+                        <li>{{informed_consent_p31}}</li>
+                        <li>{{informed_consent_p32}}</li>
+                        <li>{{informed_consent_p33}}</li>
+                      </ul>
+                    </p>
+                  </li>
+                  <li>
+                    <p>
+                      {{informed_consent_p4}}
+                    </p>
+                  </li>
+                  <li>
+                    <p>
+                      {{informed_consent_p5}}
+                    </p>
+                  </li>
+                  <li>
+                    <p>
+                      {{informed_consent_p6}}
+                    </p>
+                  </li>
+                </ul>
+                
+              </b-row>
+              {% endif %}
+              <b-row  class="mb-1" align-h="end">
+                <b-button variant="primary" type="submit">{{start_user_study}}</b-button>
+                <!-- <b-btn variant="primary" v-on:click="handleStartUserStudyClick">Start user study</b-btn> -->
+              </b-row>
+          </b-form-group>
+        </b-form>
+      </b-col>
+    </b-row>
+
+        
+  </b-container>
+</div>
+
+    <script src="{{url_for('static', filename='resolution_handling.js')}}"></script>
+    <script src="{{url_for('static', filename='message_reporting.js')}}"></script>
+    <!-- Start running your app -->
+    <script>
+
+      // This is layoutshuffling specific !!! move it somewhere else
+      const MIN_WIDTH = 1000;
+      const MIN_HEIGHT = 550;
+
+      window.app = new Vue({
+        el: '#app',
+        delimiters: ['[[',']]'], // Used to replace double { escaping with double [ escaping (to prevent jinja vs vue inference)
+        data: function() {
+          return {
+            userEmail: "{{email}}",
+            ageGroup: null,
+            gender: null,
+            education: null,
+            mlFamiliar: null,
+            ageGroups: [
+              { value: null, text: '{{enter_age}}' },
+              { value: 0, text: '0-15' },
+              { value: 16, text: '16-20' },
+              { value: 21, text: '21-30' },
+              { value: 29, text: '31-40' },
+              { value: 41, text: '41-50' },
+              { value: 51, text: '51-65' },
+              { value: 65, text: '65+' }
+            ],
+            genders: [
+              { value: null, text: '{{enter_gender}}' },
+              { value: 0, text: '{{gender_male}}' },
+              { value: 1, text: '{{gender_female}}' },
+              { value: 2, text: '{{gender_other}}' }
+            ],
+            educations: [
+              { value: null, text: '{{enter_education}}' },
+              { value: 0, text: '{{education_no_formal}}' },
+              { value: 1, text: '{{education_primary}}' },
+              { value: 2, text: '{{education_high}}' },
+              { value: 3, text: "{{education_bachelor|replace("'", "\'")|safe}}" },
+              { value: 4, text: "{{education_master|replace("'", "\'")|safe}}" },
+              { value: 5, text: '{{education_doctoral}}'}
+            ],
+            mlFamiliarOptions: [
+              { value: null, text: '{{enter_ml_familiar}}' },
+              { value: 0, text: '{{no}}' },
+              { value: 1, text: '{{yes}}' }
+            ],
+            showAlert: false,
+            alertText: ""
+          }
+        },
+        computed: {
+          showAlert() {
+            return this.name.length > 4 ? true : false
+          },
+          enoughItemsSelected() {
+            console.log("ABC");
+            return this.selectedIds.size == this.numToSelect;
+          }
+        },
+        methods: {
+          checkResolution(userData = null) {
+            // TODO move this to some consumer plugin validation step or at the very early of the plugin
+            // (which is too late here as we have join[util] => pref-elicitation[util] => compare[layoutshuffling])
+            // another possibility is to do it in continuation (read-back viewports from DB)
+            // Probably best alternative is to create extra step, e.g. /layoutshuffling/start?guid that will first check
+            // and only then continue to the utils/join !!!
+            if (!validateScreenResolution(MIN_WIDTH, MIN_HEIGHT)) {
+              this.alertText = "{{min_resolution_error}}";
+              this.showAlert = true;
+              if (userData) {
+                console.log(userData);
+                reportError("/utils/on-message", '{{ csrf_token() }}', window.location.href, this.alertText, ()=> {
+                  userData["screen_sizes"] = getScreenSizes();
+                  return userData;
+                });
+              }
+              return false;            
+            } else {
+              this.alertText = "";
+              this.showAlert = false;
+            }
+            return true;
+          },
+          setGetParameter(paramName, paramValue) {
+            let d = {};
+            let params = window.location.search.split(/\?|&/);
+            for (let i = 0; i < params.length; ++i) {
+              if(!params[i]) {
+                continue;
+              }
+              let parts = params[i].split("=");
+              d[parts[0]] = parts[1];
+            }
+            d[paramName] = paramValue;
+            let newUrl = "?";
+            let i = 0;
+            let nParams = Object.keys(d).length;
+            for (let pName in d) {
+              let val = d[pName];
+              newUrl += `${pName}=${val}`;
+              if (i < nParams - 1) {
+                newUrl += "&";
+              }
+              ++i;
+            }
+            return newUrl;
+          },
+          selectLanguage(newLang) {
+            console.log("new lang" + newLang);
+            console.log(window.location.search);
+            window.location.search = this.setGetParameter("lang", newLang);
+          },
+          async onSubmit(event) {
+            event.preventDefault();
+            
+            this.showAlert = false;
+
+            console.log("Submitting");
+            console.log("{{continuation_url}}");
+            userData = {
+                "user_email": this.userEmail,
+                "gender": this.gender,
+                "age_group": this.ageGroup,
+                "education": this.education,
+                "ml_familiar": this.mlFamiliar,
+                "user_study_guid": "{{guid}}",
+                "lang": "{{lang}}"
+            };
+
+            if (!this.checkResolution(userData)) {
+              return;
+            }
+            
+            let addParticipantRes = await fetch("{{url_for('main.add_participant')}}", {
+              method: "POST",
+              headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token() }}'
+              },
+              body: JSON.stringify(userData),
+            }).then(resp => {
+              if (resp.ok) {
+                return true;
+              }
+              return resp.status;
+            });
+
+            if (addParticipantRes === true) {
+              event.target.submit();
+            } else if (addParticipantRes == 404) {
+              // Report guid not found error, check your URL
+              this.showAlert = true;
+              this.alertText = "{{guid_not_found}}";
+            } else {
+              // Report server error, try again later
+              this.showAlert = true;
+              this.alertText = "{{server_error}}";
+            }
+            
+          },
+          // async handleStartUserStudyClick() {
+            
+          //   console.log("{{continuation_url}}");
+          //   userData = {
+          //     "email": this.userEmail,
+          //     "guid": "{{guid}}"
+          //   };
+          //   let redirected = false;
+
+          //   let addParticipantRess = await fetch("{{url_for('main.add_participant')}}", {
+          //     method: "POST",
+          //     headers: {
+          //       'Content-Type': 'application/json',
+          //       'X-CSRFToken': '{{ csrf_token() }}'
+          //     },
+          //     body: JSON.stringify({"some_key2": 547}),
+          //   }).then(resp => resp.text());
+
+          //   let res = await fetch("{{continuation_url}}",
+          //     {
+          //         method: "POST",
+          //         headers: {
+          //             'Content-Type': 'application/json',
+          //             'X-CSRFToken': '{{ csrf_token() }}'
+          //         },
+          //         body: JSON.stringify(userData),
+          //         redirect: "follow"
+          //     }
+          //   ).then(response => {
+          //       if (response.redirected) {
+          //           console.log(response);
+          //           window.location.href = response.url;
+          //           redirected = true;
+          //       } else {
+          //           return response.text()
+          //       }
+          //   });
+
+          //   // Follow link and ensure that URL bar is reloaded as well
+          //   console.log(res);
+          //   if (redirected === false) {
+          //     document.body.innerHTML = res;
+          //     window.history.pushState("", "", '{{continuation_url}}');
+          //   }
+          // }
+        },
+        async mounted() {
+          console.log("Mounted was called");
+          this.checkResolution({});
+          let fnc = this.checkResolution;
+          window.addEventListener("resize", function(e) {
+            fnc(); // cannot call as this.* in lambda because this. captures window in this context
+          });
+        }
+      })
+    </script>
+{% if footer_override is defined and footer_override is not none %}
+<div class="footerDiv mt-3">
+  {{ footer_override|safe }}
+</div>
+</body>
+</html>
+{% else %}
+{% include 'footer.html' %}
+{% endif %}
