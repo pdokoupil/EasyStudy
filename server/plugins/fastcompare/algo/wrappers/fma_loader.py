@@ -191,7 +191,7 @@ class FMADataLoader(DataLoaderBase):
                     'track_id' : self._items_indexed.index,
                     'listens'  : self._items_indexed['track_listens'].copy()   
                 }
-            )
+            ),
             self.USER_COUNT,
             self.PARETO_PARAM,
             self.SEED
