@@ -10,6 +10,9 @@ import pandas as pd
 import discogs_client as dc
 import requests
 import imghdr
+import os
+
+from common import get_abs_project_root_path
 
 
 def get_album_covers(tracks_path: Path, images_path: Path):
@@ -109,7 +112,8 @@ def get_album_covers(tracks_path: Path, images_path: Path):
 
 
 if __name__ == '__main__':
-    img_data_path = Path('server/static/datasets/fma/img')
-    tracks_path = Path('server/static/datasets/fma/tracks.csv')
+    dataset_path = os.path.join(get_abs_project_root_path(), 'static', 'datasets')
+    img_data_path = Path(f'{dataset_path}/fma/img')
+    tracks_path = Path(f'{dataset_path}/fma/tracks.csv')
     get_album_covers(tracks_path, img_data_path)
 
