@@ -18,6 +18,7 @@ RUN pip install Flask-Session
 RUN pip install is-safe-url
 RUN pip install tensorflow
 RUN pip install tensorflow-recommenders
+RUN pip install python3-discogs-client
 
 EXPOSE 5555
 
