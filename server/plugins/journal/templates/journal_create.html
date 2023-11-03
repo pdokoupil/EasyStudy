@@ -1,0 +1,308 @@
+{% include 'header.html' %}
+    <!-- Our application root element -->
+    <script src="../static/tinymce/tinymce.min.js" referrerpolicy="origin"></script>
+    <div id="app">
+      <b-container align-h="center" fluid>
+        <b-jumbotron header-level="4" header="{{plugin_name}} Create" lead="Create user study.">
+            Specify value of K (recommendation length), prolific code (if needed) and other parameters.
+        </b-jumbotron>
+
+          <!-- Handle data loader setting -->
+          <b-row align-v="center" align-h="center" class="mb-3">
+            <b-col class="text-right mt-1" align-h="start" cols="2">
+              <b-row align-v="center" align-h="start">
+                <!-- <b-icon class="h2" id="dataLoaderIcon" icon="question-circle-fill" variant="primary"></b-icon> -->
+                <!-- <b-tooltip target="dataLoaderIcon" triggers="hover">{{data_loader_hint}}</b-tooltip> -->
+                <div class="ml-3">
+                  Please select a data loader
+                </div>
+              </b-row>
+            </b-col>
+            <b-col cols="6">
+              <b-form-select v-model="dataLoader" :options="dataLoaderNames" :state="dataLoader != null" required="True" type=""></b-form-select>
+            </b-col>
+          </b-row>
+          <b-row align-v="center" align-h="center" class="mb-3">
+            <b-col cols="8" class="text-center" align-h="center">
+              <b-card v-if="dataLoader!= null && Object.keys(dataLoadersParameters[dataLoaderNames.indexOf(dataLoader)]).length" :title="dataLoader" sub-title="{{settings}}" :set="dataLoaderIdx = dataLoaderNames.indexOf(dataLoader)">
+                <b-card-body>
+                  <template>
+                    <b-row align-v="center" v-for="parameter in dataLoaderData[dataLoaderIdx]['parameters']" :key="parameter.name">
+                      <b-col class="text-right mt-1" align-h="end" cols="1">
+                        <b-icon class="h2" :id="dataLoader.concat('_').concat(parameter.name).concat('_icon')" icon="question-circle-fill" variant="primary"></b-icon>
+                        <b-tooltip :target="dataLoader.concat('_').concat(parameter.name).concat('_icon')" triggers="hover">[[parameter.help]]</b-tooltip>
+                      </b-col>
+                      <b-col cols="1">
+                        [[parameter.name]]
+                      </b-col>
+                      <b-col>
+                        <template v-if="parameter.type == 'int'">
+                          <b-input type="number" step="1" min="1" v-on:change="paramChanged" :state="dataLoadersParameters[dataLoaderIdx][parameter.name].value != '' && dataLoadersParameters[dataLoaderIdx][parameter.name].value >= 1" v-model.number="dataLoadersParameters[dataLoaderIdx][parameter.name].value" :name="parameter.name"/>
+                        </template>
+                        <template v-if="parameter.type == 'string'">
+                          <b-input type="text" v-on:change="paramChanged" :state="dataLoadersParameters[dataLoaderIdx][parameter.name].value != ''" v-model="dataLoadersParameters[dataLoaderIdx][parameter.name].value" :name="parameter.name"/>
+                        </template>
+                        <template v-if="parameter.type == 'bool'">
+                          <b-form-checkbox v-model="dataLoadersParameters[dataLoaderIdx][parameter.name].value">[[ parameter.help ]]</b-form-checkbox>
+                        </template>
+                        <template v-if="parameter.type == 'float'">
+                          <b-input type="number" min="0" v-on:change="paramChanged" :state="dataLoadersParameters[dataLoaderIdx][parameter.name].value != '' && dataLoadersParameters[dataLoaderIdx][parameter.name].value >= 0.0" v-model.number="dataLoadersParameters[dataLoaderIdx][parameter.name].value" :name="parameter.name"/>
+                        </template>
+                        <template v-if="parameter.type == 'options'">
+                          <b-form-select v-on:change="paramChanged" :state="dataLoadersParameters[dataLoaderIdx][parameter.name].value != null" v-model="dataLoadersParameters[dataLoaderIdx][parameter.name].value" :options="dataLoadersParameters[dataLoaderIdx][parameter.name].options" :name="parameter.name" required="True" type=""/>
+                        </template>
+                      </b-col>
+                    </b-row>
+                  </template>
+                </b-card-body>
+              </b-card>
+            </b-col>
+          </b-row>
+
+          <b-row align-h="center" class="mb-3">
+            <b-col cols="8">
+              <label for="k">Please select a value of K (recommendation length)</label>
+              <b-form-input v-model="kValue" type="range" min="1" max="20"></b-form-input>
+              <div class="mb-2">Value: [[ kValue ]]</div>
+            </b-col>
+          </b-row>
+          <b-row align-h="center" class="mb-3">
+            <b-col cols="8">
+              <b-input type="text" id="prolific_code" v-model="prolificCode" name="prolific_code" placeholder="Please enter prolific code (if needed)"/>
+            </b-col>
+          </b-row>
+          
+          <b-row align-h="center" class="mb-3">
+            <b-col cols="8">
+              <label for="k">Please select a refinement layout</label>
+              <b-form-select v-model="refinementLayout" :options="refinementLayoutOptions" required="True" type=""/>
+            </b-col>
+          </b-row>
+
+          <b-row align-h="center" class="mb-3">
+            <b-col class="text-center" cols="8">
+              <b-form-checkbox v-model="disableRelativeComparison">{{disable_relative_comparison}}</b-form-checkbox>
+            </b-col>
+          </b-row>
+          <b-row align-h="center" class="mb-3">
+            <b-col class="text-center" cols="8">
+              <b-form-checkbox v-model="disableDemographics">{{disable_demographics}}</b-form-checkbox>
+            </b-col>
+          </b-row>
+          <b-row align-h="center" class="mb-3">
+            <b-col class="text-center" cols="8">
+              <b-form-checkbox v-model="separateTrainingData">{{separate_training_data}}</b-form-checkbox>
+            </b-col>
+          </b-row>
+
+          <b-row align-h="center" class="mb-3">
+            <b-col class="text-center" cols="8">
+              <b-form-checkbox v-model="overrideAbout">{{override_about}}</b-form-checkbox>
+            </b-col>
+          </b-row>
+          <b-row :hidden="!overrideAbout" align-h="center" class="mb-3">
+            <b-col cols="8">
+              <textarea placeholder="{{about_placeholder}}" id="about"></textarea>
+            </b-col>
+          </b-row>
+          <b-row align-h="center" class="mb-3">
+            <b-col class="text-center" cols="8">
+              <b-form-checkbox v-model="overrideInformedConsent">{{override_informed_consent}}</b-form-checkbox>
+            </b-col>
+          </b-row>
+          <b-row :hidden="!overrideInformedConsent" align-h="center" class="mb-3">
+            <b-col cols="8">
+              <textarea placeholder="{{informed_consent_placeholder}}" id="informedConsent"></textarea>
+            </b-col>
+          </b-row>
+          <b-row align-h="center" class="mb-3">
+            <b-col class="text-center" cols="8">
+              <b-form-checkbox v-model="overrideComparisonHint">{{override_algorithm_comparison_hint}}</b-form-checkbox>
+            </b-col>
+          </b-row>
+          <b-row :hidden="!overrideComparisonHint" align-h="center" class="mb-3">
+            <b-col cols="8">
+              <textarea placeholder="{{algorithm_comparison_placeholder}}" id="comparisonHint"></textarea>
+            </b-col>
+          </b-row>
+          <b-row align-h="center" class="mb-3">
+            <b-col class="text-center" cols="8">
+              <!-- TODO translatable parametrization via string -->
+              <b-form-checkbox v-model="overrideFooter">Override footer</b-form-checkbox>
+            </b-col>
+          </b-row>
+          <b-row :hidden="!overrideFooter" align-h="center" class="mb-3">
+            <b-col cols="8">
+              <textarea placeholder="Custom footer" id="footer"></textarea>
+            </b-col>
+          </b-row>
+          <b-row align-h="center">
+            <b-col cols="8" class="text-right" align-h="end">
+              <b-btn variant="warning" v-on:click="cancelCreateUserStudy">Cancel</b-btn>
+              <b-btn variant="primary" v-on:click="onCreateUserStudy">Create</b-btn>
+            </b-col>
+          </b-row>
+      </b-container>
+    </div>
+
+    <!-- Start running your app -->
+    <script>
+      tinymce.init({
+        selector: '#about',
+        plugins: 'lists, advlist, link, image',
+      });
+      tinymce.init({
+        selector: '#informedConsent',
+        plugins: 'lists, advlist, link, image',
+      });
+      tinymce.init({
+        selector: '#comparisonHint',
+        plugins: 'lists, advlist, link, image',
+      });
+      tinymce.init({
+        selector: '#footer',
+        plugins: 'lists, advlist, link, image',
+      });
+
+      window.app = new Vue({
+        el: '#app',
+        delimiters: ['[[',']]'], // Used to replace double { escaping with double [ escaping (to prevent jinja vs vue inference)
+        data: function() {
+            return {
+              kValue: 10,
+              overrideAbout: false,
+              overrideInformedConsent: false,
+              prolificCode: "",
+              overrideComparisonHint: false,
+              overrideFooter: false,
+              disableRelativeComparison: false,
+              disableDemographics: false,
+              separateTrainingData: false,
+              refinementLayoutOptions: [
+                { value: "", text: "Random" },
+                { value: "default", text: "Default" },
+                { value: "default_shifted", text: "Default Shifted" },
+                { value: "buttons", text: "Buttons" },
+                { value: "options", text: "Options" },
+              ],
+              refinementLayout: "",
+              dataLoader: null,
+              dataLoaders: [
+                { value: null, text: '{{select_loader}}' }
+              ],
+              dataLoaderData: null,
+              dataLoaderNames: null,
+              dataLoadersParameters: []
+            }
+        },
+        methods: {
+          prepareOverrides() {
+              let textOverrides = {};
+              if (this.overrideComparisonHint) {
+                textOverrides["comparison_hint"] = tinymce.get("comparisonHint").getContent();
+              }
+              if (this.overrideAbout) {
+                textOverrides["about"] = tinymce.get("about").getContent();
+              }
+              if (this.overrideInformedConsent) {
+                textOverrides["informed_consent"] = tinymce.get("informedConsent").getContent();
+              }
+              if (this.overrideFooter) {
+                textOverrides["footer"] = tinymce.get("footer").getContent();
+              }
+              return textOverrides;
+            },
+            async onCreateUserStudy() {
+                let pluginName = "{{plugin_name}}";
+                console.log("Creating user study for plugin: " + pluginName);
+                
+                let textOverrides = this.prepareOverrides();
+
+                // Get rid of {"value": actualValue} and make it just [actualValue]
+                let dataLoaderParam = {};
+                let dataLoaderParams = this.dataLoadersParameters[this.dataLoaderNames.indexOf(this.dataLoader)];
+                for (let p in dataLoaderParams) {
+                  param[p] = dataLoaderParams[p].value;
+                }
+                let dataLoaderParameters = dataLoaderParam;
+
+                let userStudyConfiguration = {
+                    "k": parseInt(this.kValue),
+                    "prolific_code": this.prolificCode,
+                    "refinement_layout": this.refinementLayout,
+                    "text_overrides": textOverrides,
+                    "disable_relative_comparison": this.disableRelativeComparison,
+                    "disable_demographics": this.disableDemographics,
+                    "separate_training_data": this.separateTrainingData,
+                    "selected_data_loader": this.dataLoader,
+                    "selected_preference_elicitation": "Multi Objective Sampling from buckets",
+                    "preference_elicitation_parameters": {"n_relevance_buckets": 2, "n_diversity_buckets": 2, "n_novelty_buckets": 2, "n_samples_per_bucket": 4},
+                    "data_loader_parameters": dataLoaderParameters,
+                    "selected_algorithms": ["Most Popular Items Baseline", "Random Items Baseline"],
+                    "algorithm_parameters": [{"displayed_name": "BETA", "name": "Most Popular Items Baseline"}, {"displayed_name": "GAMMA", "name": "Random Items Baseline"}],
+                    "shuffle_recommendations": true
+                };
+
+                let userStudyData = {
+                    "parent_plugin": pluginName,
+                    "config": userStudyConfiguration
+                };
+
+                let res = await fetch("/create-user-study",
+                    {
+                        method: "POST",
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRFToken': '{{ csrf_token() }}'
+                        },
+                        body: JSON.stringify(userStudyData),
+                        redirect: "follow"
+                    }
+                ).then(response => {
+                    if (response.redirected) {
+                        console.log(response);
+                        window.location.href = response.url;
+                    } else {
+                        return response.text()
+                    }
+                });
+                console.log(res);
+            },
+            
+            cancelCreateUserStudy() {
+                window.location.href = "{{ url_for('main.administration') }}"
+            },
+
+            
+        },
+
+        async mounted() {
+            console.log("Is it ever called");
+            // TODO reuse above steps
+            this.dataLoaderData = await fetch("{{ url_for('fastcompare.available_data_loaders') }}").then(resp => resp.json());
+            this.dataLoaders = this.dataLoaders.concat(this.dataLoaderData.map(x => {
+              return {
+                value: x["name"],
+                text: x["name"]
+              }
+            }));
+            this.dataLoaderNames = this.dataLoaderData.map(x => x["name"]);
+            this.dataLoadersParameters = [];
+            for (let idx in this.dataLoaderData) {
+              let data = this.dataLoaderData[idx];
+              let d = {};
+              for (let paramIdx in data["parameters"]) {
+                let parameter = data["parameters"][paramIdx];
+                d[parameter.name] = {
+                  "value": parameter.default
+                }
+                if (parameter["options"]) {
+                  d[parameter.name]["options"] = parameter["options"];
+                }
+              }
+              this.dataLoadersParameters.push(d);
+            }
+          }
+      })
+    </script>
+{% include 'footer.html' %}
