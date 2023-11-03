@@ -120,7 +120,7 @@ def send_feedback():
     selected_movies = [int(m) for m in selected_movies]
 
     # Calculate weights based on selection and shown movies during preference elicitation
-    weights, supports = calculate_weight_estimate(selected_movies, session["elicitation_movies"], return_supports=True)
+    weights, supports = calculate_weight_estimate(load_ml_dataset(), selected_movies, session["elicitation_movies"], return_supports=True)
     weights /= weights.sum()
     weights = weights.tolist()
     weights = {

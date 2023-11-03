@@ -18,6 +18,8 @@ import requests
 # from app import pm
 from flask import url_for, has_app_context
 
+from plugins.utils.helpers import cos_sim_np
+
 # Movie-lens data loader
 
 class RatingUserFilter:
@@ -343,7 +345,10 @@ class MLDataLoader:
         ratings_df_i.userId = ratings_df_i.userId.map(self.user_to_user_index)
         ratings_df_i.movieId = ratings_df_i.movieId.map(self.movie_id_to_index)
         self.rating_matrix = self.ratings_df.pivot(index='userId', columns='movieId', values="rating").fillna(0).values
-        self.similarity_matrix = 1.0 - np.float32(squareform(pdist(self.rating_matrix.T, "cosine")))
+        #self.similarity_matrix = 1.0 - np.float32(squareform(pdist(self.rating_matrix.T, "cosine")))
+        # Faster, tensorflow-based implementation
+        self.similarity_matrix = cos_sim_np(self.rating_matrix.T)
+        self.distance_matrix = 1.0 - self.similarity_matrix
         
         # Maps movie index to text description
         self.movies_df["description"] = self.movies_df.title + ' ' + self.movies_df.genres
