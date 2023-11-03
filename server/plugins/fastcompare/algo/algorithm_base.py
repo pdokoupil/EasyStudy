@@ -73,7 +73,8 @@ class AlgorithmBase(ABC):
     # Instance_cache_path is for data specific for each instance (e.g. depends on parameters)
     # while class_cache_path is single cache for all combinations (useful for static data)
     # When in doubt, just use instance_cache_path and ignore class_cache_path
-    def load(self, instance_cache_path, class_cache_path):
+    # semi_local_cache_path is "per-dataset", but for whole class (other config params are ignored)
+    def load(self, instance_cache_path, class_cache_path, semi_local_cache_path):
         with open(instance_cache_path, "rb") as f:
             attribs = pickle.load(f)
         self.__dict__.update(attribs) 
@@ -83,7 +84,8 @@ class AlgorithmBase(ABC):
     # Instance_cache_path is for data specific for each instance (e.g. depends on parameters)
     # while class_cache_path is single cache for all combinations (useful for static data)
     # When in doubt, just use instance_cache_path and ignore class_cache_path
-    def save(self, instance_cache_path, class_cache_path):
+    # semi_local_cache_path is "per-dataset", but for whole class (other config params are ignored)
+    def save(self, instance_cache_path, class_cache_path, semi_local_cache_path):
         with open(instance_cache_path, "wb") as f:
             pickle.dump(self.__dict__, f)
 
@@ -121,7 +123,8 @@ class PreferenceElicitationBase(ABC):
     # Instance_cache_path is for data specific for each instance (e.g. depends on parameters)
     # while class_cache_path is single cache for all combinations (useful for static data)
     # When in doubt, just use instance_cache_path and ignore class_cache_path
-    def load(self, instance_cache_path, class_cache_path):
+    # semi_local_cache_path is "per-dataset", but for whole class (other config params are ignored)
+    def load(self, instance_cache_path, class_cache_path, semi_local_cache_path):
         with open(instance_cache_path, "rb") as f:
             attribs = pickle.load(f)
         self.__dict__.update(attribs) 
@@ -131,7 +134,8 @@ class PreferenceElicitationBase(ABC):
     # Instance_cache_path is for data specific for each instance (e.g. depends on parameters)
     # while class_cache_path is single cache for all combinations (useful for static data)
     # When in doubt, just use instance_cache_path and ignore class_cache_path
-    def save(self, instance_cache_path, class_cache_path):
+    # semi_local_cache_path is "per-dataset", but for whole class (other config params are ignored)
+    def save(self, instance_cache_path, class_cache_path, semi_local_cache_path):
         with open(instance_cache_path, "wb") as f:
             pickle.dump(self.__dict__, f)
 
@@ -166,6 +170,15 @@ class DataLoaderBase(ABC):
     def items_df_indexed():
         pass
 
+    @property
+    @abstractmethod
+    def distance_matrix():
+        pass
+
+    @property
+    @abstractmethod
+    def rating_matrix():
+        pass
     # Return image url for the given item id
     # Either remote URL (http://) (could be slow)
     # Or local, already processed via flask's url_for (if you place images into server/static/datasets/x/img/*.jpg)
@@ -206,6 +219,9 @@ class DataLoaderBase(ABC):
 
     # Return list of parameters (see ParameterType type) that will be set by the user when creating the user study and passed to the
     # Data loader's constructor
+    # NOTE: Currently all data loaders do not have any parameters
+    # if this changes at any point in time, we may have to adjust path in semi_local cache
+    # to include parameter values
     @classmethod
     @abstractmethod
     def parameters():
@@ -218,7 +234,8 @@ class DataLoaderBase(ABC):
     # Instance_cache_path is for data specific for each instance (e.g. depends on parameters)
     # while class_cache_path is single cache for all combinations (useful for static data)
     # When in doubt, just use instance_cache_path and ignore class_cache_path
-    def load(self, instance_cache_path, class_cache_path):
+    # semi_local_cache_path is "per-dataset", but for whole class (other config params are ignored)
+    def load(self, instance_cache_path, class_cache_path, semi_local_cache_path):
         with open(instance_cache_path, "rb") as f:
             attribs = pickle.load(f)
         self.__dict__.update(attribs) 
@@ -228,7 +245,8 @@ class DataLoaderBase(ABC):
     # Instance_cache_path is for data specific for each instance (e.g. depends on parameters)
     # while class_cache_path is single cache for all combinations (useful for static data)
     # When in doubt, just use instance_cache_path and ignore class_cache_path
-    def save(self, instance_cache_path, class_cache_path):
+    # semi_local_cache_path is "per-dataset", but for whole class (other config params are ignored)
+    def save(self, instance_cache_path, class_cache_path, semi_local_cache_path):
         with open(instance_cache_path, "wb") as f:
             pickle.dump(self.__dict__, f)
 

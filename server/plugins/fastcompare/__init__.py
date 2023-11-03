@@ -18,6 +18,7 @@ import numpy as np
 from plugins.utils.preference_elicitation import load_data, enrich_results
 from plugins.fastcompare.loading import load_algorithms, load_preference_elicitations, load_data_loaders, load_evaluation_metrics
 from plugins.utils.interaction_logging import log_interaction, study_ended
+from plugins.utils.helpers import cos_sim_np
 
 from models import UserStudy, Participation, Interaction
 
@@ -27,6 +28,8 @@ from flask import Blueprint, jsonify, request, redirect, url_for, make_response,
 
 from common import get_tr, load_languages, multi_lang, load_user_study_config
 from scipy.spatial.distance import squareform, pdist
+
+from cachetools import cached 
 
 __plugin_name__ = "fastcompare"
 __version__ = "0.1.0"
@@ -173,14 +176,14 @@ def get_initial_data():
     
     loader_factory = load_data_loaders()[config["selected_data_loader"]]
     loader = loader_factory(**filter_params(config["data_loader_parameters"], loader_factory))
-    load_data_loader(loader, session["user_study_guid"], loader_factory.name())
+    load_data_loader(loader, session["user_study_guid"], loader_factory.name(), get_semi_local_cache_name(loader))
     
     elicitation_factory = load_preference_elicitations()[config["selected_preference_elicitation"]]
     elicitation = elicitation_factory(
         loader=loader,
         **filter_params(config["preference_elicitation_parameters"], elicitation_factory)
     )
-    load_preference_elicitation(elicitation, session["user_study_guid"], elicitation_factory.name())
+    load_preference_elicitation(elicitation, session["user_study_guid"], elicitation_factory.name(), get_semi_local_cache_name(loader))
 
     x = load_data(loader, elicitation, el_movies)
 
@@ -220,7 +223,7 @@ def search_for_item(pattern, tr=None):
     ## TODO get_loader helper
     loader_factory = load_data_loaders()[conf["selected_data_loader"]]
     loader = loader_factory(**filter_params(conf["data_loader_parameters"], loader_factory))
-    load_data_loader(loader, session["user_study_guid"], loader_factory.name())
+    load_data_loader(loader, session["user_study_guid"], loader_factory.name(), get_semi_local_cache_name(loader))
 
     # If we have a translate function
     if tr:
@@ -256,7 +259,7 @@ def prepare_recommendations(loader, conf, recommendations, selected_movies, filt
         algorithm_displayed_name = conf["algorithm_parameters"][algorithm_idx]["displayed_name"]
         factory = algorithm_factories[algorithm_name]
         algorithm = factory(loader, **filter_params(conf["algorithm_parameters"][algorithm_idx], factory))
-        load_algorithm(algorithm, session["user_study_guid"], algorithm_displayed_name)
+        load_algorithm(algorithm, session["user_study_guid"], algorithm_displayed_name, get_semi_local_cache_name(loader))
         recommended_items = algorithm.predict(selected_movies, filter_out_movies, k=k)
 
         if conf["shuffle_recommendations"]:
@@ -291,7 +294,7 @@ def send_feedback():
 
     loader_factory = load_data_loaders()[conf["selected_data_loader"]]
     loader = loader_factory(**filter_params(conf["data_loader_parameters"], loader_factory))
-    load_data_loader(loader, session["user_study_guid"], loader_factory.name())
+    load_data_loader(loader, session["user_study_guid"], loader_factory.name(), get_semi_local_cache_name(loader))
     prepare_recommendations(loader, conf, recommendations, selected_movies, filter_out_movies, k)
 
     
@@ -462,7 +465,7 @@ def algorithm_feedback():
     ## TODO get_loader helper
     loader_factory = load_data_loaders()[conf["selected_data_loader"]]
     loader = loader_factory(**filter_params(conf["data_loader_parameters"], loader_factory))
-    load_data_loader(loader, session["user_study_guid"], loader_factory.name())
+    load_data_loader(loader, session["user_study_guid"], loader_factory.name(), get_semi_local_cache_name(loader))
 
     selected_movies = request.args.get("selected_movies")
     selected_movies = selected_movies.split(",") if selected_movies else []
@@ -555,21 +558,31 @@ from multiprocessing import Process
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
+def get_semi_local_cache_name(loader):
+    return f"{loader.name().lower().replace(' ', '')}_slc"
+
 
 #### Loading extensible components from the cache ######
 def get_cache_path(guid, name=""):
     return os.path.join("cache", __plugin_name__, guid, name)
 
-def load_algorithm(algorithm, guid, algorithm_displayed_name):
-    algorithm.load(get_cache_path(guid, algorithm_displayed_name), get_cache_path("", algorithm_displayed_name))
+def load_algorithm(algorithm, guid, algorithm_displayed_name, semi_local_cache_name):
+    algorithm.load(get_cache_path(guid, algorithm_displayed_name), get_cache_path("", algorithm_displayed_name), get_cache_path(semi_local_cache_name, algorithm_displayed_name))
 
 # Elicitation may have some internal state as well, so we load it as well
-def load_preference_elicitation(elicitation, guid, elicitation_name):
-    elicitation.load(get_cache_path(guid, elicitation_name), get_cache_path("", elicitation_name))
+def load_preference_elicitation(elicitation, guid, elicitation_name, semi_local_cache_name):
+    elicitation.load(get_cache_path(guid, elicitation_name), get_cache_path("", elicitation_name), get_cache_path(semi_local_cache_name, elicitation_name))
 
 # Dataset loaders also may have internal state, load them as well
-def load_data_loader(data_loader, guid, loader_name):
-    data_loader.load(get_cache_path(guid, loader_name), get_cache_path("", loader_name))
+def load_data_loader(data_loader, guid, loader_name, semi_local_cache_name):
+    data_loader.load(get_cache_path(guid, loader_name), get_cache_path("", loader_name), get_cache_path(semi_local_cache_name, loader_name))
+
+# Dataset loaders also may have internal state, load them as well
+@cached(cache={}, key=lambda data_loader, guid, loader_name, semi_local_cache_name: f"{guid}/{loader_name}")
+def load_data_loader_cached(data_loader, guid, loader_name, semi_local_cache_name):
+    data_loader.load(get_cache_path(guid, loader_name), get_cache_path("", loader_name), get_cache_path(semi_local_cache_name, loader_name))
+    return data_loader # Slightly hacking the API to make it more cache-friendly
+
 
 # There could be a missmatch in-between parameters passed here and what is declared by actual component factory
 # Filter out all temporary params (e.g. displayed_name) that are not directly connected to the underlying algorithm class
@@ -593,9 +606,11 @@ def long_initialization(guid):
     # Prepare data loader first
     loader_factory = load_data_loaders()[conf["selected_data_loader"]]
     loader = loader_factory(**filter_params(conf["data_loader_parameters"], loader_factory))
+    semi_local_cache_name = get_semi_local_cache_name(loader)
+    # Ensure semi local cache exists as well
+    Path(get_cache_path(semi_local_cache_name)).mkdir(parents=True, exist_ok=True)
     loader.load_data() # Actually load the data
-    loader.save(get_cache_path(guid, loader.name()), get_cache_path("", loader.name())) # Save the data loader itself to the cache
-
+    loader.save(get_cache_path(guid, loader.name()), get_cache_path("", loader.name()), get_cache_path(semi_local_cache_name, loader.name())) # Save the data loader itself to the cache
     # Then preference elicitation
     elicitation_factory = load_preference_elicitations()[conf["selected_preference_elicitation"]]
     elicitation = elicitation_factory(
@@ -603,7 +618,7 @@ def long_initialization(guid):
         **filter_params(conf["preference_elicitation_parameters"], elicitation_factory)
     )
     elicitation.fit()
-    elicitation.save(get_cache_path(guid, elicitation.name()), get_cache_path("", elicitation.name()))
+    elicitation.save(get_cache_path(guid, elicitation.name()), get_cache_path("", elicitation.name()), get_cache_path(semi_local_cache_name, elicitation.name()))
 
     # Prepare algorithms
     algorithms = conf["selected_algorithms"]
@@ -614,14 +629,12 @@ def long_initialization(guid):
         factory = algorithm_factories[algorithm_name]
         algorithm = factory(loader, **filter_params(conf["algorithm_parameters"][algorithm_idx], factory))
         algorithm_displayed_name = conf["algorithm_parameters"][algorithm_idx]["displayed_name"]
-        
         print(f"Training algorithm: {algorithm_displayed_name}")
         algorithm.fit()
         print(f"Done training algorithm: {algorithm_displayed_name}")
 
         # Save the algorithm
-        algorithm.save(get_cache_path(guid, algorithm_displayed_name), get_cache_path("", algorithm_displayed_name))
-
+        algorithm.save(get_cache_path(guid, algorithm_displayed_name), get_cache_path("", algorithm_displayed_name), get_cache_path(semi_local_cache_name, algorithm_displayed_name))
 
     # Move the questionnaire file if present
     if "questionnaire_file" in conf:
@@ -638,7 +651,7 @@ def long_initialization(guid):
 
 @bp.route("/initialize", methods=["GET"])
 def initialize():
-    print("Called here, do whatever initialization")
+    consuming_plugin = request.args.get("consuming_plugin", __plugin_name__)
     guid = request.args.get("guid")
     heavy_process = Process(
         target=long_initialization,
@@ -688,11 +701,13 @@ def fetch_results(guid):
     conf = load_user_study_config(user_study.id)
     loader_factory = load_data_loaders()[conf["selected_data_loader"]]
     loader = loader_factory(**filter_params(conf["data_loader_parameters"], loader_factory))
-    load_data_loader(loader, guid, loader_factory.name())
+    load_data_loader(loader, guid, loader_factory.name(), get_semi_local_cache_name(loader))
     
     rating_matrix = loader.ratings_df.pivot(index='user', columns='item', values="rating").fillna(0).values
-    similarity_matrix = 1.0 - np.float32(squareform(pdist(rating_matrix.T, "cosine")))
-    
+    #similarity_matrix = 1.0 - np.float32(squareform(pdist(rating_matrix.T, "cosine")))
+    # Faster, tensorflow-based implementation
+    similarity_matrix = cos_sim_np(rating_matrix.T)
+
     # print(f"Called, len={len(participants)}")
     for p in participants:
         iter_starts = Interaction.query.filter((Interaction.participation == p.id) & (Interaction.interaction_type == "iteration-started")).order_by(Interaction.id.asc()).all()
