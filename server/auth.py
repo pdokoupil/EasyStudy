@@ -65,7 +65,7 @@ def signup():
 def signup_post():
 
     form = SignupForm()
-    print(f"fm={form.email.data}, f={form.password.data}")
+    print(f"fm={form.email.data}")
     if form.validate_on_submit():
         print("Passed")
         user = User.query.filter_by(email=form.email.data).first() # if this returns a user, then the email already exists in database

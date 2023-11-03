@@ -144,7 +144,7 @@ def load_data_1(elicitation_movies):
     # Get list of items
     data = MultiObjectiveSamplingFromBucketsElicitation(
         loader.rating_matrix,
-        loader.similarity_matrix,
+        loader.distance_matrix,
         2, 2, 2, 4, 1.0
     ).get_initial_data([int(x["movie_idx"]) for x in elicitation_movies])
 
@@ -179,12 +179,12 @@ def load_data_3(elicitation_movies):
     # Result is a list of movies, each movie being a dict (JSON object)
     return result
 
-def calculate_weight_estimate(selected_movies, elicitation_movies, return_supports=False):
+def calculate_weight_estimate(loader, selected_movies, elicitation_movies, return_supports=False):
     if not selected_movies:
         x = np.array([1.0, 1.0, 1.0])
         return x / x.sum(), {}
 
-    loader = load_ml_dataset()
+    #loader = load_ml_dataset()
 
     rel = 0
     div = 0
@@ -194,7 +194,7 @@ def calculate_weight_estimate(selected_movies, elicitation_movies, return_suppor
     selected_diversities = []
     selected_novelties = []
 
-    distance_matrix = 1.0 - loader.similarity_matrix
+    #distance_matrix = 1.0 - loader.similarity_matrix
 
     
     if type(elicitation_movies[0]) == int:
@@ -204,7 +204,7 @@ def calculate_weight_estimate(selected_movies, elicitation_movies, return_suppor
     else:
         assert False
 
-    diversities = distance_matrix[np.ix_(movie_indices, movie_indices)]
+    diversities = loader.distance_matrix[np.ix_(movie_indices, movie_indices)]
     raw_diversities = diversities
     #diversities = diversities[np.triu_indices(diversities.shape[0])].reshape((-1, 1)) # Train diversity on this
     diversities = (diversities.sum(axis=0) / (diversities.shape[0] - 1)).reshape(-1,1)
@@ -234,7 +234,7 @@ def calculate_weight_estimate(selected_movies, elicitation_movies, return_suppor
         r = loader.rating_matrix[:, movie_idx]
         r = r.mean(axis=0)
         selected_relevances.append(r)
-        d = distance_matrix[movie_idx][movie_indices].sum() / (len(movie_indices) - 1)
+        d = loader.distance_matrix[movie_idx][movie_indices].sum() / (len(movie_indices) - 1)
         selected_diversities.append(d[d > 0].reshape(-1, 1))
         selected_novelties.append(1.0 - (loader.rating_matrix[:, movie_idx].astype(bool).sum() / loader.rating_matrix.shape[0]))
 
@@ -420,10 +420,10 @@ def rlprop(selected_movies, model, weights, filter_out_movies = [], k=10, norm_f
     x = wrapper(k, return_support=include_support)
     return enrich_results(x[0], loader)
 
-def get_objective_importance(selected_movie_indices, shown_movies):
+def get_objective_importance(loader, selected_movie_indices, shown_movies):
     if not selected_movie_indices:
         return None
-    importances = calculate_weight_estimate(selected_movie_indices, shown_movies)
+    importances = calculate_weight_estimate(loader, selected_movie_indices, shown_movies)
     return {
         "relevance": importances[0],
         "diversity": importances[1],

@@ -2,8 +2,11 @@
 from plugins.fastcompare.algo.algorithm_base import Parameter, ParameterType, PreferenceElicitationBase
 from plugins.utils.multi_obj_sampling import MultiObjectiveSamplingFromBucketsElicitation
 from plugins.utils.popularity_sampling import PopularitySamplingElicitation, PopularitySamplingFromBucketsElicitation
+from plugins.utils.helpers import cos_sim_np
 
-from scipy.spatial.distance import squareform, pdist
+# from scipy.spatial.distance import squareform, pdist
+
+
 
 class MultiObjectiveSamplingFromBucketsElicitationWrapper(PreferenceElicitationBase):
     # Objectives is a dictionary mapping objective name to its implementation (e.g. we can use different implementations of diversity etc..)
@@ -20,7 +23,9 @@ class MultiObjectiveSamplingFromBucketsElicitationWrapper(PreferenceElicitationB
         if "rating" not in self.ratings_df:
             self.ratings_df.loc[:, "rating"] = 1
         rating_matrix = self.ratings_df.pivot(index='user', columns='item', values="rating").fillna(0).values
-        similarity_matrix = 1.0 - np.float32(squareform(pdist(rating_matrix.T, "cosine")))
+        #similarity_matrix = 1.0 - np.float32(squareform(pdist(rating_matrix.T, "cosine")))
+        # Faster, numpy-based implementation
+        similarity_matrix = cos_sim_np(rating_matrix.T)
         self.elicitation = MultiObjectiveSamplingFromBucketsElicitation(rating_matrix, similarity_matrix, *self.args, **self.kwargs)
 
     @classmethod

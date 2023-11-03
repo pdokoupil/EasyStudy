@@ -3,10 +3,11 @@ import numpy as np
 # Samples from N buckets where each bucket corresponds to a single objective
 class MultiObjectiveSamplingFromBucketsElicitation:
     # Objectives is a dictionary mapping objective name to its implementation (e.g. we can use different implementations of diversity etc..)
-    def __init__(self, rating_matrix, similarity_matrix, n_relevance_buckets, n_diversity_buckets, n_novelty_buckets, n_samples_per_bucket, k=1.0, **kwargs):
+    def __init__(self, rating_matrix, distance_matrix, n_relevance_buckets, n_diversity_buckets, n_novelty_buckets, n_samples_per_bucket, k=1.0, **kwargs):
         
         self.rating_matrix = rating_matrix
-        self.similarity_matrix = similarity_matrix
+        #self.similarity_matrix = similarity_matrix
+        self.distance_matrix = distance_matrix
         self.n_buckets = {
             "relevance": n_relevance_buckets,
             "diversity": n_diversity_buckets,
@@ -99,14 +100,14 @@ class MultiObjectiveSamplingFromBucketsElicitation:
 
         # Calculate diversities
         #similarity_matrix = np.float32(squareform(pdist(self.rating_matrix.T, "cosine")))
-        distance_matrix = 1.0 - self.similarity_matrix
+        #distance_matrix = 1.0 - self.similarity_matrix
 
         accums = np.add.accumulate(self.n_samples_per_bucket["diversity"])
 
         # For the total number of items we have to sample across all diversity buckets
         for i in range(sum(self.n_samples_per_bucket["diversity"])):
             # Compute "approximate" diversity of each item to the list we have so far
-            diversities = distance_matrix[result[:offset]].sum(axis=0)
+            diversities = self.distance_matrix[result[:offset]].sum(axis=0)
             if movie_indices_to_ignore:
                 diversities[movie_indices_to_ignore_np] = 0.0 # This will cause that ignore items wont be sampled
             diversities[selected_so_far] = 0.0 # Filter out movies selected so far
