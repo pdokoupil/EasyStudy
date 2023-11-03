@@ -1,0 +1,306 @@
+{% include 'header.html' %}
+
+<div id="app">
+    <b-container fluid>
+        <b-jumbotron class="smallJumbotron" header="{{header}}" lead="">
+            {{hint}}
+        </b-jumbotron>
+    
+        <b-row align-h="center">
+            <b-col class="text-center">
+                <b-form method="POST" action="{{continuation_url}}">
+                    <input type="hidden" name="csrf_token" value="{{csrf_token()}}"/>
+                    <input type="hidden" name="final_questionnaire_data" value="final_questionnaire_data"/>
+                    
+                    <b-button variant="success" type="submit">{{finish}}</b-button>
+                </b-form>
+            </b-col>
+        </b-row>
+        
+        <b-row class="ml-1 mr-1">
+            <b-col v-for="variantResults in variantsResults" :set="algoIdx = variantsResults.indexOf(variantResults)" :class="variantsResults.indexOf(variantResults) != 0 ? 'verticalSeparator' : ''">
+                <b-row align-h="center">
+                    <h5>{{algorithm}} [[ variantNames[algoIdx] ]]</h5>
+                </b-row>
+                <b-row align-h="center" class="mb-1 mt-1" v-for="row in variantResults">
+                    <b-col sm="auto" class="align-middle" v-for="col in row">
+                        <div>
+                            <b-popover @show="popoverShown" @hidden="popoverHidden" :target="variantNames[algoIdx] + '_' + col.movie_idx" triggers="hover" placement="right">
+                                <template #title>[[col.movie]]</template>
+                                 <div>
+                                    <strong>Plot: </strong>
+                                    [[col.plot]]
+                                 </div>
+                                 <div v-if="col.trailer_url" class="mt-1 text-center">
+                                    <b-button target="_blank" @click="onTrailerWatch(col)" :href="col.trailer_url" size="sm" variant="primary">IMDb trailer</b-button>
+                                 </div>
+                                 
+                            </b-popover>
+                            <b-img @mouseenter="itemMouseEnter" @mouseleave="itemMouseLeave" :id="variantNames[algoIdx] + '_' + col.movie_idx" style="width: 175px; height: 260px;" block center :src="col.url" v-on:click="onSelectMovie($event, col, variantsResults.indexOf(variantResults))" :name="col.movie_idx" :alt="col.movie" />
+                        </div>
+                    </b-col>
+                </b-row>
+                <b-row align-h="center">
+                    <b-col sm="4">
+                        <label for="rating-sm" class="mt-1">{{algorithm_satisfaction}}</label>
+                        <b-form-rating :variant="algorithmRatingVariant(variantsResults.indexOf(variantResults))" v-on:change="onAlgorithmRatingChanged($event, variantsResults.indexOf(variantResults))" show-value show-value-max id="rating-sm" size="sm"></b-form-rating>
+                    </b-col>
+                </b-row>
+            </b-col>
+        </b-row>
+        <hr>
+        <b-row v-if="!selected.length" class="mt-2" align-h="center">
+            <b-form-checkbox
+                :state="dontLikeAnythingState"    
+                v-model="dontLikeAnythingValue"
+            >
+                {{like_nothing}}
+            </b-form-checkbox>
+        </b-row>
+
+    </b-container>
+</div>
+
+<script type='text/javascript'>
+    // Capture JINJA stuff here
+    var movies = {{movies | tojson | safe}};
+    var resultLayout = "{{result_layout}}";
+    var iteration = "{{iteration}}";
+    var minIterationToCancel = "{{MIN_ITERATION_TO_CANCEL}}";
+    var csrfToken = "{{csrf_token()}}"
+
+    var defaultComparisonValue = "{{disable_relative_comparison}}";
+    var defaultComparisonValidation = defaultComparisonValue == "True" ? true : false;
+    defaultComparisonValue = defaultComparisonValue == "True" ? 0 : null;
+
+    var refinementLayout = "{{refinement_layout}}";
+    var defaultRefinementValidated = refinementLayout != "4";
+    
+    var itemsPerRow = 1; // Single item per row (thus a column)
+
+    function compare_ctx_lambda() {
+        return {
+            "items": Array.from(document.getElementsByTagName("img")).map(x => {
+                return {
+                    "id": x.id, // Corresponds to movie idx
+                    "name": x.name,
+                    "url": x.src,
+                    "title": x.title,
+                    "viewport": getElementBoundingBox(x)
+                };
+            }),
+            "movie_scroll": true
+        };
+    }
+
+
+    var sliderState = 0;
+    console.log(sliderState);
+    //var refinementLayout = "{{version}}";
+
+
+</script>
+<script src="{{url_for('static', filename='resolution_handling.js')}}"></script>
+<script src="{{url_for('static', filename='interaction_reporting.js')}}"></script>
+<script src="{{url_for('static', filename='message_reporting.js')}}"></script>
+<script>
+
+    var csrfToken = "{{csrf_token()}}";
+
+    window.app = new Vue({
+    el: '#app',
+    delimiters: ['[[',']]'], // Used to replace double { escaping with double [ escaping (to prevent jinja vs vue inference)
+    data: function() {
+
+        const colsPerRow = itemsPerRow;
+
+        var numAlgorithms = Object.keys(movies).length;
+        var variantNames = new Array(numAlgorithms);
+        let moviesColumnified = new Array(numAlgorithms);
+
+        for (variantIdx in movies) {
+            let variantResults = movies[variantIdx]["movies"];
+            let order = parseInt(movies[variantIdx]["order"]);
+            variantNames[order] = variantIdx.toUpperCase();
+            console.log(variantIdx);
+            console.log(variantResults);
+            console.log(order);
+            let variantResultsColumnified = [];
+            let row = [];
+            for (idx in variantResults) {
+                let movie = variantResults[idx];
+                row.push(movie);
+                if (row.length >= colsPerRow) {
+                    variantResultsColumnified.push(row);
+                    row = [];
+                }
+            }
+            if (row.length > 0) {
+                variantResultsColumnified.push(row);
+            }
+            moviesColumnified[order] = variantResultsColumnified;
+        }
+        
+        return {
+            selected: [],
+            dontLikeAnythingValue: false,
+            variantsResults: moviesColumnified,
+            variantNames: variantNames,
+            algorithmRatingsValidated: [false, false]
+        };
+    },
+    computed: {
+        algorithmComparisonState() {
+            this.algorithmComparisonValidated = this.algorithmComparisonValue != null;
+            return this.algorithmComparisonValue != null;
+        },
+        dontLikeAnythingState() {
+            return this.dontLikeAnythingValue;
+        },
+        allValidated() {
+            let dontLikeAnythingValidated = this.selected.length > 0 || this.dontLikeAnythingValue;
+            return this.algorithmComparisonValidated &&
+                   this.allAlgorithmRatingsValidated && // All algorithms have their outputs rated
+                   dontLikeAnythingValidated;
+        }
+    },
+    methods: {
+        onTrailerWatch(movieData) {
+            reportOnInput("/utils/on-input", csrfToken, "link", movieData);
+        },
+
+        checkRefinementValidation() {
+            console.log(refinementLayout);
+            if (refinementLayout == REFINEMENT_LAYOUT_OPTIONS) {
+                this.refinementValidated = this.relevanceValue.some(x => x != null) && this.diversityValue.some(x => x != null) && this.noveltyValue.some(x => x != null);
+            }
+        },
+
+        // Custom (movie specific) implementation of indexOf operator
+        // Considers only movie's properties
+        movieIndexOf(arr, item) {
+            for (let idx in arr) {
+                let arrItem = arr[idx];
+                if (arrItem.movie_idx === item.movie_idx
+                    && arrItem.movie === item.movie
+                    && arrItem.url === item.url) {
+                        return idx;
+                    }
+            }
+            return -1;
+        },
+        onSelectMovie(event, item, variant) {
+            let variantName = this.variantNames[variant];
+            item['variant'] = variant;
+            item['variant_name'] = variantName;
+            let index = this.movieIndexOf(this.selected, item);
+            if (index > -1) {
+                // Already there, remove it
+                var copies = document.getElementsByName(event.srcElement.name);
+                for (let j = 0; j < copies.length; ++j) {
+                    copies[j].classList.remove("selected");
+                }
+                this.selected.splice(index, 1);
+                reportDeselectedItem(`/utils/deselected-item`, csrfToken, item, this.selected, ()=>{ 
+                    return {
+                        "variant": variant,
+                        "variant_name": variantName
+                    }; 
+                });
+            } else {
+                // Not there, insert
+                var copies = document.getElementsByName(event.srcElement.name);
+                for (let j = 0; j < copies.length; ++j) {
+                    copies[j].classList.add("selected");
+                }
+                this.selected.push(item);
+                reportSelectedItem(`/utils/selected-item`, csrfToken, item, this.selected, ()=>{
+                    return {
+                        "variant": variant,
+                        "variant_name": variantName
+                    };
+                });
+            }
+            this.selectedMovieIndices = this.selected.map((x) => x.movie_idx).join(",");
+            this.selectedMovieVariants = this.selected.map((x) => x.variant).join(",");
+        },
+        onAlgorithmRatingChanged(newRating, algorithmIndex) {
+            let oldRating = this.algorithmRatings[algorithmIndex];
+            this.algorithmRatingsValidated[algorithmIndex] = true;
+            this.algorithmRatings[algorithmIndex] = newRating;
+            this.allAlgorithmRatingsValidated = this.algorithmRatingsValidated.reduce((partialSum, a) => partialSum + a, 0) == this.numAlgorithms;
+            reportOnInput("/utils/on-input", csrfToken, "rating", {
+                "variant": algorithmIndex,
+                "variant_name": this.variantNames[algorithmIndex],
+                "old_rating": oldRating,
+                "new_rating": newRating
+            });
+            this.$forceUpdate(); // Make sure it propagates to UI (some issues with modifying list via direct access)
+        },
+        algorithmRatingVariant(algorithmIndex) {
+            if (this.algorithmRatingsValidated[algorithmIndex]) {
+                return "success";
+            }
+            return "danger";
+        },
+        popoverShown(event) {
+            reportOnInput("/utils/on-input", csrfToken, "popover-shown", {
+                "target": {
+                    "id": event.target.id,
+                    "name": event.target.name
+                }
+            });
+        },
+        popoverHidden(event) {
+            reportOnInput("/utils/on-input", csrfToken, "popover-hidden", {
+                "target": {
+                    "id": event.target.id,
+                    "name": event.target.name
+                }
+            });
+        },
+        itemMouseEnter(event) {
+            reportOnInput("/utils/on-input", csrfToken, "mouse-enter", {
+                "target": {
+                    "id": event.target.id,
+                    "name": event.target.name
+                }
+            });
+        },
+        itemMouseLeave(event) {
+            reportOnInput("/utils/on-input", csrfToken, "mouse-leave", {
+                "target": {
+                    "id": event.target.id,
+                    "name": event.target.name
+                }
+            });
+        },
+    },
+    async mounted() {
+        const btns = document.querySelectorAll("button");
+        const radios = document.querySelectorAll("input[type=radio]");
+        const checkboxes = document.querySelectorAll("input[type=checkbox]");
+        const textboxes = document.querySelectorAll("input[type=text]");
+        const selects = document.querySelectorAll("select");
+        
+        // Register the handlers for event reporting
+        startViewportChangeReportingWithLimit(`/utils/changed-viewport`, csrfToken, 1.0, true);
+        startScrollReportingWithLimit(`/utils/changed-viewport`, csrfToken, 1.0, document.getElementsByName("scrollableDiv"));
+        registerClickedButtonReporting(`/utils/on-input`, csrfToken, btns);
+        registerClickedRadioReporting("/utils/on-input", csrfToken, radios);
+        registerClickedCheckboxReporting("/utils/on-input", csrfToken, checkboxes);
+        registerChangedSelectionReporting("/utils/on-input", csrfToken, selects);
+        reportLoadedPage(`/utils/loaded-page`, csrfToken, "final_questionnaire");
+    }
+})
+</script>
+
+{% if footer_override is defined and footer_override is not none %}
+  <div class="footerDiv mt-3">
+    {{ footer_override | safe}}
+  </div>
+</body>
+</html>
+{% else %}
+{% include 'footer.html' %}
+{% endif %}
