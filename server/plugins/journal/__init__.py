@@ -301,6 +301,107 @@ class EASER_pretrained:
         return np.argsort(-probs)[:k].tolist()
 
 
+# If all_items is false, we only look into 1000 items with highest relevance score
+# do_normalize -> whether we normalize the diversity support
+def get_diversified_top_k_lists(k, random_users, rel_scores, rel_scores_normed,
+                                alpha, items, diversity_function, diversity_cdf,
+                                rating_matrix,
+                                n_items_subset=None, do_normalize=False, unit_normalize=False, rnd_mixture=False):
+    start_time = time.perf_counter()
+    top_k_lists = np.zeros(shape=(random_users.size, k), dtype=np.int32)
+    scores = np.zeros(shape=(items.size if n_items_subset is None else n_items_subset, ), dtype=np.float32)
+    mgains = np.zeros(shape=(items.size if n_items_subset is None else n_items_subset, ), dtype=np.float32)
+
+    assert rel_scores.shape == rel_scores_normed.shape
+    
+    # User normalized relevance scores
+    if do_normalize:
+        rel_scores = rel_scores_normed
+    
+    # Sort relevances
+    sorted_relevances = np.argsort(-rel_scores, axis=-1)
+   
+    divs = []
+   
+    # Iterate over the random users sample
+    for user_idx, random_user in enumerate(random_users):
+        
+        #print(f"User_idx = {user_idx}, user={random_user}")
+        
+        # If n_items_subset is specified, we take subset of items
+        if n_items_subset is None:
+            source_items = items
+        else:
+            if rnd_mixture:
+                #print(f"Using random mixture")
+                assert n_items_subset % 2 == 0, f"When using random mixture we expect n_items_subset ({n_items_subset}) to be divisible by 2"
+                source_items = np.concatenate([sorted_relevances[user_idx, :n_items_subset//2], np.random.choice(sorted_relevances[user_idx, n_items_subset:], n_items_subset//2, replace=False)])
+            else:
+                source_items = sorted_relevances[user_idx, :n_items_subset]
+            
+        #print(f"Source items are: {source_items}")
+        
+        # Mask-out seen items by multiplying with zero
+        # i.e. 1 is unseen
+        # 0 is seen
+        seen_items_mask = np.ones(shape=(random_users.size, source_items.size), dtype=np.int8)
+        seen_items_mask[rating_matrix[np.ix_(random_users, source_items)] > 0.0] = 0
+        
+        #print(f"Seen items mask: {seen_items_mask}")
+        
+        # Build the recommendation incrementally
+        for i in range(k):
+            # Cache f_prev
+            st = time.perf_counter()
+            f_prev = diversity_function(top_k_lists[user_idx, :i])
+            #print(f"\ti={i}, f_prev={f_prev}")
+           
+            # For every source item, try to add it and calculate its marginal gain
+            st = time.perf_counter()
+            for j, item in enumerate(source_items):
+                top_k_lists[user_idx, i] = item # try extending the list
+                mgains[j] = (diversity_function(top_k_lists[user_idx, :i+1]) - f_prev)
+                
+            # If we should normalize, use cdf_div to normalize marginal gains
+            if do_normalize:
+                # Reshape to N examples with single feature
+                mgains = diversity_cdf.transform(mgains.reshape(-1, 1)).reshape(mgains.shape)
+    
+            # Calculate scores
+            if unit_normalize:
+                # If we do unit normalization, we multiply with coefficients that sum to 1
+                scores = (1.0 - alpha) * rel_scores[user_idx, source_items] + alpha * mgains
+            else:
+                # Otherwise we just take relevance + diversity
+                scores = rel_scores[user_idx, source_items] + alpha * mgains
+                
+            if alpha == 0.0:
+                #print(f"Alpha is zero, we should only take relevance into account")
+                assert np.all(np.isclose(scores, rel_scores[user_idx, source_items]))
+            elif alpha == 1.0:
+                #print(f"Alpha is one, we should only take diversity into account")
+                assert np.all(np.isclose(scores, mgains))
+                
+            # assert np.all(scores >= 0.0) and np.all(scores <= 1.0)
+            # Ensure seen items get lowest score of 0
+            scores = scores * seen_items_mask[user_idx]
+    
+            # Get item with highest score
+            # But beware that this is index inside "scores"
+            # which has same size as subset of rnd_items
+            # so we need to map item index to actual item later on
+            best_item_idx = scores.argmax()
+            best_item = source_items[best_item_idx]
+            #print(f"Best item idx = {best_item_idx}, best item: {best_item}, best item score={scores[best_item_idx]}, mgain: {mgains[best_item_idx]}, rel: {rel_scores[user_idx, best_item_idx]}")
+            
+            # Select the best item and append it to the recommendation list            
+            top_k_lists[user_idx, i] = best_item
+            # Mask out the item so that we do not recommend it again
+            seen_items_mask[user_idx, best_item_idx] = 0
+
+    print(f"Diversification took: {time.perf_counter() - start_time}")
+    return top_k_lists
+
 @bp.route("/metric-assesment", methods=["GET"])
 def metric_assesment():
     start_time = time.perf_counter()
@@ -323,6 +424,9 @@ def metric_assesment():
     algo.load(os.path.join(get_cache_path(get_semi_local_cache_name(loader)), "item_item.npy"))
     
     
+    x1 = get_diversified_top_k_lists(k=k, )
+
+
     # cb_ild = intra_list_diversity(loader.distance_matrix)
     # cf_ild = intra_list_diversity(loader.distance_matrix)
     # bin_div = binomial_diversity(loader.all_categories, loader.get_item_index_categories, loader.rating_matrix, 0.0)
