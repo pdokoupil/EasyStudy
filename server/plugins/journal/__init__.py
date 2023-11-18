@@ -90,7 +90,7 @@ def on_joined():
             continuation_url=url_for("journal.send_feedback"),
             consuming_plugin=__plugin_name__,
             initial_data_url=url_for('fastcompare.get_initial_data'),
-            search_item_url=url_for('utils.movie_search')
+            search_item_url=url_for('fastcompare.item_search')
         )
     )
 
@@ -124,7 +124,7 @@ def send_feedback():
     # Get a loader
     loader_factory = load_data_loaders()[conf["selected_data_loader"]]
     loader = loader_factory(**filter_params(conf["data_loader_parameters"], loader_factory))
-    load_data_loader(loader, session["user_study_guid"], loader_factory.name(), get_semi_local_cache_name(loader))
+    loader = load_data_loader_cached(loader, session["user_study_guid"], loader_factory.name(), get_semi_local_cache_name(loader))
 
     # Movie indices of selected movies
     selected_movies = request.args.get("selectedMovies")
@@ -288,9 +288,9 @@ class EASER_pretrained:
     @functools.lru_cache(maxsize=None)
     def load(self, path):
         self.item_item = np.load(path)
+        assert self.item_item.shape[0] == self.item_item.shape[1] == self.all_items.size
 
-    # Predict for the user
-    def predict(self, selected_items, filter_out_items, k):
+    def predict_with_score(self, selected_items, filter_out_items, k):
         candidates = np.setdiff1d(self.all_items, selected_items)
         candidates = np.setdiff1d(candidates, filter_out_items)
         if selected_items.size == 0:
@@ -298,7 +298,15 @@ class EASER_pretrained:
         user_vector = np.zeros(shape=(self.all_items.size,), dtype=self.item_item.dtype)
         user_vector[selected_items] = 1
         probs = np.dot(user_vector, self.item_item)
-        return np.argsort(-probs)[:k].tolist()
+        # Mask out selected items
+        probs[selected_items] = np.NINF
+        # Mask out items to be filtered
+        probs[filter_out_items] = np.NINF
+        return probs, user_vector, np.argsort(-probs)[:k].tolist()
+
+    # Predict for the user
+    def predict(self, selected_items, filter_out_items, k):
+        return self.predict_with_score(selected_items, filter_out_items, k)[2]
 
 
 # If all_items is false, we only look into 1000 items with highest relevance score
@@ -311,6 +319,8 @@ def get_diversified_top_k_lists(k, random_users, rel_scores, rel_scores_normed,
     top_k_lists = np.zeros(shape=(random_users.size, k), dtype=np.int32)
     scores = np.zeros(shape=(items.size if n_items_subset is None else n_items_subset, ), dtype=np.float32)
     mgains = np.zeros(shape=(items.size if n_items_subset is None else n_items_subset, ), dtype=np.float32)
+
+    NEG_INF = int(-10e6)
 
     assert rel_scores.shape == rel_scores_normed.shape
     
@@ -374,7 +384,7 @@ def get_diversified_top_k_lists(k, random_users, rel_scores, rel_scores_normed,
             else:
                 # Otherwise we just take relevance + diversity
                 scores = rel_scores[user_idx, source_items] + alpha * mgains
-                
+
             if alpha == 0.0:
                 #print(f"Alpha is zero, we should only take relevance into account")
                 assert np.all(np.isclose(scores, rel_scores[user_idx, source_items]))
@@ -384,8 +394,13 @@ def get_diversified_top_k_lists(k, random_users, rel_scores, rel_scores_normed,
                 
             # assert np.all(scores >= 0.0) and np.all(scores <= 1.0)
             # Ensure seen items get lowest score of 0
-            scores = scores * seen_items_mask[user_idx]
-    
+            # Just multiplying by zero does not work when scores are not normalized to be always positive
+            # because masked-out items will not have smallest score (some valid, non-masked ones can be negative)
+            # scores = scores * seen_items_mask[user_idx]
+            # So instead we do scores = scores * seen_items_mask[user_idx] + NEG_INF * (1 - seen_items_mask[user_idx])
+            assert scores.min() < NEG_INF, "NEG_INF is not smaller than any valid score"
+            scores = scores * seen_items_mask[user_idx] + NEG_INF * (1 - seen_items_mask[user_idx])
+
             # Get item with highest score
             # But beware that this is index inside "scores"
             # which has same size as subset of rnd_items
@@ -401,6 +416,10 @@ def get_diversified_top_k_lists(k, random_users, rel_scores, rel_scores_normed,
 
     print(f"Diversification took: {time.perf_counter() - start_time}")
     return top_k_lists
+
+@functools.lru_cache(maxsize=None)
+def get_distance_matrix_cb(path):
+    return np.load(path)
 
 @bp.route("/metric-assesment", methods=["GET"])
 def metric_assesment():
@@ -419,45 +438,83 @@ def metric_assesment():
     # TODO get TRUE CB
     k = 10
     items = np.array(list(loader.item_index_to_id.keys()))
-    
+
     algo = EASER_pretrained(items)
     algo.load(os.path.join(get_cache_path(get_semi_local_cache_name(loader)), "item_item.npy"))
+    print(f"Took 2+:", time.perf_counter() - start_time)
+    print(f"@@ {loader.get_item_id(270)}, {loader.get_item_index(333)}, {loader.get_item_index_description(270)}, {loader.get_item_id_description(333)}")
+    # Movie indices of selected movies
+    elicitation_selected = np.array(session["elicitation_selected_movies"])
+    rel_scores, user_vector, ease_pred = algo.predict_with_score(elicitation_selected, elicitation_selected, k)
+    rel_scores = rel_scores[np.newaxis, :]
+    rel_scores_normed = rel_scores
+    user_vector = user_vector[np.newaxis, :]
     
-    
-    x1 = get_diversified_top_k_lists(k=k, )
+    print(f"Elicitation selected: {elicitation_selected}")
+    print(f"Ease pred: {ease_pred}")
+    print(f"Rel scores: {rel_scores[0, ease_pred]}")
 
+    # print(f"## Elicitation selected movies = {elicitation_selected}")
+    # user_row = np.zeros(shape=(1, items.size), dtype=np.int32)
+    # if elicitation_selected.size > 0:
+    #     user_row[0, elicitation_selected] = 1
+    # rel_scores = np.dot(user_row, algo.item_item)
+    # rel_scores_normed = rel_scores
+    print(f"Took 2++:", time.perf_counter() - start_time)
+    distance_matrix_cb = get_distance_matrix_cb(os.path.join(get_cache_path(get_semi_local_cache_name(loader)), "distance_matrix_text.npy"))
+    print(f"Distance matrix CB loading took: {time.perf_counter() - start_time}")
 
-    # cb_ild = intra_list_diversity(loader.distance_matrix)
-    # cf_ild = intra_list_diversity(loader.distance_matrix)
-    # bin_div = binomial_diversity(loader.all_categories, loader.get_item_index_categories, loader.rating_matrix, 0.0)
-    # rnd_cb_ild = RandomMaximizingRecommendationGenertor(cb_ild, k, items)
-    # rnd_cf_ild = RandomMaximizingRecommendationGenertor(cf_ild, k, items)
-    # rnd_bin_div = RandomMaximizingRecommendationGenertor(bin_div, k, items)
+    cb_ild = intra_list_diversity(distance_matrix_cb)
+    cf_ild = intra_list_diversity(loader.distance_matrix)
+    bin_div = binomial_diversity(loader.all_categories, loader.get_item_index_categories, loader.rating_matrix, 0.0, loader.name())
+
     print(f"Took 3:", time.perf_counter() - start_time)
 
+    try:
+        alpha = float(request.args.get("alpha"))
+    except:
+        alpha = 1.0
     # r1 = enrich_results(next(rnd_cb_ild)[1], loader)
     # r2 = enrich_results(next(rnd_cf_ild)[1], loader)
     # r3 = enrich_results(next(rnd_bin_div)[1], loader)
-    r1 = enrich_results(algo.predict(np.random.choice(items, 10, replace=False), [], k), loader)
+    ease_baseline = enrich_results(ease_pred, loader)
     print(f"Predicting r1 took: {time.perf_counter() - start_time}")
-    r2 = enrich_results(algo.predict(np.random.choice(items, 10, replace=False), [], k), loader)
+    r2 = get_diversified_top_k_lists(k, np.array([0]), rel_scores, rel_scores_normed,
+                                alpha=alpha, items=items, diversity_function=cf_ild, diversity_cdf=None,
+                                rating_matrix=user_vector,
+                                n_items_subset=500, do_normalize=False, unit_normalize=True, rnd_mixture=True)
+    r2 = enrich_results(r2[0], loader)
     print(f"Predicting r2 took: {time.perf_counter() - start_time}")
-    r3 = enrich_results(algo.predict(np.random.choice(items, 10, replace=False), [], k), loader)
+    r3 = get_diversified_top_k_lists(k, np.array([0]), rel_scores, rel_scores_normed,
+                                alpha=alpha, items=items, diversity_function=cb_ild, diversity_cdf=None,
+                                rating_matrix=user_vector,
+                                n_items_subset=500, do_normalize=False, unit_normalize=True, rnd_mixture=True)
+    r3 = enrich_results(r3[0], loader)
     print(f"Predicting r3 took: {time.perf_counter() - start_time}")
+    r4 = get_diversified_top_k_lists(k, np.array([0]), rel_scores, rel_scores_normed,
+                                alpha=alpha, items=items, diversity_function=bin_div, diversity_cdf=None,
+                                rating_matrix=user_vector,
+                                n_items_subset=500, do_normalize=False, unit_normalize=True, rnd_mixture=True)
+    r4 = enrich_results(r4[0], loader)
+    print(f"Predicting r4 took: {time.perf_counter() - start_time}")
 
     params = {
         "movies": {
-            "CB-ILD": {
-                "movies": r1,
+            "EASE": {
+                "movies": ease_baseline,
                 "order": 0
             },
-            "CF-ILD": {
+            "CB-ILD": {
                 "movies": r2,
                 "order": 1
             },
-            "Binomial": {
+            "CF-ILD": {
                 "movies": r3,
                 "order": 2
+            },
+            "Binomial": {
+                "movies": r4,
+                "order": 3
             }
          }
     }
@@ -481,6 +538,7 @@ def metric_assesment():
         if "footer" in conf["text_overrides"]:
             params["footer_override"] = conf["text_overrides"]["footer"]
     print(f"Took 6:", time.perf_counter() - start_time)
+    params["alpha"] = alpha
     return render_template("metric_assesment.html", **params)
 
 # from plugins.layoutshuffling import long_initialization
