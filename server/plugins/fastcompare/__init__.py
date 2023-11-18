@@ -173,26 +173,23 @@ def get_initial_data():
     el_movies = session["elicitation_movies"]
 
     config = load_user_study_config(session["user_study_id"])
-    
+
     loader_factory = load_data_loaders()[config["selected_data_loader"]]
     loader = loader_factory(**filter_params(config["data_loader_parameters"], loader_factory))
-    load_data_loader(loader, session["user_study_guid"], loader_factory.name(), get_semi_local_cache_name(loader))
-    
+    loader = load_data_loader_cached(loader, session["user_study_guid"], loader_factory.name(), get_semi_local_cache_name(loader))
     elicitation_factory = load_preference_elicitations()[config["selected_preference_elicitation"]]
     elicitation = elicitation_factory(
         loader=loader,
         **filter_params(config["preference_elicitation_parameters"], elicitation_factory)
     )
-    load_preference_elicitation(elicitation, session["user_study_guid"], elicitation_factory.name(), get_semi_local_cache_name(loader))
+    elicitation = load_preference_elicitation_cached(elicitation, session["user_study_guid"], elicitation_factory.name(), get_semi_local_cache_name(loader))
 
     x = load_data(loader, elicitation, el_movies)
 
     tr = get_tr(languages, get_lang())
-
     for i in range(len(x)):
         input_name = f"{config['selected_data_loader']}_{x[i]['movie_id']}"
         x[i]["movie"] = tr(input_name, x[i]['movie']) + " " + "|".join([tr(f"genre_{y.lower()}") for y in x[i]["genres"]])
-    
     el_movies.extend(x)
     session["elicitation_movies"] = el_movies
 
@@ -236,7 +233,6 @@ def search_for_item(pattern, tr=None):
 
 @bp.route("/item-search", methods=["GET"])
 def item_search():
-    print('caalled')
     pattern = request.args.get("pattern")
     if not pattern:
         return make_response("", 404)
@@ -572,6 +568,12 @@ def load_algorithm(algorithm, guid, algorithm_displayed_name, semi_local_cache_n
 # Elicitation may have some internal state as well, so we load it as well
 def load_preference_elicitation(elicitation, guid, elicitation_name, semi_local_cache_name):
     elicitation.load(get_cache_path(guid, elicitation_name), get_cache_path("", elicitation_name), get_cache_path(semi_local_cache_name, elicitation_name))
+
+# Elicitation may have some internal state as well, so we load it as well
+@cached(cache={}, key=lambda data_loader, guid, elicitation_name, semi_local_cache_name: f"{guid}/{elicitation_name}")
+def load_preference_elicitation_cached(elicitation, guid, elicitation_name, semi_local_cache_name):
+    elicitation.load(get_cache_path(guid, elicitation_name), get_cache_path("", elicitation_name), get_cache_path(semi_local_cache_name, elicitation_name))
+    return elicitation
 
 # Dataset loaders also may have internal state, load them as well
 def load_data_loader(data_loader, guid, loader_name, semi_local_cache_name):
