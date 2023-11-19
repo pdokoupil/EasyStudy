@@ -33,6 +33,7 @@ languages = load_languages(os.path.dirname(__file__))
 
 N_ITERATIONS = 6 # 6 iterations
 HIDE_LAST_K = 100000
+NEG_INF = int(-10e6)
 
 # Implementation of this function can differ among plugins
 def get_lang():
@@ -298,10 +299,14 @@ class EASER_pretrained:
         user_vector = np.zeros(shape=(self.all_items.size,), dtype=self.item_item.dtype)
         user_vector[selected_items] = 1
         probs = np.dot(user_vector, self.item_item)
+
+        # Here the NEG_INF used for masking must be STRICTLY smaller than probs predicted by the algorithms
+        # So that the masking works properly
+        assert NEG_INF < probs.min()
         # Mask out selected items
-        probs[selected_items] = np.NINF
+        probs[selected_items] = NEG_INF
         # Mask out items to be filtered
-        probs[filter_out_items] = np.NINF
+        probs[filter_out_items] = NEG_INF
         return probs, user_vector, np.argsort(-probs)[:k].tolist()
 
     # Predict for the user
@@ -319,8 +324,6 @@ def get_diversified_top_k_lists(k, random_users, rel_scores, rel_scores_normed,
     top_k_lists = np.zeros(shape=(random_users.size, k), dtype=np.int32)
     scores = np.zeros(shape=(items.size if n_items_subset is None else n_items_subset, ), dtype=np.float32)
     mgains = np.zeros(shape=(items.size if n_items_subset is None else n_items_subset, ), dtype=np.float32)
-
-    NEG_INF = int(-10e6)
 
     assert rel_scores.shape == rel_scores_normed.shape
     
@@ -384,14 +387,6 @@ def get_diversified_top_k_lists(k, random_users, rel_scores, rel_scores_normed,
             else:
                 # Otherwise we just take relevance + diversity
                 scores = rel_scores[user_idx, source_items] + alpha * mgains
-
-            if alpha == 0.0:
-                #print(f"Alpha is zero, we should only take relevance into account")
-                assert np.all(np.isclose(scores, rel_scores[user_idx, source_items]))
-            elif alpha == 1.0:
-                #print(f"Alpha is one, we should only take diversity into account")
-                assert np.all(np.isclose(scores, mgains))
-                
             # assert np.all(scores >= 0.0) and np.all(scores <= 1.0)
             # Ensure seen items get lowest score of 0
             # Just multiplying by zero does not work when scores are not normalized to be always positive
@@ -399,6 +394,9 @@ def get_diversified_top_k_lists(k, random_users, rel_scores, rel_scores_normed,
             # scores = scores * seen_items_mask[user_idx]
             # So instead we do scores = scores * seen_items_mask[user_idx] + NEG_INF * (1 - seen_items_mask[user_idx])
             min_score = scores.min()
+            # Unlike in predict_with_score, here we do not mandate NEG_INF to be strictly smaller
+            # because rel_scores may already contain some NEG_INF that was set by predict_with_score
+            # called previously -> so we allow <=.
             assert NEG_INF <= min_score, f"min_score ({min_score}) is not smaller than NEG_INF ({NEG_INF})"
             scores = scores * seen_items_mask[user_idx] + NEG_INF * (1 - seen_items_mask[user_idx])
 
@@ -437,7 +435,7 @@ def metric_assesment():
     print(f"Took 2:", time.perf_counter() - start_time)
 
     # TODO get TRUE CB
-    k = 10
+    k = 8 # We use k=8 instead of k=10 so that items fit to screen easily
     items = np.array(list(loader.item_index_to_id.keys()))
 
     algo = EASER_pretrained(items)
@@ -527,11 +525,11 @@ def metric_assesment():
     params["cagliari_university"] = tr("footer_cagliari_university")
     params["t1"] = tr("footer_t1")
     params["t2"] = tr("footer_t2")
-    params["title"] = tr("questionnaire_title")
-    params["header"] = tr("questionnaire_header")
-    params["hint"] = tr("questionnaire_hint")
+    params["title"] = tr("metric_assesment_title")
+    params["header"] = tr("metric_assesment_header")
+    params["hint"] = tr("metric_assesment_hint")
     params["continuation_url"] = request.args.get("continuation_url")
-    params["finish"] = tr("questionnaire_finish")
+    params["finish"] = tr("metric_assesment_finish")
     print(f"Took 5:", time.perf_counter() - start_time)
     # Handle overrides
     params["footer_override"] = None
