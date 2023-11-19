@@ -398,7 +398,8 @@ def get_diversified_top_k_lists(k, random_users, rel_scores, rel_scores_normed,
             # because masked-out items will not have smallest score (some valid, non-masked ones can be negative)
             # scores = scores * seen_items_mask[user_idx]
             # So instead we do scores = scores * seen_items_mask[user_idx] + NEG_INF * (1 - seen_items_mask[user_idx])
-            assert scores.min() < NEG_INF, "NEG_INF is not smaller than any valid score"
+            min_score = scores.min()
+            assert NEG_INF <= min_score, f"min_score ({min_score}) is not smaller than NEG_INF ({NEG_INF})"
             scores = scores * seen_items_mask[user_idx] + NEG_INF * (1 - seen_items_mask[user_idx])
 
             # Get item with highest score
