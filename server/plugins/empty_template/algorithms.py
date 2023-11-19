@@ -3,7 +3,6 @@ from tempfile import TemporaryDirectory
 import time
 import numpy as np
 import pandas as pd
-import torch
 from plugins.fastcompare.algo.algorithm_base import AlgorithmBase, PreferenceElicitationBase, DataLoaderBase, Parameter, ParameterType
 
 # Tensorflow setting
