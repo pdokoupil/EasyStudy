@@ -76,7 +76,7 @@ def signup_post():
             return "The user already exists" #flask.redirect(flask.url_for('auth.signup'))
 
         # create new user with the form data. Hash the password so plaintext version isn't saved.
-        new_user = User(email=form.email.data, password=generate_password_hash(form.password.data, method='sha256'))
+        new_user = User(email=form.email.data, password=generate_password_hash(form.password.data))
 
         # add the new user to the database
         db.session.add(new_user)
