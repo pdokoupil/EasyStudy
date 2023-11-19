@@ -1,8 +1,20 @@
 {% include 'header.html' %}
+<style>
+    .verticalSeparator {
+        border-left: 10px solid red;
+    }
 
+    .footerDiv {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        height: 30px;
+        max-height: 3vh;
+    }
+</style>
 <div id="app">
     <b-container fluid>
-        <b-jumbotron class="smallJumbotron" header="{{header}}" lead="">
+        <b-jumbotron style="max-height: 7vh;" class="smallJumbotron" header="{{header}}" lead="">
             {{hint}}
         </b-jumbotron>
     
@@ -17,20 +29,20 @@
             </b-col>
         </b-row> -->
 
-        <b-row align-h="center">
+        <b-row align-h="center" style="max-height: 3vh;">
             <b-col class="text-center">
-                <h1>Alpha = {{alpha}}</h1>
+                <h3>Alpha = {{alpha}}</h3>
             </b-col>
         </b-row>
         
-        <b-row class="ml-1 mr-1">
-            <b-col v-for="variantResults in variantsResults" :set="algoIdx = variantsResults.indexOf(variantResults)" :class="variantsResults.indexOf(variantResults) != 0 ? 'verticalSeparator' : ''">
-                <b-row align-h="center">
+        <b-row class="ml-1 mr-1" style="height: 85vh;">
+            <!-- Prevent the column from overflow in vertical direction -->
+            <b-col class="row-container" style="display: flex; flex-direction: column; overflow: hidden; height: 100%;" v-for="variantResults in variantsResults" :set="algoIdx = variantsResults.indexOf(variantResults)" :class="variantsResults.indexOf(variantResults) != 0 ? 'verticalSeparator' : ''">
+                <b-row style="flex: 1; display: flex; align-items: stretch;" align-h="center">
                     <h5>{{algorithm}} [[ variantNames[algoIdx] ]]</h5>
                 </b-row>
-                <b-row align-h="center" class="mb-1 mt-1" v-for="row in variantResults">
-                    <b-col sm="auto" class="align-middle" v-for="col in row">
-                        <div>
+                <b-row align-h="center" class="custom-row" v-for="row in variantResults">
+                    <b-col cols="auto" style="height: 100%; margin-left: 1px; margin-right: 1px; padding-left: 0; padding-right: 0;" class="align-middle" v-for="col in row">
                             <b-popover @show="popoverShown" @hidden="popoverHidden" :target="variantNames[algoIdx] + '_' + col.movie_idx" triggers="hover" placement="right">
                                 <template #title>[[col.movie]]</template>
                                  <div>
@@ -42,27 +54,12 @@
                                  </div>
                                  
                             </b-popover>
-                            <b-img @mouseenter="itemMouseEnter" @mouseleave="itemMouseLeave" :id="variantNames[algoIdx] + '_' + col.movie_idx" style="width: 175px; height: 260px;" block center :src="col.url" v-on:click="onSelectMovie($event, col, variantsResults.indexOf(variantResults))" :name="col.movie_idx" :alt="col.movie" />
-                        </div>
-                    </b-col>
-                </b-row>
-                <b-row align-h="center">
-                    <b-col sm="4">
-                        <label for="rating-sm" class="mt-1">{{algorithm_satisfaction}}</label>
-                        <b-form-rating :variant="algorithmRatingVariant(variantsResults.indexOf(variantResults))" v-on:change="onAlgorithmRatingChanged($event, variantsResults.indexOf(variantResults))" show-value show-value-max id="rating-sm" size="sm"></b-form-rating>
+                            <b-img @mouseenter="itemMouseEnter" @mouseleave="itemMouseLeave" :id="variantNames[algoIdx] + '_' + col.movie_idx" style="height: 99%;" block center :src="col.url" v-on:click="onSelectMovie($event, col, variantsResults.indexOf(variantResults))" :name="col.movie_idx" :alt="col.movie" />
                     </b-col>
                 </b-row>
             </b-col>
         </b-row>
         <hr>
-        <b-row v-if="!selected.length" class="mt-2" align-h="center">
-            <b-form-checkbox
-                :state="dontLikeAnythingState"    
-                v-model="dontLikeAnythingValue"
-            >
-                {{like_nothing}}
-            </b-form-checkbox>
-        </b-row>
 
     </b-container>
 </div>
@@ -82,7 +79,7 @@
     var refinementLayout = "{{refinement_layout}}";
     var defaultRefinementValidated = refinementLayout != "4";
     
-    var itemsPerRow = 1; // Single item per row (thus a column)
+    var itemsPerRow = 2; // Two columns per recommendation list
 
     function compare_ctx_lambda() {
         return {
@@ -171,6 +168,19 @@
         }
     },
     methods: {
+        setRowHeights() {
+            const containers = this.$el.querySelectorAll('.row-container');
+            for (let containerIdx = 0; containerIdx < containers.length; ++containerIdx) {
+                let container = containers[containerIdx];
+                const rows = container.querySelectorAll('.custom-row');
+                const numRows = rows.length;
+                const rowHeight = 100 / numRows; // Calculate height per row
+
+                rows.forEach(row => {
+                    row.style.height = `${rowHeight}%`; // Set the height for each row
+                });
+            }
+        },
         onTrailerWatch(movieData) {
             reportOnInput("/utils/on-input", csrfToken, "link", movieData);
         },
@@ -297,6 +307,21 @@
         registerClickedCheckboxReporting("/utils/on-input", csrfToken, checkboxes);
         registerChangedSelectionReporting("/utils/on-input", csrfToken, selects);
         reportLoadedPage(`/utils/loaded-page`, csrfToken, "final_questionnaire");
+
+        this.setRowHeights();
+        window.addEventListener('resize', this.setRowHeights);
+
+        history.pushState(null, document.title, location.href);
+        window.addEventListener('popstate', function (event)
+        {
+            history.pushState(null, document.title, location.href);
+            reportError("/utils/on-message", csrfToken, window.location.href, "Attempt to navigate back", ()=> {
+                return {"type": "Navigate back", "iteration": iteration};
+            });
+        });
+    },
+    beforeDestroy() {
+        window.removeEventListener('resize', this.setRowHeights); // Remove event listener on component destroy
     }
 })
 </script>
