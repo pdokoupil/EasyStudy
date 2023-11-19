@@ -21,8 +21,6 @@ from plugins.utils.rlprop_wrapper import get_supports
 
 import pandas as pd
 
-loader = load_ml_dataset()
-
 
 import functools
 
@@ -1390,6 +1388,8 @@ def show_differences(df_interaction, df_elicitation_selections, df_impressions, 
     return results, results2
 
 if __name__ == "__main__":
+    global loader
+    loader = load_ml_dataset()
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--reranking", action="store_true", default=False)
