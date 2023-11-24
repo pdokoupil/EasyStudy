@@ -15,6 +15,7 @@ import argparse
 [sys.path.append(i) for i in ['../.', '../..', '../../.']]
 
 import tensorflow as tf
+tf.get_logger().setLevel('ERROR')
 
 from plugins.utils.preference_elicitation import prepare_tf_model, load_ml_dataset, prepare_wrapper, weighted_average_strategy, rlprop, weighted_average, recommend_2_3
 from plugins.utils.rlprop_wrapper import get_supports

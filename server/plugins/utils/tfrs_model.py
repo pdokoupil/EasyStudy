@@ -1,4 +1,5 @@
 import tensorflow as tf
+tf.get_logger().setLevel('ERROR')
 import tensorflow_recommenders as tfrs
 
 from typing import Dict, Text

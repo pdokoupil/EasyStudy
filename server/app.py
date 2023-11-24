@@ -6,6 +6,8 @@ from flask_wtf.csrf import CSRFProtect
 
 from flask_session import Session
 
+#from werkzeug.middleware.profiler import ProfilerMiddleware
+
 db = SQLAlchemy()
 pm = PluginManager(plugins_folder="plugins")
 csrf = CSRFProtect()
@@ -52,6 +54,8 @@ def initialize_db_tables():
 
 def create_app():
     app = flask.Flask(__name__)
+    #app.wsgi_app = ProfilerMiddleware(app.wsgi_app)
+
 
     app.config['SECRET_KEY'] = '8bf29bd88d0bfb94509f5fb0'
     app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///db.sqlite'

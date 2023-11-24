@@ -5,6 +5,7 @@ from plugins.fastcompare.algo.algorithm_base import AlgorithmBase, Parameter, Pa
 from plugins.utils.tfrs_model import get_model_mf
 
 import tensorflow as tf
+tf.get_logger().setLevel('ERROR')
 
 class TFRecommendersWrapper(AlgorithmBase, ABC):
     def __init__(self, loader, model, epochs, **kwargs):

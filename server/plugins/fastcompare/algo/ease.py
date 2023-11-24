@@ -3,6 +3,7 @@ from abc import ABC
 import numpy as np
 import pandas as pd
 import tensorflow as tf
+tf.get_logger().setLevel('ERROR')
 from plugins.fastcompare.algo.algorithm_base import (
     AlgorithmBase,
     Parameter,

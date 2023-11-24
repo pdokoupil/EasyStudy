@@ -7,6 +7,7 @@ from plugins.fastcompare.algo.algorithm_base import AlgorithmBase, PreferenceEli
 
 # Tensorflow setting
 import tensorflow as tf
+tf.get_logger().setLevel('ERROR')
 
 
 
