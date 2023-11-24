@@ -1,5 +1,6 @@
 import numpy as np
 import tensorflow as tf
+tf.get_logger().setLevel('ERROR')
 
 def cos_sim_tf(a, b=None):
     if b is None:
@@ -13,4 +14,4 @@ def cos_sim_tf(a, b=None):
 def cos_sim_np(a):
     a = a / np.linalg.norm(a, axis=1, keepdims=True)        
     res = a @ a.T
-    return res
+    return res.astype(np.float32)

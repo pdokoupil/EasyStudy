@@ -13,6 +13,7 @@ import pickle
 
 
 import tensorflow as tf
+tf.get_logger().setLevel('ERROR')
 tf.config.set_visible_devices([], 'GPU') # Disable GPU because of adagrad issues
 # tf.random.set_seed(42)
 # np.random.seed(42)
