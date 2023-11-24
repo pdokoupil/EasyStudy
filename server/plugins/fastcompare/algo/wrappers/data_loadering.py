@@ -354,7 +354,7 @@ class MLGenomeDataLoader(DataLoaderBase):
         self._ratings_df = self._ratings_df.drop_duplicates(subset=['item_id', 'user_id'], keep='last')
 
         rating_matrix_df = self._ratings_df.reset_index().pivot(index='user_id', columns='item_id', values="rating").fillna(0)
-        self._rating_matrix = rating_matrix_df.values
+        self._rating_matrix = rating_matrix_df.values.astype(np.int8)
         print("LOADER below filtering3", time.strftime("%H:%M:%S", time.localtime()))
 
         self.item_id_to_index = {item_id : item_index for item_index, item_id in enumerate(rating_matrix_df.columns)}
@@ -365,6 +365,7 @@ class MLGenomeDataLoader(DataLoaderBase):
 
         print(f"## Loading took: {time.perf_counter() - start_time}")
         self._ratings_df = self._ratings_df.rename(columns={"user_id": "user"})
+        self._ratings_df = self._ratings_df.drop(columns=["starring", "avgRating", "directedBy"]) # Drop unused columns to reduce size
         self._ratings_df.loc[:, "item"] = self._ratings_df.item_id.map(lambda x: self.item_id_to_index[x])
         print("LOADER below filtering4", time.strftime("%H:%M:%S", time.localtime()))
         # TODO remove "movie" in column names to "item"
@@ -376,6 +377,7 @@ class MLGenomeDataLoader(DataLoaderBase):
         print("LOADER below filtering5", time.strftime("%H:%M:%S", time.localtime()))
 
         self._distance_matrix = 1.0 - cos_sim_np(self._rating_matrix.T)
+        assert self._distance_matrix.dtype == np.float32 and self._rating_matrix.dtype == np.int8
     # Returns dataframe with the interactions/ratings (be aware that implicit feedback is now considered)
     # There should be "user" and "item" columns in the dataframe
     @property
@@ -428,10 +430,14 @@ class MLGenomeDataLoader(DataLoaderBase):
 
     def get_item_index_categories(self, item_index):
         return self.movie_id_to_imdb_data[self.item_index_to_id[item_index]]["genres"]
-    
+
     def get_item_id_categories(self, item_id):
         return self.movie_id_to_imdb_data[item_id]["genres"]
 
+    def get_item_id_plot(self, item_id):
+        if len(self.movie_id_to_imdb_data[item_id]["plot"]) > 0:
+            return self.movie_id_to_imdb_data[item_id]["plot"][0] # Get the first of plots
+        return ""
 
     @classmethod
     def name(self):
@@ -440,6 +446,34 @@ class MLGenomeDataLoader(DataLoaderBase):
     @classmethod
     def parameters(self):
         return []
+    
+    def load(self, instance_cache_path, class_cache_path, semi_local_cache_path):
+        with open(semi_local_cache_path, "rb") as f:
+            data = pickle.load(f)
+        self.__dict__.update(data)
+        self.metadata_df_indexed = self.metadata_df.set_index("item_id")
+        
+        
+    def save(self, instance_cache_path, class_cache_path, semi_local_cache_path):
+        data = {
+            "_ratings_df": self._ratings_df,
+            "metadata_df": self.metadata_df,
+            "img_dir_path": self.img_dir_path,
+            "metadata_path": self.metadata_path,
+            "ratings_path": self.ratings_path,
+            "movie_data_path": self.movie_data_path,
+            "movie_id_to_imdb_data": self.movie_id_to_imdb_data,
+            "movie_id_to_url": self.movie_id_to_url,
+            "all_genres": self.all_genres,
+            "item_id_to_index": self.item_id_to_index,
+            "item_index_to_id": self.item_index_to_id,
+            "item_index_to_description": self.item_index_to_description,
+            "_distance_matrix": self._distance_matrix,
+            "_rating_matrix": self._rating_matrix
+        }
+        with open(semi_local_cache_path, "wb") as f:
+            pickle.dump(data, f)
+
 
 class GoodbooksDataLoader(DataLoaderBase):
 

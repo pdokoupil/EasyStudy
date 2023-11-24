@@ -1,4 +1,3 @@
-
 from plugins.fastcompare.algo.algorithm_base import Parameter, ParameterType, PreferenceElicitationBase
 from plugins.utils.multi_obj_sampling import MultiObjectiveSamplingFromBucketsElicitation
 from plugins.utils.popularity_sampling import PopularitySamplingElicitation, PopularitySamplingFromBucketsElicitation
@@ -11,22 +10,15 @@ from plugins.utils.helpers import cos_sim_np
 class MultiObjectiveSamplingFromBucketsElicitationWrapper(PreferenceElicitationBase):
     # Objectives is a dictionary mapping objective name to its implementation (e.g. we can use different implementations of diversity etc..)
     def __init__(self, loader, *args, **kwargs):
-        self.ratings_df = loader.ratings_df
-        self.elicitation = None
-        self.args = args
-        self.kwargs = kwargs
+        print(f"Distance matrix: {loader.distance_matrix.dtype}, {loader.distance_matrix.sum()}")
+        self.elicitation = MultiObjectiveSamplingFromBucketsElicitation(loader.rating_matrix, loader.distance_matrix, *args, **kwargs)
 
     def get_initial_data(self, movie_indices_to_ignore=[]):
         return self.elicitation.get_initial_data(movie_indices_to_ignore)
 
     def fit(self):
-        if "rating" not in self.ratings_df:
-            self.ratings_df.loc[:, "rating"] = 1
-        rating_matrix = self.ratings_df.pivot(index='user', columns='item', values="rating").fillna(0).values
-        #similarity_matrix = 1.0 - np.float32(squareform(pdist(rating_matrix.T, "cosine")))
-        # Faster, numpy-based implementation
-        similarity_matrix = cos_sim_np(rating_matrix.T)
-        self.elicitation = MultiObjectiveSamplingFromBucketsElicitation(rating_matrix, similarity_matrix, *self.args, **self.kwargs)
+        # No fitting is needed
+        pass
 
     @classmethod
     def name(cls):
@@ -40,6 +32,14 @@ class MultiObjectiveSamplingFromBucketsElicitationWrapper(PreferenceElicitationB
             Parameter("n_novelty_buckets", ParameterType.INT, 2, help_key="n_novelty_buckets"),
             Parameter("n_samples_per_bucket", ParameterType.INT, 4, help_key="n_samples_per_bucket"),
         ]
+    
+    def load(self, instance_cache_path, class_cache_path, semi_local_cache_path):
+        # Do not load anything
+        pass
+
+    def save(self, instance_cache_path, class_cache_path, semi_local_cache_path):
+        # Do not save anything
+        pass
 
 import numpy as np
 from plugins.fastcompare.algo.algorithm_base import PreferenceElicitationBase, Parameter, ParameterType
