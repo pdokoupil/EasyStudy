@@ -1,9 +1,12 @@
 from abc import ABC
 import functools
+import pickle
 import random
 import sys
 import os
 import time
+
+from plugins.fastcompare.algo.wrappers.data_loadering import MLGenomeDataLoader
 
 
 
@@ -19,15 +22,17 @@ from sqlalchemy.orm import Session
 import numpy as np
 
 from common import get_tr, load_languages, multi_lang, load_user_study_config
-from flask import Blueprint, request, redirect, render_template, url_for, session
+from flask import Blueprint, jsonify, make_response, request, redirect, render_template, url_for, session
 
 from plugins.utils.preference_elicitation import recommend_2_3, rlprop, weighted_average, get_objective_importance, prepare_tf_model, calculate_weight_estimate, load_ml_dataset, enrich_results
 from plugins.utils.interaction_logging import log_interaction, log_message
 from plugins.fastcompare.loading import load_data_loaders
-from plugins.fastcompare import elicitation_ended, filter_params, iteration_started, iteration_ended, load_data_loader, load_data_loader_cached
+from plugins.fastcompare import elicitation_ended, filter_params, iteration_started, iteration_ended, load_data_loader, load_data_loader_cached, search_for_item
 #from plugins.multiobjective import prepare_recommendations
 from plugins.fastcompare import prepare_recommendations, get_semi_local_cache_name, get_cache_path
 from plugins.journal.metrics import binomial_diversity, intra_list_diversity
+
+#from memory_profiler import profile
 
 languages = load_languages(os.path.dirname(__file__))
 
@@ -91,7 +96,7 @@ def on_joined():
             continuation_url=url_for("journal.send_feedback"),
             consuming_plugin=__plugin_name__,
             initial_data_url=url_for('fastcompare.get_initial_data'),
-            search_item_url=url_for('fastcompare.item_search')
+            search_item_url=url_for('journal.item_search')
         )
     )
 
@@ -113,6 +118,23 @@ def plugin_name():
     return {
         "plugin_name": __plugin_name__
     }
+
+@bp.route("/item-search", methods=["GET"])
+def item_search():
+    pattern = request.args.get("pattern")
+    if not pattern:
+        return make_response("", 404)
+    
+    conf = load_user_study_config(session["user_study_id"])
+    
+    ## TODO get_loader helper
+    loader_factory = load_data_loaders()[conf["selected_data_loader"]]
+    loader = loader_factory(**filter_params(conf["data_loader_parameters"], loader_factory))
+    loader = load_data_loader_cached(loader, session["user_study_guid"], loader_factory.name(), get_semi_local_cache_name(loader))
+
+    res = search_for_item(pattern, loader, tr=None)
+
+    return jsonify(res)
 
 # Receives arbitrary feedback (typically from preference elicitation) and generates recommendation
 @bp.route("/send-feedback", methods=["GET"])
@@ -281,15 +303,28 @@ class GreedyMaximizingRecommendationGenertor:
                     max_mgain_item = item
             top_k.append(max_mgain_item)
         return self.objective(top_k), top_k
-    
+
 class EASER_pretrained:
     def __init__(self, all_items, **kwargs):
         self.all_items = all_items
+
+    # We do this to hijack the cache so that there is one shared cache instance
+    # instead of per algorithm instance cache (that causes leaks)
+    def __eq__(self, other) -> bool:
+        if not isinstance(other, EASER_pretrained):
+            return False
+        
+        # We use arange for items, so just comparing the size should be fine for our purpose
+        return self.all_items.size == other.all_items.size
+
+    def __hash__(self) -> int:
+        return self.all_items.size
 
     @functools.lru_cache(maxsize=None)
     def load(self, path):
         self.item_item = np.load(path)
         assert self.item_item.shape[0] == self.item_item.shape[1] == self.all_items.size
+        return self
 
     def predict_with_score(self, selected_items, filter_out_items, k):
         candidates = np.setdiff1d(self.all_items, selected_items)
@@ -420,6 +455,131 @@ def get_diversified_top_k_lists(k, random_users, rel_scores, rel_scores_normed,
 def get_distance_matrix_cb(path):
     return np.load(path)
 
+@functools.lru_cache(maxsize=None)
+def load_cdf_cache(base_path, metric_name):
+    with open(os.path.join(base_path, "cdf", f"{metric_name}.pckl"), "rb") as f:
+        return pickle.load(f)
+
+# Plugin specific version of enrich_results
+# Here we are sure that we are inside this particular plugin
+# thus we have a particular data loader and can use some of its internals
+def enrich_results(top_k, loader, support=None):
+    assert isinstance(loader, MLGenomeDataLoader), f"Loader name: {loader.name()} type: {type(loader)}"
+    top_k_ids = [loader.get_item_id(movie_idx) for movie_idx in top_k]
+    top_k_description = [loader.items_df_indexed.loc[movie_id].title for movie_id in top_k_ids]
+    top_k_genres = [loader.get_item_id_categories(movie_id) for movie_id in top_k_ids]
+    top_k_genres = [x if x != ["(no genres listed)"] else [] for x in top_k_genres]
+    top_k_url = [loader.get_item_index_image_url(movie_idx) for movie_idx in top_k]
+    top_k_trailers = [""] * len(top_k)
+    top_k_plots = [loader.get_item_id_plot(movie_id) for movie_id in top_k_ids]
+
+
+    if support:
+        top_k_supports = [
+            {
+                "relevance": np.round(support["relevance"][i], 4),
+                "diversity": np.round(support["diversity"][i], 4),
+                "novelty": np.round(support["novelty"][i], 4),
+                "raw_rating": np.round(support["raw_rating"][i], 4),
+                "raw_distance": np.squeeze(np.round(support["raw_distance"][i], 4)).tolist(),
+                "raw_users_viewed_item": support["raw_users_viewed_item"][i],
+            }
+            for i in range(len(top_k))
+        ]
+        return [
+            {
+            "movie": movie,
+            "url": url,
+            "movie_idx": str(movie_idx),
+            "movie_id": movie_id,
+            "genres": genres,
+            "support": support,
+            "trailer_url": trailer_url,
+            "plot": plot,
+            "rank": rank
+            }
+            for movie, url, movie_idx, movie_id, genres, support, trailer_url, plot, rank in
+                zip(top_k_description, top_k_url, top_k, top_k_ids, top_k_genres, top_k_supports, top_k_trailers, top_k_plots, range(len(top_k_ids)))
+        ]
+    return [
+        {
+            "movie": movie,
+            "url": url,
+            "movie_idx": str(movie_idx),
+            "movie_id": movie_id,
+            "genres": genres,
+            "trailer_url": trailer_url,
+            "plot": plot,
+            "rank": rank
+        }
+        for movie, url, movie_idx, movie_id, genres, trailer_url, plot, rank in
+            zip(top_k_description, top_k_url, top_k, top_k_ids, top_k_genres, top_k_trailers, top_k_plots, range(len(top_k_ids)))
+    ]
+
+@bp.route("/compare-alphas", methods=["POST", "GET"])
+def compare_alphas():
+    #@profile
+    #def compare_alphas_x():
+    conf = load_user_study_config(session["user_study_id"])
+    selected_metric_name = request.form.get("selected_metric_name")
+    #selected_metric_index = request.form.get("selected_metric_index")
+    session["selected_metric_name"] = selected_metric_name
+    params = {}
+
+    # Get a loader
+    loader_factory = load_data_loaders()[conf["selected_data_loader"]]
+    loader = loader_factory(**filter_params(conf["data_loader_parameters"], loader_factory))
+    loader = load_data_loader_cached(loader, session["user_study_guid"], loader_factory.name(), get_semi_local_cache_name(loader))
+
+    alphas = [0.3, 0.6, 0.9]
+    alpha_orders = np.arange(len(alphas))
+    np.random.shuffle(alpha_orders)
+
+    if selected_metric_name == "CF-ILD":
+        div_f = intra_list_diversity(loader.distance_matrix)
+    elif selected_metric_name == "CB-ILD":
+        distance_matrix_cb = get_distance_matrix_cb(os.path.join(get_cache_path(get_semi_local_cache_name(loader)), "distance_matrix_text.npy"))
+        div_f = intra_list_diversity(distance_matrix_cb)
+    elif selected_metric_name == "BIN-DIV":
+        div_f = binomial_diversity(loader.all_categories, loader.get_item_index_categories, loader.rating_matrix, 0.0, loader.name())
+    else:
+        print("Should not get there")
+        selected_metric_name="CF-ILD"
+        div_f = intra_list_diversity(loader.distance_matrix)
+        #assert False
+
+    params["movies"] = {}
+
+    k = 8 # We use k=8 instead of k=10 so that items fit to screen easily
+    items = np.arange(loader.rating_matrix.shape[1])
+    algo = EASER_pretrained(items)
+    algo = algo.load(os.path.join(get_cache_path(get_semi_local_cache_name(loader)), "item_item.npy"))
+    elicitation_selected = np.array(session["elicitation_selected_movies"])
+    rel_scores, user_vector, _ = algo.predict_with_score(elicitation_selected, elicitation_selected, k)
+    rel_scores = rel_scores[np.newaxis, :]
+    cdf_rel = load_cdf_cache(get_cache_path(get_semi_local_cache_name(loader)), "REL")
+    rel_scores_normed = cdf_rel.transform(rel_scores.reshape(-1, 1)).reshape(rel_scores.shape)
+    user_vector = user_vector[np.newaxis, :]
+
+
+    cdf_div = load_cdf_cache(get_cache_path(get_semi_local_cache_name(loader)), selected_metric_name)
+    for alpha_order, alpha in zip(alpha_orders, alphas):
+
+        rec_list = get_diversified_top_k_lists(k, np.array([0]), rel_scores, rel_scores_normed,
+                                        alpha=alpha, items=items, diversity_function=div_f, diversity_cdf=cdf_div,
+                                        rating_matrix=user_vector,
+                                        n_items_subset=500, do_normalize=False, unit_normalize=True, rnd_mixture=True)
+
+        rec_list = enrich_results(rec_list[0], loader)
+
+        params["movies"][str(alpha)] = {
+            "movies": rec_list,
+            "order": str(alpha_order)
+        }
+
+    return render_template("compare_alphas.html", **params)
+    #return compare_alphas_x()
+
 @bp.route("/metric-assesment", methods=["GET"])
 def metric_assesment():
     start_time = time.perf_counter()
@@ -436,17 +596,18 @@ def metric_assesment():
 
     # TODO get TRUE CB
     k = 8 # We use k=8 instead of k=10 so that items fit to screen easily
-    items = np.array(list(loader.item_index_to_id.keys()))
+    items = np.arange(loader.rating_matrix.shape[1])
 
     algo = EASER_pretrained(items)
-    algo.load(os.path.join(get_cache_path(get_semi_local_cache_name(loader)), "item_item.npy"))
+    algo = algo.load(os.path.join(get_cache_path(get_semi_local_cache_name(loader)), "item_item.npy"))
     print(f"Took 2+:", time.perf_counter() - start_time)
     print(f"@@ {loader.get_item_id(270)}, {loader.get_item_index(333)}, {loader.get_item_index_description(270)}, {loader.get_item_id_description(333)}")
     # Movie indices of selected movies
     elicitation_selected = np.array(session["elicitation_selected_movies"])
     rel_scores, user_vector, ease_pred = algo.predict_with_score(elicitation_selected, elicitation_selected, k)
     rel_scores = rel_scores[np.newaxis, :]
-    rel_scores_normed = rel_scores
+    cdf_rel = load_cdf_cache(get_cache_path(get_semi_local_cache_name(loader)), "REL")
+    rel_scores_normed = cdf_rel.transform(rel_scores.reshape(-1, 1)).reshape(rel_scores.shape)
     user_vector = user_vector[np.newaxis, :]
     
     print(f"Elicitation selected: {elicitation_selected}")
@@ -478,20 +639,23 @@ def metric_assesment():
     # r3 = enrich_results(next(rnd_bin_div)[1], loader)
     ease_baseline = enrich_results(ease_pred, loader)
     print(f"Predicting r1 took: {time.perf_counter() - start_time}")
+    cdf_cf_div = load_cdf_cache(get_cache_path(get_semi_local_cache_name(loader)), "CF-ILD")
     r2 = get_diversified_top_k_lists(k, np.array([0]), rel_scores, rel_scores_normed,
-                                alpha=alpha, items=items, diversity_function=cf_ild, diversity_cdf=None,
+                                alpha=alpha, items=items, diversity_function=cf_ild, diversity_cdf=cdf_cf_div,
                                 rating_matrix=user_vector,
                                 n_items_subset=500, do_normalize=False, unit_normalize=True, rnd_mixture=True)
     r2 = enrich_results(r2[0], loader)
     print(f"Predicting r2 took: {time.perf_counter() - start_time}")
+    cdf_cb_div = load_cdf_cache(get_cache_path(get_semi_local_cache_name(loader)), "CB-ILD")
     r3 = get_diversified_top_k_lists(k, np.array([0]), rel_scores, rel_scores_normed,
-                                alpha=alpha, items=items, diversity_function=cb_ild, diversity_cdf=None,
+                                alpha=alpha, items=items, diversity_function=cb_ild, diversity_cdf=cdf_cb_div,
                                 rating_matrix=user_vector,
                                 n_items_subset=500, do_normalize=False, unit_normalize=True, rnd_mixture=True)
     r3 = enrich_results(r3[0], loader)
     print(f"Predicting r3 took: {time.perf_counter() - start_time}")
+    cdf_bin_div = load_cdf_cache(get_cache_path(get_semi_local_cache_name(loader)), "BIN-DIV")
     r4 = get_diversified_top_k_lists(k, np.array([0]), rel_scores, rel_scores_normed,
-                                alpha=alpha, items=items, diversity_function=bin_div, diversity_cdf=None,
+                                alpha=alpha, items=items, diversity_function=bin_div, diversity_cdf=cdf_bin_div,
                                 rating_matrix=user_vector,
                                 n_items_subset=500, do_normalize=False, unit_normalize=True, rnd_mixture=True)
     r4 = enrich_results(r4[0], loader)
@@ -515,7 +679,7 @@ def metric_assesment():
                 "movies": r4,
                 "order": 3
             }
-         }
+        }
     }
     print(f"Took 4:", time.perf_counter() - start_time)
     tr = get_tr(languages, get_lang())
