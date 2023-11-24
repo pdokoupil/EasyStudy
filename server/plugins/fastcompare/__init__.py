@@ -214,14 +214,7 @@ def on_joined():
         search_item_url=url_for(f'{__plugin_name__}.item_search')
     ))
 
-def search_for_item(pattern, tr=None):
-    conf = load_user_study_config(session["user_study_id"])
-    
-    ## TODO get_loader helper
-    loader_factory = load_data_loaders()[conf["selected_data_loader"]]
-    loader = loader_factory(**filter_params(conf["data_loader_parameters"], loader_factory))
-    load_data_loader(loader, session["user_study_guid"], loader_factory.name(), get_semi_local_cache_name(loader))
-
+def search_for_item(pattern, loader, tr=None):
     # If we have a translate function
     if tr:
         found_items = loader.items_df[loader.items_df.item_id.astype(str).map(tr).str.contains(pattern, case=False)]
@@ -242,7 +235,15 @@ def item_search():
         tr = None
     else:
         tr = get_tr(languages, lang)
-    res = search_for_item(pattern, tr)
+
+    conf = load_user_study_config(session["user_study_id"])
+    
+    ## TODO get_loader helper
+    loader_factory = load_data_loaders()[conf["selected_data_loader"]]
+    loader = loader_factory(**filter_params(conf["data_loader_parameters"], loader_factory))
+    load_data_loader(loader, session["user_study_guid"], loader_factory.name(), get_semi_local_cache_name(loader))
+
+    res = search_for_item(pattern, loader, tr)
 
     return jsonify(res)
 
