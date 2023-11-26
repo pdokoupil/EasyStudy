@@ -132,7 +132,7 @@ class StandardVaeWrapper(AlgorithmBase):
     def load(self, instance_cache_path, class_cache_path):
         self.model.save_path = instance_cache_path
         self.model.model.load_weights(instance_cache_path)
-
+        return self
 
 
 
@@ -246,7 +246,7 @@ class MultVaeWrapper(AlgorithmBase):
     def load(self, instance_cache_path, class_cache_path):
         self.model.save_path = instance_cache_path
         self.model.model.load_weights(instance_cache_path)
-
+        return self
 
 #RBM 
 from recommenders.models.rbm.rbm import RBM
@@ -316,3 +316,4 @@ class RbmWrapper(AlgorithmBase):
     def load(self, instance_cache_path, class_cache_path):
         self.model.load(instance_cache_path)
         self.model.init_training_session(self.rating_matrix)
+        return self

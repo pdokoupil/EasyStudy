@@ -40,7 +40,7 @@ def load_ml_dataset(ml_variant="ml-latest"):
             [RatingLowFilter(4.0), MovieFilterByYear(1990), RatingFilterOld(2010), RatingsPerYearFilter(50.0), RatingUserFilter(100), RatedMovieFilter(), LinkFilter()],
             img_dir_path=img_dir_path, descriptions_path=descriptions_path
         )
-        loader.load()
+        loader = loader.load()
         print(f"## Loading took: {time.perf_counter() - start_time}")
 
         print(f"Caching the data to {cache_path}")

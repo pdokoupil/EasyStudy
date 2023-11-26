@@ -8,6 +8,8 @@ import numpy as np
 import pandas as pd
 import requests
 
+from cachetools import cached
+
 from plugins.fastcompare.algo.algorithm_base import DataLoaderBase
 from plugins.utils.ml_data_loader import MLDataLoader, RatingLowFilter, MovieFilterByYear, RatingFilterOld, RatingsPerYearFilter, RatingUserFilter, RatedMovieFilter, LinkFilter
 
@@ -59,10 +61,10 @@ class MLDataLoaderWrapper(DataLoaderBase):
             rating_matrix_path=None, img_dir_path=img_dir_path
         )
 
-    def load_data(self):
+    def load_data(self, *args, **kwargs):
         #cache_path = os.path.join(basedir, "static", "ml-latest", "data_cache.pckl")
         start_time = time.perf_counter()
-        self.loader.load()
+        self.loader = self.loader.load()
         print(f"## Loading took: {time.perf_counter() - start_time}")
         
         self.loader.movies_df = self.loader.movies_df.rename(columns={"movieId": "item_id"})
@@ -264,7 +266,12 @@ class MLGenomeDataLoader(DataLoaderBase):
         return False
 
 
-    def load_data(self):
+    def load_data(self, semi_local_cache_path, *args, **kwargs):
+
+        if os.path.exists(semi_local_cache_path):
+            print("There is already existing cache, loading from there")
+            return self.load(None, None, semi_local_cache_path)
+
         #cache_path = os.path.join(basedir, "static", "ml-latest", "data_cache.pckl")
         start_time = time.perf_counter()
         print("LOADER before loading files", time.strftime("%H:%M:%S", time.localtime()))
@@ -447,14 +454,21 @@ class MLGenomeDataLoader(DataLoaderBase):
     def parameters(self):
         return []
     
+    # We do the caching here, so that if multiple user studies are created, they can all share this instance assuming
+    # they were created with same class_cache_path and semi_local_cache_path 
+    @cached(cache={}, key=lambda data_loader, instance_cache_path, class_cache_path, semi_local_cache_name: f"{class_cache_path}/{semi_local_cache_name}")
     def load(self, instance_cache_path, class_cache_path, semi_local_cache_path):
         with open(semi_local_cache_path, "rb") as f:
             data = pickle.load(f)
         self.__dict__.update(data)
         self.metadata_df_indexed = self.metadata_df.set_index("item_id")
+        return self
         
         
     def save(self, instance_cache_path, class_cache_path, semi_local_cache_path):
+        if os.path.exists(semi_local_cache_path):
+            print("Not saving, cache already exists")
+            return
         data = {
             "_ratings_df": self._ratings_df,
             "metadata_df": self.metadata_df,
@@ -498,7 +512,7 @@ class GoodbooksDataLoader(DataLoaderBase):
         # Ensure img dir path exists
         Path(self.img_dir_path).mkdir(parents=True, exist_ok=True)
 
-    def load_data(self):
+    def load_data(self, *args, **kwargs):
         #cache_path = os.path.join(basedir, "static", "ml-latest", "data_cache.pckl")
         start_time = time.perf_counter()
 

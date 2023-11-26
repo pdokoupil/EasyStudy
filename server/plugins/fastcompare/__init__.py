@@ -564,27 +564,26 @@ def get_cache_path(guid, name=""):
     return os.path.join("cache", __plugin_name__, guid, name)
 
 def load_algorithm(algorithm, guid, algorithm_displayed_name, semi_local_cache_name):
-    algorithm.load(get_cache_path(guid, algorithm_displayed_name), get_cache_path("", algorithm_displayed_name), get_cache_path(semi_local_cache_name, algorithm_displayed_name))
+    return algorithm.load(get_cache_path(guid, algorithm_displayed_name), get_cache_path("", algorithm_displayed_name), get_cache_path(semi_local_cache_name, algorithm_displayed_name))
 
 # Elicitation may have some internal state as well, so we load it as well
 def load_preference_elicitation(elicitation, guid, elicitation_name, semi_local_cache_name):
-    elicitation.load(get_cache_path(guid, elicitation_name), get_cache_path("", elicitation_name), get_cache_path(semi_local_cache_name, elicitation_name))
+    return elicitation.load(get_cache_path(guid, elicitation_name), get_cache_path("", elicitation_name), get_cache_path(semi_local_cache_name, elicitation_name))
 
 # Elicitation may have some internal state as well, so we load it as well
 @cached(cache={}, key=lambda data_loader, guid, elicitation_name, semi_local_cache_name: f"{guid}/{elicitation_name}")
 def load_preference_elicitation_cached(elicitation, guid, elicitation_name, semi_local_cache_name):
-    elicitation.load(get_cache_path(guid, elicitation_name), get_cache_path("", elicitation_name), get_cache_path(semi_local_cache_name, elicitation_name))
-    return elicitation
+    return elicitation.load(get_cache_path(guid, elicitation_name), get_cache_path("", elicitation_name), get_cache_path(semi_local_cache_name, elicitation_name))
 
 # Dataset loaders also may have internal state, load them as well
 def load_data_loader(data_loader, guid, loader_name, semi_local_cache_name):
-    data_loader.load(get_cache_path(guid, loader_name), get_cache_path("", loader_name), get_cache_path(semi_local_cache_name, loader_name))
+    return data_loader.load(get_cache_path(guid, loader_name), get_cache_path("", loader_name), get_cache_path(semi_local_cache_name, loader_name))
 
 # Dataset loaders also may have internal state, load them as well
 @cached(cache={}, key=lambda data_loader, guid, loader_name, semi_local_cache_name: f"{guid}/{loader_name}")
 def load_data_loader_cached(data_loader, guid, loader_name, semi_local_cache_name):
-    data_loader.load(get_cache_path(guid, loader_name), get_cache_path("", loader_name), get_cache_path(semi_local_cache_name, loader_name))
-    return data_loader # Slightly hacking the API to make it more cache-friendly
+    # Slightly hacking the API to make it more cache-friendly
+    return data_loader.load(get_cache_path(guid, loader_name), get_cache_path("", loader_name), get_cache_path(semi_local_cache_name, loader_name))
 
 
 # There could be a missmatch in-between parameters passed here and what is declared by actual component factory
@@ -612,7 +611,12 @@ def long_initialization(guid):
     semi_local_cache_name = get_semi_local_cache_name(loader)
     # Ensure semi local cache exists as well
     Path(get_cache_path(semi_local_cache_name)).mkdir(parents=True, exist_ok=True)
-    loader.load_data() # Actually load the data
+    # Actually load the data, passing-in the class and semi-local cache names
+    # Note that instance cache does not make sense here since this is clear instance
+    loader = loader.load_data(
+        class_cache_path=get_cache_path("", loader.name()),
+        semi_local_cache_path=get_cache_path(semi_local_cache_name, loader.name())
+    )
     loader.save(get_cache_path(guid, loader.name()), get_cache_path("", loader.name()), get_cache_path(semi_local_cache_name, loader.name())) # Save the data loader itself to the cache
     # Then preference elicitation
     elicitation_factory = load_preference_elicitations()[conf["selected_preference_elicitation"]]

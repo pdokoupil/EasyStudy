@@ -373,4 +373,4 @@ class MLDataLoader:
                 self.movie_index_to_url[self.movie_id_to_index[movie_id]] = os.path.join(self.img_dir_path, img_name)
 
         print(f"Already downloaded images for: {len(self.movie_index_to_url)} movies")
-        return True
+        return self
