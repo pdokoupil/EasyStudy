@@ -568,7 +568,7 @@ def compare_alphas():
         rec_list = get_diversified_top_k_lists(k, np.array([0]), rel_scores, rel_scores_normed,
                                         alpha=alpha, items=items, diversity_function=div_f, diversity_cdf=cdf_div,
                                         rating_matrix=user_vector,
-                                        n_items_subset=500, do_normalize=False, unit_normalize=True, rnd_mixture=True)
+                                        n_items_subset=500, do_normalize=True, unit_normalize=True, rnd_mixture=True)
 
         rec_list = enrich_results(rec_list[0], loader)
 
@@ -584,15 +584,11 @@ def compare_alphas():
 def metric_assesment():
     start_time = time.perf_counter()
     conf = load_user_study_config(session["user_study_id"])
-    print(f"Took 1:", time.perf_counter() - start_time)
 
     # Get a loader
     loader_factory = load_data_loaders()[conf["selected_data_loader"]]
-    print(f"Took 1+:", time.perf_counter() - start_time)
     loader = loader_factory(**filter_params(conf["data_loader_parameters"], loader_factory))
-    print(f"Took 1++:", time.perf_counter() - start_time)
     loader = load_data_loader_cached(loader, session["user_study_guid"], loader_factory.name(), get_semi_local_cache_name(loader))
-    print(f"Took 2:", time.perf_counter() - start_time)
 
     # TODO get TRUE CB
     k = 8 # We use k=8 instead of k=10 so that items fit to screen easily
@@ -643,21 +639,21 @@ def metric_assesment():
     r2 = get_diversified_top_k_lists(k, np.array([0]), rel_scores, rel_scores_normed,
                                 alpha=alpha, items=items, diversity_function=cf_ild, diversity_cdf=cdf_cf_div,
                                 rating_matrix=user_vector,
-                                n_items_subset=500, do_normalize=False, unit_normalize=True, rnd_mixture=True)
+                                n_items_subset=500, do_normalize=True, unit_normalize=True, rnd_mixture=True)
     r2 = enrich_results(r2[0], loader)
     print(f"Predicting r2 took: {time.perf_counter() - start_time}")
     cdf_cb_div = load_cdf_cache(get_cache_path(get_semi_local_cache_name(loader)), "CB-ILD")
     r3 = get_diversified_top_k_lists(k, np.array([0]), rel_scores, rel_scores_normed,
                                 alpha=alpha, items=items, diversity_function=cb_ild, diversity_cdf=cdf_cb_div,
                                 rating_matrix=user_vector,
-                                n_items_subset=500, do_normalize=False, unit_normalize=True, rnd_mixture=True)
+                                n_items_subset=500, do_normalize=True, unit_normalize=True, rnd_mixture=True)
     r3 = enrich_results(r3[0], loader)
     print(f"Predicting r3 took: {time.perf_counter() - start_time}")
     cdf_bin_div = load_cdf_cache(get_cache_path(get_semi_local_cache_name(loader)), "BIN-DIV")
     r4 = get_diversified_top_k_lists(k, np.array([0]), rel_scores, rel_scores_normed,
                                 alpha=alpha, items=items, diversity_function=bin_div, diversity_cdf=cdf_bin_div,
                                 rating_matrix=user_vector,
-                                n_items_subset=500, do_normalize=False, unit_normalize=True, rnd_mixture=True)
+                                n_items_subset=500, do_normalize=True, unit_normalize=True, rnd_mixture=True)
     r4 = enrich_results(r4[0], loader)
     print(f"Predicting r4 took: {time.perf_counter() - start_time}")
 

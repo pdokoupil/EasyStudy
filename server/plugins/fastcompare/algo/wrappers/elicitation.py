@@ -10,7 +10,6 @@ from plugins.utils.helpers import cos_sim_np
 class MultiObjectiveSamplingFromBucketsElicitationWrapper(PreferenceElicitationBase):
     # Objectives is a dictionary mapping objective name to its implementation (e.g. we can use different implementations of diversity etc..)
     def __init__(self, loader, *args, **kwargs):
-        print(f"Distance matrix: {loader.distance_matrix.dtype}, {loader.distance_matrix.sum()}")
         self.elicitation = MultiObjectiveSamplingFromBucketsElicitation(loader.rating_matrix, loader.distance_matrix, *args, **kwargs)
 
     def get_initial_data(self, movie_indices_to_ignore=[]):
