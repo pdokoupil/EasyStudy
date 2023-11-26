@@ -77,7 +77,8 @@ class AlgorithmBase(ABC):
     def load(self, instance_cache_path, class_cache_path, semi_local_cache_path):
         with open(instance_cache_path, "rb") as f:
             attribs = pickle.load(f)
-        self.__dict__.update(attribs) 
+        self.__dict__.update(attribs)
+        return self
 
     # Save internal state, default implementation using pickle
     # more complex models may need to override this behavior
@@ -127,7 +128,8 @@ class PreferenceElicitationBase(ABC):
     def load(self, instance_cache_path, class_cache_path, semi_local_cache_path):
         with open(instance_cache_path, "rb") as f:
             attribs = pickle.load(f)
-        self.__dict__.update(attribs) 
+        self.__dict__.update(attribs)
+        return self
 
     # Save internal state, default implementation using pickle
     # more complex models may need to override this behavior
@@ -238,7 +240,8 @@ class DataLoaderBase(ABC):
     def load(self, instance_cache_path, class_cache_path, semi_local_cache_path):
         with open(instance_cache_path, "rb") as f:
             attribs = pickle.load(f)
-        self.__dict__.update(attribs) 
+        self.__dict__.update(attribs)
+        return self
 
     # Save internal state, default implementation using pickle
     # more complex models may need to override this behavior

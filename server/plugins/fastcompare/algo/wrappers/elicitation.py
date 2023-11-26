@@ -34,7 +34,7 @@ class MultiObjectiveSamplingFromBucketsElicitationWrapper(PreferenceElicitationB
     
     def load(self, instance_cache_path, class_cache_path, semi_local_cache_path):
         # Do not load anything
-        pass
+        return self
 
     def save(self, instance_cache_path, class_cache_path, semi_local_cache_path):
         # Do not save anything

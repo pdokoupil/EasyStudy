@@ -73,6 +73,7 @@ class TFRecommendersWrapper(AlgorithmBase, ABC):
 
     def load(self, instance_cache_path, class_cache_path):
         self.model.load_weights(instance_cache_path)
+        return self
 
 
 class SimpleMatrixFactorization(TFRecommendersWrapper):
