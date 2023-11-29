@@ -355,6 +355,11 @@ def get_diversified_top_k_lists(k, random_users, rel_scores, rel_scores_normed,
                                 alpha, items, diversity_function, diversity_cdf,
                                 rating_matrix,
                                 n_items_subset=None, do_normalize=False, unit_normalize=False, rnd_mixture=False):
+    ####TODO REMOVE SEED SETTING!!!
+    random.seed(42)
+    np.random.seed(42)
+    ### TODO
+    
     start_time = time.perf_counter()
     top_k_lists = np.zeros(shape=(random_users.size, k), dtype=np.int32)
     scores = np.zeros(shape=(items.size if n_items_subset is None else n_items_subset, ), dtype=np.float32)
@@ -522,7 +527,7 @@ def compare_alphas():
     #def compare_alphas_x():
     conf = load_user_study_config(session["user_study_id"])
     selected_metric_name = request.form.get("selected_metric_name")
-    #selected_metric_index = request.form.get("selected_metric_index")
+    selected_metric_index = request.form.get("selected_metric_index")
     session["selected_metric_name"] = selected_metric_name
     params = {}
 
@@ -671,7 +676,7 @@ def metric_assesment():
                 "movies": r3,
                 "order": 2
             },
-            "Binomial": {
+            "BIN-DIV": {
                 "movies": r4,
                 "order": 3
             }
