@@ -329,9 +329,9 @@ class EASER_pretrained:
     def predict_with_score(self, selected_items, filter_out_items, k):
         candidates = np.setdiff1d(self.all_items, selected_items)
         candidates = np.setdiff1d(candidates, filter_out_items)
-        if selected_items.size == 0:
-            return np.random.choice(candidates, size=k, replace=False).tolist()
         user_vector = np.zeros(shape=(self.all_items.size,), dtype=self.item_item.dtype)
+        if selected_items.size == 0:
+            return np.zeros_like(user_vector), user_vector, np.random.choice(candidates, size=k, replace=False).tolist()
         user_vector[selected_items] = 1
         probs = np.dot(user_vector, self.item_item)
 
