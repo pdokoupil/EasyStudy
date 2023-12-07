@@ -67,7 +67,7 @@
         
         <b-row align-h="center">
             <b-col class="text-center">
-                <b-form v-if="selectedMetric != null" method="POST" action="{{url_for('journal.compare_alphas')}}">
+                <b-form v-if="selectedMetric != null" method="POST" action="{{url_for('journal.metric_feedback')}}">
                     <input type="hidden" name="csrf_token" value="{{csrf_token()}}"/>
                     <input type="hidden" name="selected_metric_name" :value="selectedMetric.variantName"/>
                     <input type="hidden" name="selected_metric_index" :value="selectedMetric.variant"/>

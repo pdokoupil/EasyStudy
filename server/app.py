@@ -7,12 +7,14 @@ from flask_wtf.csrf import CSRFProtect
 from flask_session import Session
 
 #from werkzeug.middleware.profiler import ProfilerMiddleware
+import redis
 
 db = SQLAlchemy()
 pm = PluginManager(plugins_folder="plugins")
 csrf = CSRFProtect()
 
 sess = Session()
+rds = redis.Redis(host='localhost', port=6379, decode_responses=True)
 
 # Insert/set all values that have to be set once (e.g. insert interaction types into DB)
 def initialize_db_tables():
@@ -60,7 +62,8 @@ def create_app():
     app.config['SECRET_KEY'] = '8bf29bd88d0bfb94509f5fb0'
     app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///db.sqlite'
     app.config['SESSION_COOKIE_NAME'] = "something"
-    app.config["SESSION_TYPE"] = "filesystem"
+    app.config["SESSION_TYPE"] = "sqlalchemy"
+    app.config["SESSION_SQLALCHEMY"] = db
 
     sess.init_app(app)
 
