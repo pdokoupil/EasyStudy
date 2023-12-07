@@ -1,10 +1,13 @@
 from abc import ABC
 import functools
+import json
 import pickle
 import random
 import sys
 import os
 import time
+
+import flask
 
 from plugins.fastcompare.algo.wrappers.data_loadering import MLGenomeDataLoader
 
@@ -34,17 +37,21 @@ from plugins.journal.metrics import binomial_diversity, intra_list_diversity
 
 #from memory_profiler import profile
 
+from app import rds
+
 languages = load_languages(os.path.dirname(__file__))
 
-N_ITERATIONS = 6 # 6 iterations
+N_ITERATIONS = 6 # 6 iterations per block
+ALGORITHMS = ["WA", "RLPROP", "MOEA-RS"]
 HIDE_LAST_K = 100000
 NEG_INF = int(-10e6)
+N_ALPHA_ITERS = 2
 
 # Implementation of this function can differ among plugins
 def get_lang():
     default_lang = "en"
-    if "lang" in session and session["lang"] and session["lang"] in languages:
-        return session["lang"]
+    if "lang" in session and session['lang'] and session['lang'] in languages:
+        return session['lang']
     return default_lang
 
 __plugin_name__ = "journal"
@@ -125,12 +132,12 @@ def item_search():
     if not pattern:
         return make_response("", 404)
     
-    conf = load_user_study_config(session["user_study_id"])
+    conf = load_user_study_config(session['user_study_id'])
     
     ## TODO get_loader helper
     loader_factory = load_data_loaders()[conf["selected_data_loader"]]
     loader = loader_factory(**filter_params(conf["data_loader_parameters"], loader_factory))
-    loader = load_data_loader_cached(loader, session["user_study_guid"], loader_factory.name(), get_semi_local_cache_name(loader))
+    loader = load_data_loader_cached(loader, session['user_study_guid'], loader_factory.name(), get_semi_local_cache_name(loader))
 
     res = search_for_item(pattern, loader, tr=None)
 
@@ -140,14 +147,14 @@ def item_search():
 @bp.route("/send-feedback", methods=["GET"])
 def send_feedback():
     # We read k from configuration of the particular user study
-    conf = load_user_study_config(session["user_study_id"])
+    conf = load_user_study_config(session['user_study_id'])
     k = conf["k"]
-    session["rec_k"] = k
+
 
     # Get a loader
     loader_factory = load_data_loaders()[conf["selected_data_loader"]]
     loader = loader_factory(**filter_params(conf["data_loader_parameters"], loader_factory))
-    loader = load_data_loader_cached(loader, session["user_study_guid"], loader_factory.name(), get_semi_local_cache_name(loader))
+    loader = load_data_loader_cached(loader, session['user_study_guid'], loader_factory.name(), get_semi_local_cache_name(loader))
 
     # Movie indices of selected movies
     selected_movies = request.args.get("selectedMovies")
@@ -155,13 +162,13 @@ def send_feedback():
     selected_movies = [int(m) for m in selected_movies]
 
     # Calculate weights based on selection and shown movies during preference elicitation
-    weights, supports = calculate_weight_estimate(loader, selected_movies, session["elicitation_movies"], return_supports=True)
+    weights, supports = calculate_weight_estimate(loader, selected_movies, session['elicitation_movies'], return_supports=True)
     weights /= weights.sum()
     weights = weights.tolist()
-    weights = {
-        algo_displayed_name: weights for algo_displayed_name in displyed_name_mapping.values()
-    }
-    session["weights"] = weights
+    # weights = {
+    #     algo_displayed_name: weights for algo_displayed_name in displyed_name_mapping.values()
+    # }
+    #rds.hset(f"user:weights:{session['uuid']}:", mapping=weights)
     print(f"Weights initialized to {weights}")
 
 
@@ -181,55 +188,48 @@ def send_feedback():
     prepare_recommendations(loader, conf, recommendations, selected_movies, filter_out_movies, k)
     #prepare_recommendations(weights, recommendations, initial_weights_recommendation, selected_movies, filter_out_movies, k)
     print(f"Recommendations={recommendations}")
-
-    slider_state = {
-        algo_displayed_name: {} for algo_displayed_name in displyed_name_mapping.values()
-    }
     
-    session["movies"] = recommendations
-    session["initial_weights_recommendation"] = initial_weights_recommendation
-    session["iteration"] = 1
-    session["elicitation_selected_movies"] = selected_movies
-    session["selected_movie_indices"] = [] #dict() # For each iteration, we can store selected movies
-    session["selected_variants"] = []
-    session["nothing"] = []
-    session["cmp"] = []
-    session["a_r"] = []
-    session["slider_state"] = slider_state
-
-    # Build permutation
-    p = []
-    for i in range(N_ITERATIONS):
-        orders = dict()
-        available_orders = [0, 1] # We compare two algorithms
-        for j, algorithm_displayed_name in enumerate(conf["selected_algorithms"]):
-            if algorithm_displayed_name == displyed_name_mapping["weighted_average"]: # Weighted average is not displayed
-                continue
-            order_idx = np.random.randint(len(available_orders))
-            orders[algorithm_displayed_name] = available_orders[order_idx]
-            del available_orders[order_idx]
-
-        p.append(orders)
-
-    session["permutation"] = p
-    session["orig_permutation"] = p
-    session["algorithms_to_show"] = [displyed_name_mapping["rlprop"]] * N_ITERATIONS
+    rds.hset(f"user:{session['uuid']}", mapping={
+        'movies': json.dumps(recommendations),
+        'initial_weights_recommendation': json.dumps(initial_weights_recommendation),
+        'iteration': 1,
+        'elicitation_selected_movies': json.dumps(selected_movies),
+        'selected_movie_indices': json.dumps([])
+    })
 
     # Set randomly generated refinement layout
     if "refinement_layout" in conf and conf["refinement_layout"]:
         print("Using configured refinement layout")
         refinement_layout_name = conf["refinement_layout"]
-        session["refinement_layout"] = refinement_layouts[refinement_layout_name]
     else:
         print(f"Using random refinement layout")
         refinement_layout_name = np.random.choice(list(refinement_layouts.keys()))
-        session["refinement_layout"] =  refinement_layouts[refinement_layout_name]
-    
+
+    p = [1, 0, 2]    
+    rds.hset(f"user:{session['uuid']}", "refinement_layout", refinement_layouts[refinement_layout_name])
+
     elicitation_ended(
-        session["elicitation_movies"], session["elicitation_selected_movies"],
+        session['elicitation_movies'], selected_movies,
         orig_permutation=p, displyed_name_mapping=displyed_name_mapping, refinement_layout=refinement_layout_name,
         supports={key: np.round(value.astype(float), 4).tolist() for key, value in supports.items()}
     )    
+
+    #TODO log those into elicitation-ended
+    ### Initialize stuff related to alpha comparison (after metric assesment step) ###
+    # Permutation over alphas
+    possible_alphas = [0.0, 0.01, 0.1, 0.3, 0.6, 1.0]
+    np.random.shuffle(possible_alphas)
+
+    ### Initialize MORS related stuff ###
+    algorithm_order = np.arange(len(ALGORITHMS))
+    np.random.shuffle(algorithm_order)
+    # ALGORITHM[0] has order ALGORITHM_ORDER[0]
+    
+    rds.hset(f"user:{session['uuid']}", mapping={
+        "alphas_iteration": 1,
+        "alphas_p": json.dumps([possible_alphas[:3], possible_alphas[3:]]),
+        "algorithm_order": json.dumps(algorithm_order.tolist())
+    })
 
     #return redirect(url_for("multiobjective.compare_and_refine"))
     return redirect(url_for("journal.metric_assesment"))
@@ -521,24 +521,101 @@ def enrich_results(top_k, loader, support=None):
             zip(top_k_description, top_k_url, top_k, top_k_ids, top_k_genres, top_k_trailers, top_k_plots, range(len(top_k_ids)))
     ]
 
-@bp.route("/compare-alphas", methods=["POST", "GET"])
-def compare_alphas():
+@bp.route("/done", methods=["GET", "POST"])
+def done():
+    #it = session['iteration']
+    #it += 1
+    #session.modified = True
+    print(f"Sess id={request.cookies['something']}")
+    uuid = session['uuid']
+    rds.hset(f"user:{uuid}", "iteration", 1)
+
+    return f"DONE, it={rds.hget('user:' + uuid, 'iteration')}"
+    
+@bp.route("/mors-feedback", methods=["GET", "POST"])
+def mors_feedback():
+    #print(f"MORS-FEEDBACK IT before = {session['iteration']}")
+    rds.hincrby(f"user:{session['uuid']}", "iteration")
+
+    #print(f"MORS feedback iter after: {session['iteration']} but should have been {it + 1}")
+    #assert session.modified == True
+    #session.modified = True
+    return flask.Flask.redirect(flask.current_app, url_for("journal.mors"))
+
+@bp.route("/mors", methods=["GET", "POST"])
+def mors():
+    #it = session['iteration']
+    user_data = rds.hgetall(f"user:{session['uuid']}")
+    it = int(user_data["iteration"])
+
+    print(f"MORS IT={it}")
+
+    cur_block = (int(it) - 1) // N_ITERATIONS
+    cur_algorithm = ALGORITHMS[int(json.loads(user_data['algorithm_order'])[cur_block])]
+    
+    if cur_algorithm == "RLPROP":
+        pass
+    elif cur_algorithm == "WA":
+        pass
+    elif cur_algorithm == "MOEA-RS":
+        pass
+    else:
+        assert False, f"Unknown algorithm: {cur_algorithm} for it={it}"
+
+    print(f"Algorithm = {cur_algorithm}")
+
+    if it >= N_ITERATIONS * len(ALGORITHMS):
+        continuation_url = url_for("journal.done")
+    else:
+        continuation_url = url_for("journal.mors_feedback")
+
+    params = {
+        "continuation_url": continuation_url,
+        "iteration": it,
+        "movies": user_data['movies']
+    }
+    #assert session.modified == False
+    return render_template("mors.html", **params)
+
+# Called as continuation of compare-alphas, redirects for compare-alphas (next step)
+# This is where we generate the results, compare-alphas then just shows them
+@bp.route("/metric-feedback", methods=["POST"])
+def metric_feedback():
+    
+    u_key = f"user:{session['uuid']}"
+
+    user_data = rds.hgetall(u_key)
+
+    # We are before first iteration
+    cur_iter = int(user_data['alphas_iteration'])
+    print(f"METRIC FEEDBACK step 1 = {cur_iter}")
+    if cur_iter == 1:
+        selected_metric_name = request.form.get("selected_metric_name")
+        #selected_metric_index = request.form.get("selected_metric_index")
+        rds.hset(u_key, 'selected_metric_name', selected_metric_name)
+    else:
+        selected_metric_name = user_data['selected_metric_name']
+    
+    if cur_iter >= N_ALPHA_ITERS:
+        continuation_url = url_for("journal.mors")
+    else:
+        continuation_url = url_for("journal.metric_feedback")
+
+
+    # Take alpha values to be shown in the current step
+    current_alphas = json.loads(user_data['alphas_p'])[cur_iter - 1]
+
     #@profile
     #def compare_alphas_x():
-    conf = load_user_study_config(session["user_study_id"])
-    selected_metric_name = request.form.get("selected_metric_name")
-    selected_metric_index = request.form.get("selected_metric_index")
-    session["selected_metric_name"] = selected_metric_name
+    conf = load_user_study_config(session['user_study_id'])
     params = {}
 
     # Get a loader
     loader_factory = load_data_loaders()[conf["selected_data_loader"]]
     loader = loader_factory(**filter_params(conf["data_loader_parameters"], loader_factory))
-    loader = load_data_loader_cached(loader, session["user_study_guid"], loader_factory.name(), get_semi_local_cache_name(loader))
+    loader = load_data_loader_cached(loader, session['user_study_guid'], loader_factory.name(), get_semi_local_cache_name(loader))
 
-    alphas = [0.3, 0.6, 0.9]
-    alpha_orders = np.arange(len(alphas))
-    np.random.shuffle(alpha_orders)
+    alpha_orders = np.arange(len(current_alphas))
 
     if selected_metric_name == "CF-ILD":
         div_f = intra_list_diversity(loader.distance_matrix)
@@ -559,7 +636,7 @@ def compare_alphas():
     items = np.arange(loader.rating_matrix.shape[1])
     algo = EASER_pretrained(items)
     algo = algo.load(os.path.join(get_cache_path(get_semi_local_cache_name(loader)), "item_item.npy"))
-    elicitation_selected = np.array(session["elicitation_selected_movies"])
+    elicitation_selected = np.array(json.loads(user_data['elicitation_selected_movies']))
     rel_scores, user_vector, _ = algo.predict_with_score(elicitation_selected, elicitation_selected, k)
     rel_scores = rel_scores[np.newaxis, :]
     cdf_rel = load_cdf_cache(get_cache_path(get_semi_local_cache_name(loader)), "REL")
@@ -568,7 +645,7 @@ def compare_alphas():
 
 
     cdf_div = load_cdf_cache(get_cache_path(get_semi_local_cache_name(loader)), selected_metric_name)
-    for alpha_order, alpha in zip(alpha_orders, alphas):
+    for alpha_order, alpha in zip(alpha_orders, current_alphas):
 
         rec_list = get_diversified_top_k_lists(k, np.array([0]), rel_scores, rel_scores_normed,
                                         alpha=alpha, items=items, diversity_function=div_f, diversity_cdf=cdf_div,
@@ -582,18 +659,36 @@ def compare_alphas():
             "order": str(alpha_order)
         }
 
+    #session['alpha_movies'] = params
+    rds.hset(u_key + ":alpha_movies", mapping={
+        "movies": json.dumps(params["movies"])
+    })
+
+    cur_iter += 1
+    #session['alphas_iteration'] = cur_iter
+    rds.hset(u_key, 'alphas_iteration', cur_iter)
+
+    return redirect(url_for("journal.compare_alphas", continuation_url=continuation_url))
+
+@bp.route("/compare-alphas", methods=["GET", "POST"])
+def compare_alphas():
+    continuation_url = request.args.get("continuation_url")
+    #params = session['alpha_movies']
+    u_key = f"user:{session['uuid']}"
+    params = rds.hgetall(u_key + ":alpha_movies")
+    params["movies"] = json.loads(params["movies"])
+    params["continuation_url"] = continuation_url
     return render_template("compare_alphas.html", **params)
-    #return compare_alphas_x()
 
 @bp.route("/metric-assesment", methods=["GET"])
 def metric_assesment():
     start_time = time.perf_counter()
-    conf = load_user_study_config(session["user_study_id"])
+    conf = load_user_study_config(session['user_study_id'])
 
     # Get a loader
     loader_factory = load_data_loaders()[conf["selected_data_loader"]]
     loader = loader_factory(**filter_params(conf["data_loader_parameters"], loader_factory))
-    loader = load_data_loader_cached(loader, session["user_study_guid"], loader_factory.name(), get_semi_local_cache_name(loader))
+    loader = load_data_loader_cached(loader, session['user_study_guid'], loader_factory.name(), get_semi_local_cache_name(loader))
 
     # TODO get TRUE CB
     k = 8 # We use k=8 instead of k=10 so that items fit to screen easily
@@ -604,7 +699,8 @@ def metric_assesment():
     print(f"Took 2+:", time.perf_counter() - start_time)
     print(f"@@ {loader.get_item_id(270)}, {loader.get_item_index(333)}, {loader.get_item_index_description(270)}, {loader.get_item_id_description(333)}")
     # Movie indices of selected movies
-    elicitation_selected = np.array(session["elicitation_selected_movies"])
+    elicitation_selected = json.loads(rds.hget(f"user:{session['uuid']}", "elicitation_selected_movies"))
+    elicitation_selected = np.array(elicitation_selected)
     rel_scores, user_vector, ease_pred = algo.predict_with_score(elicitation_selected, elicitation_selected, k)
     rel_scores = rel_scores[np.newaxis, :]
     cdf_rel = load_cdf_cache(get_cache_path(get_semi_local_cache_name(loader)), "REL")

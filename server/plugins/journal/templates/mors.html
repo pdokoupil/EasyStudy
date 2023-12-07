@@ -33,65 +33,28 @@
                 </b-form>
             </b-col>
         </b-row> -->
-
-        <b-row class="ml-1 mr-1" style="height: 85vh;">
-            <!-- Prevent the column from overflow in vertical direction -->
-            <b-col class="row-container" style="display: flex; flex-direction: column; overflow: hidden; height: 100%;" v-for="variantResults in variantsResults" :set="algoIdx = variantsResults.indexOf(variantResults)" :id="variantNames[algoIdx]" :class="variantsResults.indexOf(variantResults) != 0 ? 'verticalSeparator' : ''">
-                <b-row style="flex: 1; display: flex; align-items: stretch;" align-h="center">
-                    <h5>{{algorithm}} [[ variantNames[algoIdx] ]]</h5>
-                </b-row>
-                <b-row align-h="center" class="custom-row" v-for="row in variantResults">
-                    <b-col cols="auto" style="height: 100%; margin-left: 1px; margin-right: 1px; padding-left: 0; padding-right: 0;" class="align-middle" v-for="col in row">
-                            <b-popover @show="popoverShown" @hidden="popoverHidden" :target="variantNames[algoIdx] + '_' + col.movie_idx" triggers="hover" placement="right">
-                                <template #title>[[col.movie]]</template>
-                                    <div v-if="col.plot">
-                                    <strong>Plot: </strong>
-                                    [[col.plot]]
-                                    </div>
-                                    <div v-if="col.trailer_url" class="mt-1 text-center">
-                                    <b-button target="_blank" @click="onTrailerWatch(col)" :href="col.trailer_url" size="sm" variant="primary">IMDb trailer</b-button>
-                                    </div>
-                                    
-                            </b-popover>
-                            <b-img @mouseenter="itemMouseEnter" @mouseleave="itemMouseLeave" :id="variantNames[algoIdx] + '_' + col.movie_idx" style="height: 99%;" block center :src="col.url" v-on:click="onSelectMovie($event, col, variantsResults.indexOf(variantResults))" :name="col.movie_idx" :alt="col.movie" />
-                    </b-col>
-                </b-row>
+        <b-row align-h="center">
+            <b-col class="text-center">
+                {{continuation_url}}
             </b-col>
         </b-row>
         
-        <b-form method="POST" action="{{continuation_url}}">
+        <b-row align-h="center">
+            <b-col class="text-center">
+                {{iteration}}
+            </b-col>
+        </b-row>
 
-            <b-row align-h="center" style="max-height: 3vh;">
-                <b-col class="text-center" v-for="variantName in variantNames">
-                    <b-form-radio-group
-                        id="radio-most-diverse"
-                        name="radio-most-diverse"
-                        v-model="mostDiverse"
-                    >
-                        <b-form-radio :disabled="leastDiverse == variantName" :value="variantName">Most diverse</b-form-radio>
-                    </b-form-radio-group>
-                </b-col>
-            </b-row>
-            <hr>
-            <b-row align-h="center" style="max-height: 3vh;">
-                <b-col class="text-center" v-for="variantName in variantNames">
-                    <b-form-radio-group
-                        id="radio-least-diverse"
-                        name="radio-least-diverse"
-                        v-model="leastDiverse"
-                    >
-                        <b-form-radio :disabled="mostDiverse == variantName" :value="variantName">Least diverse</b-form-radio>
-                    </b-form-radio-group>
-                </b-col>
-                
-            </b-row>
-            <b-row align-h="center">
-                <b-col class="text-center">
+        <b-row align-h="center">
+            <b-col class="text-center">
+                <b-form method="POST" action="{{continuation_url}}">
                     <input type="hidden" name="csrf_token" value="{{csrf_token()}}"/>
-                    <b-button v-if="mostDiverse != null && leastDiverse != null" variant="success" type="submit">Continue</b-button>
-                </b-col>
-            </b-row>
-        </b-form>
+                    <b-button variant="success" type="submit">Continue</b-button>
+                </b-form>
+            </b-col>
+        </b-row>
+
+        <hr>
 
     </b-container>
 </div>
@@ -101,7 +64,8 @@
     var movies = {{movies | tojson | safe}};
     var resultLayout = "{{result_layout}}";
     var iteration = "{{iteration}}";
-    var csrfToken = "{{csrf_token()}}";
+    var minIterationToCancel = "{{MIN_ITERATION_TO_CANCEL}}";
+    var csrfToken = "{{csrf_token()}}"
 
     var defaultComparisonValue = "{{disable_relative_comparison}}";
     var defaultComparisonValidation = defaultComparisonValue == "True" ? true : false;
@@ -181,9 +145,7 @@
             variantsResults: moviesColumnified,
             variantNames: variantNames,
             algorithmRatingsValidated: [false, false],
-            selectedMetric: null,
-            mostDiverse: null,
-            leastDiverse: null
+            selectedMetric: null
         };
     },
     computed: {
@@ -244,24 +206,20 @@
             item['variant'] = variant;
             item['variant_name'] = variantName;
             let index = this.movieIndexOf(this.selected, item);
-            
+
             if (this.selectedMetric != null && this.selectedMetric.idx != variant) {
                 // We need to remove all selected class tags
-                console.log(this.selectedMetric);
-                console.log(this.selectedMetric.variant, " ", this.selectedMetric.variantName);
                 let elem = document.getElementById(this.selectedMetric.variantName);
                 let imgs = elem.getElementsByTagName('img');
                 for (img of imgs) {
                     img.classList.remove("selected");
                 }
             }
-            
+
             this.selectedMetric = {
                 variant: variant,
                 variantName: variantName
             };
-            
-            console.log(variant, " ", variantName);
 
             // SrcElement is the image, parentNode is cell above, then another Parent is row and final parent is whole column
             let elem = document.getElementById(variantName);
@@ -272,10 +230,6 @@
 
             if (index > -1) {
                 // Already there, remove it
-                // var copies = document.getElementsByName(event.srcElement.name);
-                // for (let j = 0; j < copies.length; ++j) {
-                //     copies[j].classList.remove("selected");
-                // }
                 this.selected.splice(index, 1);
                 reportDeselectedItem(`/utils/deselected-item`, csrfToken, item, this.selected, ()=>{ 
                     return {
@@ -285,10 +239,6 @@
                 });
             } else {
                 // Not there, insert
-                // var copies = document.getElementsByName(event.srcElement.name);
-                // for (let j = 0; j < copies.length; ++j) {
-                //     copies[j].classList.add("selected");
-                // }
                 this.selected.push(item);
                 reportSelectedItem(`/utils/selected-item`, csrfToken, item, this.selected, ()=>{
                     return {
