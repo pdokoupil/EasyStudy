@@ -14,7 +14,7 @@ pm = PluginManager(plugins_folder="plugins")
 csrf = CSRFProtect()
 
 sess = Session()
-rds = redis.Redis(host='localhost', port=6379, decode_responses=True)
+rds = redis.Redis(host='localhost', port=6379)
 
 # Insert/set all values that have to be set once (e.g. insert interaction types into DB)
 def initialize_db_tables():

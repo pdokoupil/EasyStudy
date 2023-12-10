@@ -23,6 +23,48 @@
             {{hint}}
         </b-jumbotron>
     
+        <b-col align-h="center">
+            <b-row align-h="center" v-for="variantResults in variantsResults" :set="algoIdx = variantsResults.indexOf(variantResults)">
+                <b-col class="text-center" align-h="center">
+                    <h5>{{algorithm}} [[ variantNames[algoIdx] ]]</h5>
+                    <b-row align-h="center" class="mb-1 mt-1" v-for="row in variantResults">
+                        <b-col class="col" xl="auto" class="align-middle" v-for="col in row">
+                        
+                        <div>
+                            <b-popover @show="popoverShown" @hidden="popoverHidden" :target="variantNames[algoIdx] + '_' + col.movie_idx" triggers="hover" placement="right">
+                                <template #title>[[col.movie]]</template>
+                                 <div>
+                                    <strong>Plot: </strong>
+                                    [[col.plot]]
+                                 </div>
+                                 <div v-if="col.trailer_url" class="mt-1 text-center">
+                                    <b-button target="_blank" @click="onTrailerWatch(col)" :href="col.trailer_url" size="sm" variant="primary">IMDb trailer</b-button>
+                                 </div>
+                                 
+                            </b-popover>
+                            <b-img @mouseenter="itemMouseEnter" @mouseleave="itemMouseLeave" :id="variantNames[algoIdx] + '_' + col.movie_idx" style="width: 175px; height: 260px;" block center :src="col.url" v-on:click="onSelectMovie($event, col, variantsResults.indexOf(variantResults))" :name="col.movie_idx" :alt="col.movie" />
+                            
+                            
+                        </div>
+                        </b-col>
+                    </b-row>
+                    <b-row align-h="center">
+                        <b-col cols="4">
+                            <label for="rating-sm" class="mt-1">{{algorithm_satisfaction}}</label>
+                            <b-form-rating :variant="algorithmRatingVariant(variantsResults.indexOf(variantResults))" v-on:change="onAlgorithmRatingChanged($event, variantsResults.indexOf(variantResults))" show-value show-value-max id="rating-sm" size="sm"></b-form-rating>
+                        </b-col>
+                    </b-row>
+                    
+                    <!-- Separator (except for after last one) -->
+                    <b-row v-if="algoIdx < variantsResults.length - 1" class="mt-1 mb-1">
+                        <b-container fluid>
+                            <div style="height: 10px; background-color: red;"></div>
+                        </b-container>
+                    </b-row>
+                </b-col>
+            </b-row>
+        </b-col>
+
         <!-- <b-row align-h="center">
             <b-col class="text-center">
                 <b-form method="POST" action="{{continuation_url}}">
@@ -49,6 +91,8 @@
             <b-col class="text-center">
                 <b-form method="POST" action="{{continuation_url}}">
                     <input type="hidden" name="csrf_token" value="{{csrf_token()}}"/>
+                    <input type="hidden" name="selected_items" :value="selectedMovieIndices"/>
+                    <input type="hidden" name="wtf" value="Test"/>
                     <b-button variant="success" type="submit">Continue</b-button>
                 </b-form>
             </b-col>
@@ -74,7 +118,9 @@
     var refinementLayout = "{{refinement_layout}}";
     var defaultRefinementValidated = refinementLayout != "4";
     
-    var itemsPerRow = 2; // Two columns per recommendation list
+    var itemsPerRow = 5; // Two columns per recommendation list
+
+    
 
     function compare_ctx_lambda() {
         return {
@@ -145,7 +191,8 @@
             variantsResults: moviesColumnified,
             variantNames: variantNames,
             algorithmRatingsValidated: [false, false],
-            selectedMetric: null
+            selectedMetric: null,
+            selectedMovieIndices: ""
         };
     },
     computed: {
@@ -206,30 +253,12 @@
             item['variant'] = variant;
             item['variant_name'] = variantName;
             let index = this.movieIndexOf(this.selected, item);
-
-            if (this.selectedMetric != null && this.selectedMetric.idx != variant) {
-                // We need to remove all selected class tags
-                let elem = document.getElementById(this.selectedMetric.variantName);
-                let imgs = elem.getElementsByTagName('img');
-                for (img of imgs) {
-                    img.classList.remove("selected");
-                }
-            }
-
-            this.selectedMetric = {
-                variant: variant,
-                variantName: variantName
-            };
-
-            // SrcElement is the image, parentNode is cell above, then another Parent is row and final parent is whole column
-            let elem = document.getElementById(variantName);
-            let imgs = elem.getElementsByTagName('img');
-            for (img of imgs) {
-                img.classList.add("selected");
-            }
-
             if (index > -1) {
                 // Already there, remove it
+                var copies = document.getElementsByName(event.srcElement.name);
+                for (let j = 0; j < copies.length; ++j) {
+                    copies[j].classList.remove("selected");
+                }
                 this.selected.splice(index, 1);
                 reportDeselectedItem(`/utils/deselected-item`, csrfToken, item, this.selected, ()=>{ 
                     return {
@@ -239,6 +268,10 @@
                 });
             } else {
                 // Not there, insert
+                var copies = document.getElementsByName(event.srcElement.name);
+                for (let j = 0; j < copies.length; ++j) {
+                    copies[j].classList.add("selected");
+                }
                 this.selected.push(item);
                 reportSelectedItem(`/utils/selected-item`, csrfToken, item, this.selected, ()=>{
                     return {
