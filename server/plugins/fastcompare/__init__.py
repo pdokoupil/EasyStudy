@@ -613,7 +613,7 @@ def long_initialization(guid):
     Path(get_cache_path(semi_local_cache_name)).mkdir(parents=True, exist_ok=True)
     # Actually load the data, passing-in the class and semi-local cache names
     # Note that instance cache does not make sense here since this is clear instance
-    loader = loader.load_data(
+    loader.load_data(
         class_cache_path=get_cache_path("", loader.name()),
         semi_local_cache_path=get_cache_path(semi_local_cache_name, loader.name())
     )

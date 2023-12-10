@@ -1,6 +1,5 @@
 from abc import ABC
 import functools
-import json
 import pickle
 import random
 import sys
@@ -61,6 +60,34 @@ __author_contact__ = "Patrik.Dokoupil@matfyz.cuni.cz"
 __description__ = "Complex plugin for a very customized user study that we have used for journal paper"
 
 bp = Blueprint(__plugin_name__, __plugin_name__, url_prefix=f"/{__plugin_name__}")
+
+# Redis helpers
+# TODO deice if should be moved somewhere else
+# Return user key for a given user (by session)
+def get_uname():
+    return f"user:{session['uuid']}"
+
+# Wrapper for setting values, performs serialization via pickle
+def set_val(key, val):
+    name = get_uname()
+    print("Called setval with=", pickle.dumps(val))
+    rds.hset(name, key, value=pickle.dumps(val))
+
+def set_mapping(name, mapping):
+    rds.hset(name, mapping={x: pickle.dumps(v) for x, v in mapping.items()})
+
+# Wrapper for getting values, performs deserialization via pickle
+def get_val(key):
+    name = get_uname()
+    return pickle.loads(rds.hget(name, key))
+
+def get_all(name):
+    res = {str(x, encoding="utf-8") : pickle.loads(v) for x, v in rds.hgetall(name).items()}
+    return res
+
+def incr(key):
+    x = get_val(key)
+    set_val(key, x + 1)
 
 @bp.route("/create")
 @multi_lang
@@ -150,7 +177,6 @@ def send_feedback():
     conf = load_user_study_config(session['user_study_id'])
     k = conf["k"]
 
-
     # Get a loader
     loader_factory = load_data_loaders()[conf["selected_data_loader"]]
     loader = loader_factory(**filter_params(conf["data_loader_parameters"], loader_factory))
@@ -189,12 +215,12 @@ def send_feedback():
     #prepare_recommendations(weights, recommendations, initial_weights_recommendation, selected_movies, filter_out_movies, k)
     print(f"Recommendations={recommendations}")
     
-    rds.hset(f"user:{session['uuid']}", mapping={
-        'movies': json.dumps(recommendations),
-        'initial_weights_recommendation': json.dumps(initial_weights_recommendation),
-        'iteration': 1,
-        'elicitation_selected_movies': json.dumps(selected_movies),
-        'selected_movie_indices': json.dumps([])
+    set_mapping(get_uname(), {
+        'movies': recommendations,
+        'initial_weights_recommendation': initial_weights_recommendation,
+        'iteration': 0, # Start with zero, because at the very beginning, mors_feedback is called, not mors and that generates recommendations for first iteration, but at the same time, increases the iteration
+        'elicitation_selected_movies': selected_movies,
+        'selected_movie_indices': []
     })
 
     # Set randomly generated refinement layout
@@ -206,7 +232,7 @@ def send_feedback():
         refinement_layout_name = np.random.choice(list(refinement_layouts.keys()))
 
     p = [1, 0, 2]    
-    rds.hset(f"user:{session['uuid']}", "refinement_layout", refinement_layouts[refinement_layout_name])
+    set_val("refinement_layout", refinement_layouts[refinement_layout_name])
 
     elicitation_ended(
         session['elicitation_movies'], selected_movies,
@@ -225,10 +251,16 @@ def send_feedback():
     np.random.shuffle(algorithm_order)
     # ALGORITHM[0] has order ALGORITHM_ORDER[0]
     
-    rds.hset(f"user:{session['uuid']}", mapping={
+    set_mapping(get_uname(), {
         "alphas_iteration": 1,
-        "alphas_p": json.dumps([possible_alphas[:3], possible_alphas[3:]]),
-        "algorithm_order": json.dumps(algorithm_order.tolist())
+        "alphas_p": [possible_alphas[:3], possible_alphas[3:]],
+        "algorithm_order": algorithm_order,
+        "recommendations": {
+           algo: [] for algo in ALGORITHMS # For each algorithm and each iteration we hold the recommendation
+        },
+        "selected_items": {
+           algo: [] for algo in ALGORITHMS # For each algorithm and each iteration we hold the selected items
+        }
     })
 
     #return redirect(url_for("multiobjective.compare_and_refine"))
@@ -527,15 +559,227 @@ def done():
     #it += 1
     #session.modified = True
     print(f"Sess id={request.cookies['something']}")
-    uuid = session['uuid']
-    rds.hset(f"user:{uuid}", "iteration", 1)
+    # Start with zero, because at the very beginning, mors_feedback is called, not mors and that generates recommendations for first iteration, but at the same time, increases the iteration
+    set_val("iteration", 0)
 
-    return f"DONE, it={rds.hget('user:' + uuid, 'iteration')}"
+    return f"DONE, it={get_val('iteration')}"
+
+#####    Algorithms     #####
+# TODO move algorithms to shared common
+
+# Some common abstraction
+# Runs diversification on a relevance based recommendation
+# w.r.t. algorithm passed as algo
+def morsify(k, target_weights, random_users, rel_scores_normed,
+                                algo, items, objectives,
+                                rating_matrix, n_items_subset=None,
+                                do_normalize=False, rnd_mixture=False):
+    ####TODO REMOVE SEED SETTING!!!
+    random.seed(42)
+    np.random.seed(42)
+    ### TODO
     
+    start_time = time.perf_counter()
+    top_k_lists = np.zeros(shape=(random_users.size, k), dtype=np.int32)
+    scores = np.zeros(shape=(items.size if n_items_subset is None else n_items_subset, ), dtype=np.float32)
+    # Hold marginal gain for each item, objective pair
+    mgains = np.zeros(shape=(len(objectives) + 1, items.size if n_items_subset is None else n_items_subset), dtype=np.float32)
+    # marginal gains for relevance are calculated separate, this is optimization and brings some savings when compared to naive calculation
+    mgains[-1, :] = rel_scores_normed
+
+    # Sort relevances
+    sorted_relevances = np.argsort(-rel_scores_normed, axis=-1)
+   
+    # Iterate over the random users sample
+    for user_idx, random_user in enumerate(random_users):
+        
+        #print(f"User_idx = {user_idx}, user={random_user}")
+        
+        # If n_items_subset is specified, we take subset of items
+        if n_items_subset is None:
+            source_items = items
+        else:
+            if rnd_mixture:
+                assert n_items_subset % 2 == 0, f"When using random mixture we expect n_items_subset ({n_items_subset}) to be divisible by 2"
+                source_items = np.concatenate([sorted_relevances[user_idx, :n_items_subset//2], np.random.choice(sorted_relevances[user_idx, n_items_subset:], n_items_subset//2, replace=False)])
+            else:
+                source_items = sorted_relevances[user_idx, :n_items_subset]
+
+        # Mask-out seen items by multiplying with zero
+        # i.e. 1 is unseen
+        # 0 is seen
+        # Lets first set zeros everywhere
+        seen_items_mask = np.zeros(shape=(random_users.size, source_items.size), dtype=np.int8)
+        # And only put 1 to UNSEEN items in CANDIDATE (source_items) list
+        seen_items_mask[rating_matrix[np.ix_(random_users, source_items)] <= 0.0] = 1
+        print(f"### Unseen: {seen_items_mask.sum()} out of: {seen_items_mask.shape[0] * seen_items_mask.shape[1]}")
+        
+        # Build the recommendation incrementally
+        for i in range(k):
+            for objective_index, (objective, objective_mgain_cdf) in enumerate(objectives):
+                # Cache f_prev
+                f_prev = objective(top_k_lists[user_idx, :i])
+                
+                # For every source item, try to add it and calculate its marginal gain
+                st = time.perf_counter()
+                for j, item in enumerate(source_items):
+                    top_k_lists[user_idx, i] = item # try extending the list
+                    mgains[objective_index, j] = (objective(top_k_lists[user_idx, :i+1]) - f_prev)
+                    
+                # If we should normalize, use cdf_div to normalize marginal gains
+                if do_normalize:
+                    # Reshape to N examples with single feature
+                    mgains[objective_index] = objective_mgain_cdf.transform(mgains[objective_index].reshape(-1, 1)).reshape(mgains[objective_index].shape)
+        
+            # Calculate scores
+            scores = algo(rel_scores_normed, mgains, target_weights)
+
+            # Ensure seen items get lowest score of 0
+            # Just multiplying by zero does not work when scores are not normalized to be always positive
+            # because masked-out items will not have smallest score (some valid, non-masked ones can be negative)
+            # scores = scores * seen_items_mask[user_idx]
+            # So instead we do scores = scores * seen_items_mask[user_idx] + NEG_INF * (1 - seen_items_mask[user_idx])
+            min_score = scores.min()
+            # Unlike in predict_with_score, here we do not mandate NEG_INF to be strictly smaller
+            # because rel_scores may already contain some NEG_INF that was set by predict_with_score
+            # called previously -> so we allow <=.
+            assert NEG_INF <= min_score, f"min_score ({min_score}) is not smaller than NEG_INF ({NEG_INF})"
+            scores = scores * seen_items_mask[user_idx] + NEG_INF * (1 - seen_items_mask[user_idx])
+
+            # Get item with highest score
+            # But beware that this is index inside "scores"
+            # which has same size as subset of rnd_items
+            # so we need to map item index to actual item later on
+            best_item_idx = scores.argmax()
+            best_item = source_items[best_item_idx]
+                
+            # Select the best item and append it to the recommendation list            
+            top_k_lists[user_idx, i] = best_item
+            # Mask out the item so that we do not recommend it again
+            seen_items_mask[user_idx, best_item_idx] = 0
+
+    print(f"Diversification took: {time.perf_counter() - start_time}")
+    return top_k_lists
+
+
+# Greedy algorithm that just search items whose supports are 
+def greedy(mgains, target_weights):
+    n_objectives, n_items = mgains.shape
+    assert n_objectives == target_weights.size
+    # Convert distances to scores (the lower the distance, the higher the score)
+    scores = -1 * ((mgains - target_weights[:, np.newaxis]) ** 2).sum(axis=0)
+    assert scores.shape == np.shape([n_items, ])
+    return scores
+
+
+class rlprop_mod:
+    def __init__(self, weights):
+        self.weights = weights
+        self.n_objectives = weights.size
+        self.TOT = 0.0
+        self.gm = np.zeros(shape=(self.n_objectives, ), dtype=np.float32)
+
+    def __call__(self, mgains):
+        _, n_items = mgains.shape
+        assert np.all(mgains >= 0.0), "We expect all mgains to be normalized to be greater than 0"
+        tots = np.zeros(shape={n_items, }, dtype=np.float32)
+        remainder = np.zeros_like(self.gm)
+        scores = np.zeros_like(tots)
+        for item_idx in np.arange(n_items):
+            tots[item_idx] = max(self.TOT, self.TOT + mgains[:, item_idx].sum())
+            remainder = (tots[item_idx] * self.weights - self.gm) ** 2
+            assert remainder.shape == (self.n_objectives,)
+            # We want to push remainder to 0 by maximizing score (so we minimize its negative)
+            scores[item_idx] = -remainder.sum()
+
+
+
+# Does not get throough morsify as this is end-to-end approach to MORS, not "diversification" or "morsification"
+def moea():
+    pass
+
+##### End of algorithms #####
+
 @bp.route("/mors-feedback", methods=["GET", "POST"])
 def mors_feedback():
+    user_data = get_all(get_uname())
+    it = user_data["iteration"]
+
+    cur_block = it // N_ITERATIONS
+    cur_algorithm = ALGORITHMS[user_data['algorithm_order'][cur_block]]
+
+    # Get selected items
+    selected_items = request.form.get("selected_items")
+    selected_items = selected_items.split(",") if selected_items else []
+    selected_items = [int(m) for m in selected_items]
+    selected_items_history = get_val('selected_items')
+    selected_items_history[cur_algorithm].append(selected_items)
+    set_val('selected_items', selected_items_history)
+    
+    # Store those items in redis
+    
+    conf = load_user_study_config(session['user_study_id'])
+
+    # Get a loader
+    loader_factory = load_data_loaders()[conf["selected_data_loader"]]
+    loader = loader_factory(**filter_params(conf["data_loader_parameters"], loader_factory))
+    loader = load_data_loader_cached(loader, session['user_study_guid'], loader_factory.name(), get_semi_local_cache_name(loader))
+
+
     #print(f"MORS-FEEDBACK IT before = {session['iteration']}")
-    rds.hincrby(f"user:{session['uuid']}", "iteration")
+    
+    
+    # Generate the actual recommendations
+    recommendation = {}
+
+    items = np.arange(loader.rating_matrix.shape[1])
+    objectives = []
+    # Uniform target weights for now
+    target_weights = np.ones(shape=(len(objectives), ), dtype=np.float32) / len(objectives)
+
+    k = 10
+
+    # Generate recommendation for relevance only EASE
+    ease = EASER_pretrained(items)
+    ease = ease.load(os.path.join(get_cache_path(get_semi_local_cache_name(loader)), "item_item.npy"))
+    elicitation_selected = np.array(user_data['elicitation_selected_movies'])
+    # Train the algorithm on all movies selected during preference elicitation
+    # and all movies previously selected during recommendations made by current algorithm
+    training_selections = np.concat([elicitation_selected] + selected_items_history[cur_algorithm])
+    rel_scores, user_vector, _ = ease.predict_with_score(training_selections, training_selections, k)
+    rel_scores = rel_scores[np.newaxis, :]
+    cdf_rel = load_cdf_cache(get_cache_path(get_semi_local_cache_name(loader)), "REL")
+    rel_scores_normed = cdf_rel.transform(rel_scores.reshape(-1, 1)).reshape(rel_scores.shape)
+    user_vector = user_vector[np.newaxis, :]
+
+    if cur_algorithm == "RLPROP":
+        top_k = np.random.choice(np.arange(15000), 10, replace=False)
+    elif cur_algorithm == "WA":
+        algo = greedy
+        top_k = morsify(
+            10, target_weights, np.array([0]), rel_scores_normed, algo,
+            items, objectives, user_vector, n_items_subset=5,
+            do_normalize=True, rnd_mixture=True
+        )
+    elif cur_algorithm == "MOEA-RS":
+        top_k = np.random.choice(np.arange(15000), 10, replace=False)
+    else:
+        assert False, f"Unknown algorithm: {cur_algorithm} for it={it}"
+
+    recommendation[cur_algorithm] = {
+        'movies': enrich_results(top_k, loader),
+        'order': 0
+    }
+
+    # Increment the iteration
+    incr("iteration")
+
+    # Here we should generate recommendation and update the current list
+    recommendations = get_val('recommendations')
+    recommendations[cur_algorithm].append(recommendation)
+    set_val('recommendations', recommendations)
+
+    set_val('recommendation', recommendation)
 
     #print(f"MORS feedback iter after: {session['iteration']} but should have been {it + 1}")
     #assert session.modified == True
@@ -545,13 +789,13 @@ def mors_feedback():
 @bp.route("/mors", methods=["GET", "POST"])
 def mors():
     #it = session['iteration']
-    user_data = rds.hgetall(f"user:{session['uuid']}")
-    it = int(user_data["iteration"])
+    user_data = get_all(get_uname())
+    it = user_data["iteration"]
 
     print(f"MORS IT={it}")
 
     cur_block = (int(it) - 1) // N_ITERATIONS
-    cur_algorithm = ALGORITHMS[int(json.loads(user_data['algorithm_order'])[cur_block])]
+    cur_algorithm = ALGORITHMS[user_data['algorithm_order'][cur_block]]
     
     if cur_algorithm == "RLPROP":
         pass
@@ -569,10 +813,11 @@ def mors():
     else:
         continuation_url = url_for("journal.mors_feedback")
 
+    # TODO replace random with user_data['movies'] which in turn should be filled in by recommendation algorithms
     params = {
         "continuation_url": continuation_url,
         "iteration": it,
-        "movies": user_data['movies']
+        "movies": get_val('recommendation')
     }
     #assert session.modified == False
     return render_template("mors.html", **params)
@@ -581,29 +826,26 @@ def mors():
 # This is where we generate the results, compare-alphas then just shows them
 @bp.route("/metric-feedback", methods=["POST"])
 def metric_feedback():
-    
-    u_key = f"user:{session['uuid']}"
-
-    user_data = rds.hgetall(u_key)
+    user_data = get_all(get_uname())
 
     # We are before first iteration
-    cur_iter = int(user_data['alphas_iteration'])
+    cur_iter = user_data['alphas_iteration']
     print(f"METRIC FEEDBACK step 1 = {cur_iter}")
     if cur_iter == 1:
         selected_metric_name = request.form.get("selected_metric_name")
         #selected_metric_index = request.form.get("selected_metric_index")
-        rds.hset(u_key, 'selected_metric_name', selected_metric_name)
+        set_val('selected_metric_name', selected_metric_name)
     else:
         selected_metric_name = user_data['selected_metric_name']
     
     if cur_iter >= N_ALPHA_ITERS:
-        continuation_url = url_for("journal.mors")
+        continuation_url = url_for("journal.mors_feedback")
     else:
         continuation_url = url_for("journal.metric_feedback")
 
 
     # Take alpha values to be shown in the current step
-    current_alphas = json.loads(user_data['alphas_p'])[cur_iter - 1]
+    current_alphas = user_data['alphas_p'][cur_iter - 1]
 
     #@profile
     #def compare_alphas_x():
@@ -636,7 +878,7 @@ def metric_feedback():
     items = np.arange(loader.rating_matrix.shape[1])
     algo = EASER_pretrained(items)
     algo = algo.load(os.path.join(get_cache_path(get_semi_local_cache_name(loader)), "item_item.npy"))
-    elicitation_selected = np.array(json.loads(user_data['elicitation_selected_movies']))
+    elicitation_selected = np.array(user_data['elicitation_selected_movies'])
     rel_scores, user_vector, _ = algo.predict_with_score(elicitation_selected, elicitation_selected, k)
     rel_scores = rel_scores[np.newaxis, :]
     cdf_rel = load_cdf_cache(get_cache_path(get_semi_local_cache_name(loader)), "REL")
@@ -660,13 +902,13 @@ def metric_feedback():
         }
 
     #session['alpha_movies'] = params
-    rds.hset(u_key + ":alpha_movies", mapping={
-        "movies": json.dumps(params["movies"])
+    set_mapping(get_uname() + ":alpha_movies", {
+        "movies": params["movies"]
     })
 
     cur_iter += 1
     #session['alphas_iteration'] = cur_iter
-    rds.hset(u_key, 'alphas_iteration', cur_iter)
+    set_val('alphas_iteration', cur_iter)
 
     return redirect(url_for("journal.compare_alphas", continuation_url=continuation_url))
 
@@ -675,8 +917,7 @@ def compare_alphas():
     continuation_url = request.args.get("continuation_url")
     #params = session['alpha_movies']
     u_key = f"user:{session['uuid']}"
-    params = rds.hgetall(u_key + ":alpha_movies")
-    params["movies"] = json.loads(params["movies"])
+    params = get_all(u_key + ":alpha_movies")
     params["continuation_url"] = continuation_url
     return render_template("compare_alphas.html", **params)
 
@@ -699,8 +940,7 @@ def metric_assesment():
     print(f"Took 2+:", time.perf_counter() - start_time)
     print(f"@@ {loader.get_item_id(270)}, {loader.get_item_index(333)}, {loader.get_item_index_description(270)}, {loader.get_item_id_description(333)}")
     # Movie indices of selected movies
-    elicitation_selected = json.loads(rds.hget(f"user:{session['uuid']}", "elicitation_selected_movies"))
-    elicitation_selected = np.array(elicitation_selected)
+    elicitation_selected = np.array(get_val("elicitation_selected_movies"))
     rel_scores, user_vector, ease_pred = algo.predict_with_score(elicitation_selected, elicitation_selected, k)
     rel_scores = rel_scores[np.newaxis, :]
     cdf_rel = load_cdf_cache(get_cache_path(get_semi_local_cache_name(loader)), "REL")
