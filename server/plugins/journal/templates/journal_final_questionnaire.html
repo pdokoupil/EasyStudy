@@ -1,0 +1,137 @@
+{% include 'header.html' %}
+
+<div id="app">
+    <b-container fluid>
+        <b-jumbotron class="smallJumbotron" header="{{header}}" lead="">
+            {{hint}}
+        </b-jumbotron>
+    
+        <b-form method="GET" action="{{ continuation_url }}">
+            <b-row class="mb-3" align-h="center">
+                <b-col cols="auto" >
+                    <b-row align-v="center">
+                        <b-col class="mt-2" cols="auto">
+                            <b-row>
+                                <b-col>
+                                    <b-icon class="h1" icon="grid"></b-icon>
+                                </b-col>
+                            </b-row>
+                            <b-row>
+                                <b-col>
+                                    <b-icon class="h1" icon="grid"></b-icon>
+                                </b-col>
+                            </b-row>
+                        </b-col>
+                        <b-col>
+                            <b-form-group name="q1" id="q1">
+                                <b-label for="q1">
+                                    <strong>1. TODO Q1</strong>
+                                </b-label>
+                                <b-form-radio-group name="q1" required>
+                                    <b-form-radio value="-2">Strongly Disagree</b-form-radio>
+                                    <b-form-radio value="-1">Disagree</b-form-radio>
+                                    <b-form-radio value="0">Neutral</b-form-radio>
+                                    <b-form-radio value="1">Agree</b-form-radio>
+                                    <b-form-radio value="2" class="mr-5">Strongly Agree</b-form-radio>
+                                    <b-form-radio value="3" class="ml-5">I don't understand</b-form-radio>
+                                </b-form-radio-group>
+                            </b-form-group>
+                        </b-col>
+                    </b-row>
+                    
+                    <b-row class="mt-5" align-v="center">
+                        <b-col class="mt-2" cols="auto">
+                            <b-row>
+                                <b-col>
+                                    <b-icon class="h1" icon="grid"></b-icon>
+                                </b-col>
+                            </b-row>
+                            <b-row>
+                                <b-col>
+                                    <b-icon class="h1" icon="grid"></b-icon>
+                                </b-col>
+                            </b-row>
+                        </b-col>
+                        <b-col>
+                            <b-form-group name="q2" id="q2">
+                                <b-label for="q2">
+                                    <strong>2. TODO Q2</strong>
+                                </b-label>
+                                <b-form-radio-group name="q2" required>
+                                    <b-form-radio value="-2">Strongly Disagree</b-form-radio>
+                                    <b-form-radio value="-1">Disagree</b-form-radio>
+                                    <b-form-radio value="0">Neutral</b-form-radio>
+                                    <b-form-radio value="1">Agree</b-form-radio>
+                                    <b-form-radio value="2" class="mr-5">Strongly Agree</b-form-radio>
+                                    <b-form-radio value="3" class="ml-5">I don't understand</b-form-radio>
+                                </b-form-radio-group>
+                            </b-form-group>
+                        </b-col>
+                    </b-row>
+
+                </b-col>
+            </b-row>
+        </b-form>
+
+        <b-row align-h="center">
+            <b-col class="text-center">
+                <b-form method="POST" action="{{continuation_url}}">
+                    <input type="hidden" name="csrf_token" value="{{csrf_token()}}"/>
+                    <input type="hidden" name="final_questionnaire_data" value="final_questionnaire_data"/>
+                    <b-button variant="success" type="submit">{{finish}}</b-button>
+                </b-form>
+            </b-col>
+        </b-row>
+        
+        
+
+    </b-container>
+</div>
+
+<script src="{{url_for('static', filename='message_reporting.js')}}"></script>
+<script src="{{url_for('static', filename='resolution_handling.js')}}"></script>
+<script src="{{url_for('static', filename='interaction_reporting.js')}}"></script>
+<script>
+
+    var csrfToken = "{{csrf_token()}}";
+
+    window.app = new Vue({
+    el: '#app',
+    delimiters: ['[[',']]'], // Used to replace double { escaping with double [ escaping (to prevent jinja vs vue inference)
+    data: function() {
+        
+        return {
+            
+        };
+    },
+    methods: {
+        
+    },
+    async mounted() {
+        const btns = document.querySelectorAll("button");
+        const radios = document.querySelectorAll("input[type=radio]");
+        const checkboxes = document.querySelectorAll("input[type=checkbox]");
+        const textboxes = document.querySelectorAll("input[type=text]");
+        const selects = document.querySelectorAll("select");
+        
+        // Register the handlers for event reporting
+        startViewportChangeReportingWithLimit(`/utils/changed-viewport`, csrfToken, 1.0, true);
+        startScrollReportingWithLimit(`/utils/changed-viewport`, csrfToken, 1.0, document.getElementsByName("scrollableDiv"));
+        registerClickedButtonReporting(`/utils/on-input`, csrfToken, btns);
+        registerClickedRadioReporting("/utils/on-input", csrfToken, radios);
+        registerClickedCheckboxReporting("/utils/on-input", csrfToken, checkboxes);
+        registerChangedSelectionReporting("/utils/on-input", csrfToken, selects);
+        reportLoadedPage(`/utils/loaded-page`, csrfToken, "final_questionnaire");
+    }
+})
+</script>
+
+{% if footer_override is defined and footer_override is not none %}
+  <div class="footerDiv mt-3">
+    {{ footer_override | safe}}
+  </div>
+</body>
+</html>
+{% else %}
+{% include 'footer.html' %}
+{% endif %}

@@ -4,6 +4,10 @@
         border-left: 10px solid red;
     }
 
+    .horizontalSeparator {
+        border-top: 10px solid red;
+    }
+
     .footerDiv {
         position: fixed;
         bottom: 0;
@@ -16,7 +20,138 @@
         outline: 5px solid greenyellow;
         outline-offset: -5px;
     }
+
+    .draggableSquare {
+        width: 150px;
+        padding: 10px;
+        margin: 5px;
+        color: white;
+        text-align:center;
+        border-radius: 0.75em;
+        touch-action: none;
+        user-select: none;
+        transform: translate(0px, 0px);
+        font-size: large;
+        font-weight: bold;
+    }
 </style>
+<script src="https://unpkg.com/interactjs@1.10.26/dist/interact.min.js"></script>
+<script>
+
+// https://stackoverflow.com/questions/37545130/how-to-restrict-drag-elements-to-overlap-in-interact-js
+function overlapsCheck (event) {
+    var target = event.target
+    var overlapElements = document.getElementsByClassName("draggable");
+    var dx = event.dx;
+    var dy = event.dy;
+
+    var overlap = false;
+    var maxOverlapTop = 0;
+    var targetDims = event.target.getBoundingClientRect();
+    
+    var tolerance = 30; /*Do not try to solve smaller overlaps*/
+
+    for(i = 0; i < overlapElements.length; i++){
+        var overlapElementDims =  
+        overlapElements[i].getBoundingClientRect();
+
+        if(overlapElements[i] != event.target){
+            if(((targetDims.right + dx) < (overlapElementDims.left + 1)) 
+            ||((targetDims.left + 1 + dx) > (overlapElementDims.right)) 
+            ||((targetDims.top + 1 + dy) > (overlapElementDims.bottom)) 
+            ||((targetDims.bottom + dy) < (overlapElementDims.top + 1))){
+
+            }
+            else{
+                //check whether Y overlap is substantial
+                if(Math.abs(targetDims.top - overlapElementDims.top) < tolerance){  
+                    overlap = true;
+                    
+                    if( maxOverlapTop < overlapElementDims.top){
+                        maxOverlapTop = overlapElementDims.top;
+                        relativeYTransition = overlapElementDims.top - targetDims.top +  tolerance;
+                    }
+                }
+            }
+        }
+    };
+    
+    if(overlap === true){
+        //move item below the last item with overlaps
+        
+        dims = target.getBoundingClientRect();
+
+        var x = (parseFloat(target.getAttribute('data-x')) || 0) + event.dx;
+        var y = (parseFloat(target.getAttribute('data-y')) || 0) + event.dy;
+        
+        //var x = dims.left;
+        //var y = dims.top;
+        console.log([x,y, maxOverlapTop])
+        var y_target = y + relativeYTransition;
+        
+        event.target.style.transform = 'translate(' + x + 'px, ' + y_target + 'px)';
+
+        event.target.setAttribute('data-x', x);
+        event.target.setAttribute('data-y', y_target);    
+    
+    
+        // recurrent calling as the re-position might cause another overlap
+        overlapsCheck (event);
+    }
+}
+
+// target elements with the "draggable" class
+interact('.draggable')
+  .draggable({
+    // enable inertial throwing
+    inertia: false,
+    // keep the element within the area of it's parent
+    modifiers: [
+    //    interact.modifiers.snap({
+    //     targets: [
+    //       interact.snappers.grid({ x: 30, y: 15 })
+    //     ],
+    //     range: Infinity,
+    //     relativePoints: [ { x: 0, y: 0 } ]
+    //   }),
+      interact.modifiers.restrictRect({
+        restriction: 'parent',
+        endOnly: true
+      })
+    ],
+       
+    // enable autoScroll
+    autoScroll: true,
+
+    listeners: {
+      // call this function on every dragmove event
+      move: dragMoveListener,
+
+      // call this function on every dragend event
+      end (event) {
+        //var textEl = event.target.querySelector('p')
+        overlapsCheck (event);
+      }   
+    }
+  })
+
+function dragMoveListener (event) {
+    var target = event.target
+    // keep the dragged position in the data-x/data-y attributes
+    var x = (parseFloat(target.getAttribute('data-x')) || 0) + event.dx;
+    var y = (parseFloat(target.getAttribute('data-y')) || 0) + event.dy;
+
+    // translate the element
+    target.style.transform = 'translate(' + x + 'px, ' + y + 'px)';
+
+    // update the posiion attributes
+    target.setAttribute('data-x', x);
+    target.setAttribute('data-y', y);
+}
+
+// this function is used later in the resizing and gesture demos
+window.dragMoveListener = dragMoveListener;
+</script>
 <div id="app">
     <b-container fluid>
         <b-jumbotron style="max-height: 7vh;" class="smallJumbotron" header="{{header}}" lead="">
@@ -34,13 +169,19 @@
             </b-col>
         </b-row> -->
 
-        <b-row class="ml-1 mr-1" style="height: 85vh;">
-            <!-- Prevent the column from overflow in vertical direction -->
-            <b-col class="row-container" style="display: flex; flex-direction: column; overflow: hidden; height: 100%;" v-for="variantResults in variantsResults" :set="algoIdx = variantsResults.indexOf(variantResults)" :id="variantNames[algoIdx]" :class="variantsResults.indexOf(variantResults) != 0 ? 'verticalSeparator' : ''">
+        <b-row>
+            <b-col v-for="variantResults in variantsResults" :set="algoIdx = variantsResults.indexOf(variantResults)">
                 <b-row style="flex: 1; display: flex; align-items: stretch;" align-h="center">
                     <h5>{{algorithm}} [[ variantNames[algoIdx] ]]</h5>
                 </b-row>
-                <b-row align-h="center" class="custom-row" v-for="row in variantResults">
+            </b-col>
+        </b-row>
+
+        <b-row class="ml-1 mr-1" style="height: 75vh;">
+            <!-- Prevent the column from overflow in vertical direction -->
+            <b-col class="row-container" style="display: flex; flex-direction: column; overflow: hidden; height: 100%;" v-for="variantResults in variantsResults" :set="algoIdx = variantsResults.indexOf(variantResults)" :id="variantNames[algoIdx]" :class="variantsResults.indexOf(variantResults) != 0 ? 'verticalSeparator' : ''">
+                
+                <b-row align-h="center" class="custom-row" :style="{'background-color': variantColors[algoIdx]}" v-for="row in variantResults">
                     <b-col cols="auto" style="height: 100%; margin-left: 1px; margin-right: 1px; padding-left: 0; padding-right: 0;" class="align-middle" v-for="col in row">
                             <b-popover @show="popoverShown" @hidden="popoverHidden" :target="variantNames[algoIdx] + '_' + col.movie_idx" triggers="hover" placement="right">
                                 <template #title>[[col.movie]]</template>
@@ -58,10 +199,29 @@
                 </b-row>
             </b-col>
         </b-row>
-        
         <b-form method="POST" action="{{continuation_url}}">
-
-            <b-row align-h="center" style="max-height: 3vh;">
+            <b-row class="horizontalSeparator mt-1 pt-1" align-h="center" align-v="center">
+                <b-col class="text-right" style="font-size: large;">
+                    🡸 Least Diverse 🡸
+                </b-col>
+                <b-col class="text-center">
+                    <div style="width: 100%; height: 100%; background-color: rgb(214, 210, 210);">
+                        <!-- <b-row > -->
+                            <div class="draggable draggableSquare" :style="{'background-color': variantColors[variantNames.indexOf(variantName)]}" style="color: black;" v-for="variantName in variantNames">
+                                [[variantName]]
+                            </div>
+                        <!-- </b-row> -->
+                    </div>
+                    
+                    <!-- <div style="width: 100%; height: 100%; background-color: rgb(168, 164, 164);">
+                        
+                    </div> -->
+                </b-col>
+                <b-col class="text-left" style="font-size: large;">
+                    🡺 Most Diverse 🡺
+                </b-col>
+            </b-row>
+            <!-- <b-row align-h="center" style="max-height: 3vh;">
                 <b-col class="text-center" v-for="variantName in variantNames">
                     <b-form-radio-group
                         id="radio-most-diverse"
@@ -84,11 +244,11 @@
                     </b-form-radio-group>
                 </b-col>
                 
-            </b-row>
+            </b-row> -->
             <b-row align-h="center">
                 <b-col class="text-center">
                     <input type="hidden" name="csrf_token" value="{{csrf_token()}}"/>
-                    <b-button v-if="mostDiverse != null && leastDiverse != null" variant="success" type="submit">Continue</b-button>
+                    <b-button variant="success" type="submit">Continue</b-button>
                 </b-col>
             </b-row>
         </b-form>
@@ -150,12 +310,28 @@
 
         var numAlgorithms = Object.keys(movies).length;
         var variantNames = new Array(numAlgorithms);
+        // var variantColors = new Array(numAlgorithms);
         let moviesColumnified = new Array(numAlgorithms);
 
+        let availColors = [
+            "#f8f398",
+            "#f1b963",
+            "#cbf078",
+            "#e46161",
+            "#f5c7f7",
+            "#a393eb",
+            "#5e63b6",
+            "#27296d"
+        ];
+
+        let variantColors = availColors.slice(0, numAlgorithms);
+
+        let colorIdx = 0;
         for (variantIdx in movies) {
             let variantResults = movies[variantIdx]["movies"];
             let order = parseInt(movies[variantIdx]["order"]);
             variantNames[order] = variantIdx.toUpperCase();
+
             console.log(variantIdx);
             console.log(variantResults);
             console.log(order);
@@ -180,10 +356,12 @@
             dontLikeAnythingValue: false,
             variantsResults: moviesColumnified,
             variantNames: variantNames,
+            variantColors: variantColors,
             algorithmRatingsValidated: [false, false],
             selectedMetric: null,
             mostDiverse: null,
-            leastDiverse: null
+            leastDiverse: null,
+            bgColor: "red"
         };
     },
     computed: {

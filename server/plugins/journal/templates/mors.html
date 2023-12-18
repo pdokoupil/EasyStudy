@@ -48,13 +48,13 @@
                         </div>
                         </b-col>
                     </b-row>
-                    <b-row align-h="center">
+                    <!-- <b-row align-h="center">
                         <b-col cols="4">
                             <label for="rating-sm" class="mt-1">{{algorithm_satisfaction}}</label>
                             <b-form-rating :variant="algorithmRatingVariant(variantsResults.indexOf(variantResults))" v-on:change="onAlgorithmRatingChanged($event, variantsResults.indexOf(variantResults))" show-value show-value-max id="rating-sm" size="sm"></b-form-rating>
                         </b-col>
                     </b-row>
-                    
+                     -->
                     <!-- Separator (except for after last one) -->
                     <b-row v-if="algoIdx < variantsResults.length - 1" class="mt-1 mb-1">
                         <b-container fluid>
@@ -87,16 +87,116 @@
             </b-col>
         </b-row>
 
-        <b-row align-h="center">
-            <b-col class="text-center">
-                <b-form method="POST" action="{{continuation_url}}">
-                    <input type="hidden" name="csrf_token" value="{{csrf_token()}}"/>
-                    <input type="hidden" name="selected_items" :value="selectedMovieIndices"/>
-                    <input type="hidden" name="wtf" value="Test"/>
-                    <b-button variant="success" type="submit">Continue</b-button>
-                </b-form>
-            </b-col>
+        <b-row v-if="!selected.length" class="mt-2" align-h="center">
+            <b-form-checkbox
+                :state="dontLikeAnythingState"    
+                v-model="dontLikeAnythingValue"
+            >
+                {{like_nothing}}
+            </b-form-checkbox>
         </b-row>
+
+        <b-row class="mt-4 mb-4">
+            <b-col center class="align-middle"></b-col>
+            <b-col center class="align-middle text-center">
+                <b-button
+                    @click="showAndScroll"
+                    :disabled="showRefinement || !allValidated"
+                    block
+                    variant="primary"
+                    :class="showRefinement ? null : 'collapsed'"
+                    :aria-expanded="showRefinement ? 'true' : 'false'"
+                    aria-controls="collapse-1">Continue</b-button>
+            </b-col>
+            <b-col center class="align-middle"></b-col>
+        </b-row>
+
+        <b-collapse id="collapse-1" v-model="showRefinement" class="mt-2">
+            <b-card>
+                <b-row class="mb-3">
+                    <b-col class="text-center">You can tweak the recommendation algorithm by fine-tuning the amount of attention it pays to different objectives. This will affect recommendations in the next step. Description of individual objectives is hidden under the questionmark icon. <strong>How much of the specified quality should be present in the next recommendation iteration?</strong></b-col>
+                </b-row>
+                <b-row align-v="center">
+                    <b-col>
+                        <b-form method="GET" action="{{ url_for('journal.mors_feedback') }}">
+                            <b-row align-h="center">
+                                <b-col class="text-center" align-v="center">
+                                    Relevance
+                                </b-col>
+                            </b-row>
+                            <b-row class="mb-2" align-v="center">
+                                <b-col></b-col>
+                                <b-col class="text-center">
+                                    <!-- <b-icon class="mr-1 h3" id="relevance-help" icon="question-circle-fill" variant="primary"></b-icon>
+                                    <b-tooltip target="relevance-help" triggers="hover">{{relevance_explanation}}</b-tooltip> -->
+                                    <b-form-input style="height: 100%;" id="range-1" type="range"  step="0.01" min="0" max="1"></b-form-input>
+                                </b-col>
+                                <b-col></b-col>
+                            </b-row>
+                            <b-row class="mb-2" align-v="center">
+                                <b-col align-v="center" class="text-right">
+                                    Uniformity
+                                </b-col>
+                                <b-col align-v="center" class="text-center" style="vertical-align: middle; text-align: center;">
+                                    <!-- <b-icon class="mr-1 h3" id="relevance-help" icon="question-circle-fill" variant="primary"></b-icon>
+                                    <b-tooltip target="relevance-help" triggers="hover">{{relevance_explanation}}</b-tooltip> -->
+                                    <b-form-input style="height: 100%;" id="range-1" type="range"  step="0.01" min="0" max="1"></b-form-input>
+                                </b-col>
+                                <b-col align-v="center"class="text-left">
+                                    Diversity
+                                </b-col>
+                            </b-row>
+                            <b-row class="mb-2" align-v="center">
+                                <b-col class="text-right">
+                                    Exploitation
+                                </b-col>
+                                <b-col class="text-center">
+                                    <!-- <b-icon class="mr-1 h3" id="relevance-help" icon="question-circle-fill" variant="primary"></b-icon>
+                                    <b-tooltip target="relevance-help" triggers="hover">{{relevance_explanation}}</b-tooltip> -->
+                                    <b-form-input style="height: 100%;" id="range-1" type="range"  step="0.01" min="0" max="1"></b-form-input>
+                                </b-col>
+                                <b-col class="text-left">
+                                    Exploration
+                                </b-col>
+                            </b-row>
+                            <b-row class="mb-2" align-v="center">
+                                <b-col class="text-right">
+                                    Popularity
+                                </b-col>
+                                <b-col class="text-center">
+                                    <!-- <b-icon class="mr-1 h3" id="relevance-help" icon="question-circle-fill" variant="primary"></b-icon>
+                                    <b-tooltip target="relevance-help" triggers="hover">{{relevance_explanation}}</b-tooltip> -->
+                                    <b-form-input style="height: 100%;" id="range-1" type="range"  step="0.01" min="0" max="1"></b-form-input>
+                                </b-col>
+                                <b-col class="text-left">
+                                    Novelty
+                                </b-col>
+                            </b-row>
+                        </b-form>
+                    </b-col>
+                </b-row>
+                <b-row align-h="center">
+                    <b-col>
+                        
+                    </b-col>
+                    <b-col>
+                        <b-col class="text-center">
+                            <b-form method="POST" action="{{continuation_url}}">
+                                <input type="hidden" name="csrf_token" value="{{csrf_token()}}"/>
+                                <input type="hidden" name="selected_items" :value="selectedMovieIndices"/>
+                                <input type="hidden" name="wtf" value="Test"/>
+                                <b-button variant="success" block type="submit">Continue</b-button>
+                            </b-form>
+                        </b-col>
+                    </b-col>
+                    <b-col>
+                        
+                    </b-col>
+                </b-row>
+            </b-card>
+        </b-collapse>
+
+        
 
         <hr>
 
@@ -192,7 +292,9 @@
             variantNames: variantNames,
             algorithmRatingsValidated: [false, false],
             selectedMetric: null,
-            selectedMovieIndices: ""
+            selectedMovieIndices: "",
+            showRefinement: false,
+
         };
     },
     computed: {
@@ -205,12 +307,24 @@
         },
         allValidated() {
             let dontLikeAnythingValidated = this.selected.length > 0 || this.dontLikeAnythingValue;
-            return this.algorithmComparisonValidated &&
-                   this.allAlgorithmRatingsValidated && // All algorithms have their outputs rated
-                   dontLikeAnythingValidated;
+            // return this.algorithmComparisonValidated &&
+            //        this.allAlgorithmRatingsValidated && // All algorithms have their outputs rated
+            //        dontLikeAnythingValidated;
+            return dontLikeAnythingValidated;
         }
     },
     methods: {
+        onClickContinue() {
+            this.showRefinement = true;
+        },
+        showAndScroll() {
+            this.showRefinement = true;
+            this.$nextTick(() => {
+                window.setTimeout(function(){
+                    window.scrollTo(0, document.body.scrollHeight);
+                }, 150);
+            });
+        },
         setRowHeights() {
             const containers = this.$el.querySelectorAll('.row-container');
             for (let containerIdx = 0; containerIdx < containers.length; ++containerIdx) {
