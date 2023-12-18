@@ -3,6 +3,56 @@ import functools
 import numpy as np
 import scipy
 
+class uniformity:
+    def __init__(self, diversity):
+        self.diversity = diversity
+    def __call__(self, rec_list):
+        return 1 - self.diversity(rec_list)
+
+# Distance w.r.t. user past profile
+class exploration:
+    def __init__(self, user_vector, distance_matrix):
+        self.user_vector = np.where(user_vector > 0)[0]
+        self.distance_matrix = distance_matrix
+        assert self.user_vector.ndim == 1
+        assert self.distance_matrix.ndim == 2
+
+    def __call__(self, rec_list):
+        x = self.distance_matrix[np.ix_(self.user_vector, rec_list)]
+        assert x.shape == (self.user_vector.size, rec_list.size)
+        return x.sum()
+
+# Similarity w.r.t. user past profile
+class exploitation:
+    def __init__(self, user_vector, similarity_matrix):
+        self.user_vector = np.where(user_vector > 0)[0]
+        self.similarity_matrix = similarity_matrix
+        assert self.user_vector.ndim == 1
+        assert self.similarity_matrix.ndim == 2
+
+    def __call__(self, rec_list):
+        x = self.similarity_matrix[np.ix_(self.user_vector, rec_list)]
+        assert x.shape == (self.user_vector.size, rec_list.size)
+        return x.sum()
+
+class item_popularity:
+    def __init__(self, rating_matrix):
+        # Convert to bool as we are only interested in whether each item was or was not consumed
+        self.rating_matrix = rating_matrix.astype(bool)
+        # We assume full rating matrix here (not just single user vector)
+        assert self.rating_matrix.ndim == 2, f"Rating matrix shape: {rating_matrix.shape}"
+        self.item_popularities = self.rating_matrix.sum(axis=0) / self.rating_matrix.shape[0]
+    def __call__(self, rec_list):
+        return self.item_popularities[rec_list].sum()
+
+class popularity_based_novelty:
+    def __init__(self, rating_matrix):
+        self.rating_matrix = rating_matrix.astype(bool)
+        assert self.rating_matrix.ndim == 2, f"Rating matrix shape: {rating_matrix.shape}"
+        self.item_novelties = (1 - (self.rating_matrix.sum(axis=0) / self.rating_matrix.shape[0]))
+    def __call__(self, rec_list):
+        return self.item_novelties[rec_list].sum()
+
 # Standard ILD calculation over given 
 class intra_list_diversity:
     def __init__(self, distance_matrix):
@@ -126,7 +176,7 @@ class binomial_diversity:
             p = self._p_g(g)
             s += (self._binomial_probability(N, l, p) / (1.0 - self._binomial_probability(N, 0, p)))
 
-        return 1.0 - s
+        return np.clip(1.0 - s, 0.0, 1.0)
     
     def _non_red(self, rec_list, rec_list_categories):
         #rec_list_categories = self._get_list_categories(rec_list)

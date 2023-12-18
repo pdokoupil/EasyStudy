@@ -7,6 +7,7 @@ import os
 import time
 
 import flask
+from sklearn.preprocessing import QuantileTransformer
 
 from plugins.fastcompare.algo.wrappers.data_loadering import MLGenomeDataLoader
 
@@ -32,7 +33,7 @@ from plugins.fastcompare.loading import load_data_loaders
 from plugins.fastcompare import elicitation_ended, filter_params, iteration_started, iteration_ended, load_data_loader, load_data_loader_cached, search_for_item
 #from plugins.multiobjective import prepare_recommendations
 from plugins.fastcompare import prepare_recommendations, get_semi_local_cache_name, get_cache_path
-from plugins.journal.metrics import binomial_diversity, intra_list_diversity
+from plugins.journal.metrics import binomial_diversity, intra_list_diversity, item_popularity, popularity_based_novelty, exploration, exploitation
 
 #from memory_profiler import profile
 
@@ -126,12 +127,7 @@ def join():
 # Callback once user has joined we forward to preference elicitation
 @bp.route("/on-joined", methods=["GET", "POST"])
 def on_joined():
-    return redirect(url_for("utils.preference_elicitation",
-            continuation_url=url_for("journal.send_feedback"),
-            consuming_plugin=__plugin_name__,
-            initial_data_url=url_for('fastcompare.get_initial_data'),
-            search_item_url=url_for('journal.item_search')
-        )
+    return redirect(url_for("journal.pre_study_questionnaire")
     )
 
 displyed_name_mapping = {
@@ -169,6 +165,65 @@ def item_search():
     res = search_for_item(pattern, loader, tr=None)
 
     return jsonify(res)
+
+@bp.route("/block-questionnaire", methods=["GET", "POST"])
+def block_questionnaire():
+    params = {
+        "continuation_url": url_for("journal.block_questionnaire_done"),
+        "header": "Per-Block questionnaire",
+        "hint": "Fill-in the questionnaire",
+        "finish": "Continue"
+    }
+    return render_template("journal_block_questionnaire.html", **params)
+
+@bp.route("/block-questionnaire-done", methods=["GET", "POST"])
+def block_questionnaire_done():
+    user_data = get_all(get_uname())
+    it = user_data["iteration"]
+    cur_block = it // N_ITERATIONS
+    cur_algorithm = ALGORITHMS[user_data['algorithm_order'][cur_block]]
+
+    if cur_block == len(ALGORITHMS):
+        # We are done
+        return redirect(url_for("journal.done"))
+    else:
+        # Otherwise continue with next block
+        return redirect(url_for("journal.mors_feedback"))
+    
+
+
+@bp.route("/pre-study-questionnaire", methods=["GET", "POST"])
+def pre_study_questionnaire():
+    params = {
+        "continuation_url": url_for("journal.pre_study_questionnaire_done"),
+        "header": "Pre study questionnaire",
+        "hint": "Fill-in the questionnaire",
+        "finish": "Proceed to user study"
+    }
+    return render_template("journal_pre_study_questionnaire.html", **params)
+
+@bp.route("/pre-study-questionnaire-done", methods=["GET", "POST"])
+def pre_study_questionnaire_done():
+    return redirect(url_for("utils.preference_elicitation", continuation_url=url_for("journal.send_feedback"),
+            consuming_plugin=__plugin_name__,
+            initial_data_url=url_for('fastcompare.get_initial_data'),
+            search_item_url=url_for('journal.item_search')))
+
+@bp.route("/final-questionnaire", methods=["GET", "POST"])
+def final_questionnaire():
+    params = {
+        "continuation_url": url_for("journal.finish_user_study"),
+        "header": "Final questionnaire",
+        "hint": "Fill-in the questionnaire",
+        "finish": "Finish"
+    }
+    return render_template("journal_final_questionnaire.html", **params)
+
+@bp.route("/finish-user-study", methods=["GET", "POST"])
+def finish_user_study():
+    # TODO handle final questionnaire feedback
+    session["iteration"] = get_val("iteration")
+    return redirect(url_for("utils.finish"))
 
 # Receives arbitrary feedback (typically from preference elicitation) and generates recommendation
 @bp.route("/send-feedback", methods=["GET"])
@@ -243,8 +298,9 @@ def send_feedback():
     #TODO log those into elicitation-ended
     ### Initialize stuff related to alpha comparison (after metric assesment step) ###
     # Permutation over alphas
-    possible_alphas = [0.0, 0.01, 0.1, 0.3, 0.6, 1.0]
+    possible_alphas = [0.0, 0.01, 0.1, 0.25, 0.5, 0.75, 0.9, 0.99, 1.0]
     np.random.shuffle(possible_alphas)
+    selected_alphas = possible_alphas[:6]
 
     ### Initialize MORS related stuff ###
     algorithm_order = np.arange(len(ALGORITHMS))
@@ -253,7 +309,7 @@ def send_feedback():
     
     set_mapping(get_uname(), {
         "alphas_iteration": 1,
-        "alphas_p": [possible_alphas[:3], possible_alphas[3:]],
+        "alphas_p": [selected_alphas[:3], selected_alphas[3:]],
         "algorithm_order": algorithm_order,
         "recommendations": {
            algo: [] for algo in ALGORITHMS # For each algorithm and each iteration we hold the recommendation
@@ -553,16 +609,23 @@ def enrich_results(top_k, loader, support=None):
             zip(top_k_description, top_k_url, top_k, top_k_ids, top_k_genres, top_k_trailers, top_k_plots, range(len(top_k_ids)))
     ]
 
+# TODO remove
+@bp.route("/reset", methods=["GET", "POST"])
+def reset():
+    set_val("iteration", 0)
+    return redirect(url_for("journal.mors_feedback"))
+
 @bp.route("/done", methods=["GET", "POST"])
 def done():
-    #it = session['iteration']
-    #it += 1
-    #session.modified = True
-    print(f"Sess id={request.cookies['something']}")
-    # Start with zero, because at the very beginning, mors_feedback is called, not mors and that generates recommendations for first iteration, but at the same time, increases the iteration
-    set_val("iteration", 0)
+    # #it = session['iteration']
+    # #it += 1
+    # #session.modified = True
+    # print(f"Sess id={request.cookies['something']}")
+    # # Start with zero, because at the very beginning, mors_feedback is called, not mors and that generates recommendations for first iteration, but at the same time, increases the iteration
+    # set_val("iteration", 0)
 
-    return f"DONE, it={get_val('iteration')}"
+    # return f"DONE, it={get_val('iteration')}"
+    return redirect(url_for("journal.final_questionnaire"))
 
 #####    Algorithms     #####
 # TODO move algorithms to shared common
@@ -570,107 +633,118 @@ def done():
 # Some common abstraction
 # Runs diversification on a relevance based recommendation
 # w.r.t. algorithm passed as algo
-def morsify(k, target_weights, random_users, rel_scores_normed,
-                                algo, items, objectives,
-                                rating_matrix, n_items_subset=None,
-                                do_normalize=False, rnd_mixture=False):
+def morsify(k, rel_scores,
+            algo, items, objective_fs,
+            rating_row, n_items_subset=None,
+            do_normalize=False, rnd_mixture=False):
     ####TODO REMOVE SEED SETTING!!!
     random.seed(42)
     np.random.seed(42)
     ### TODO
     
+    assert rel_scores.ndim == 1
+    assert rating_row.ndim == 1
+    
     start_time = time.perf_counter()
-    top_k_lists = np.zeros(shape=(random_users.size, k), dtype=np.int32)
-    scores = np.zeros(shape=(items.size if n_items_subset is None else n_items_subset, ), dtype=np.float32)
+    top_k_list = np.zeros(shape=(k, ), dtype=np.int32)
+    
     # Hold marginal gain for each item, objective pair
-    mgains = np.zeros(shape=(len(objectives) + 1, items.size if n_items_subset is None else n_items_subset), dtype=np.float32)
+    mgains = np.zeros(shape=(len(objective_fs), items.size if n_items_subset is None else n_items_subset), dtype=np.float32)
     # marginal gains for relevance are calculated separate, this is optimization and brings some savings when compared to naive calculation
-    mgains[-1, :] = rel_scores_normed
 
     # Sort relevances
-    sorted_relevances = np.argsort(-rel_scores_normed, axis=-1)
+    sorted_relevances = np.argsort(-rel_scores, axis=-1)
    
-    # Iterate over the random users sample
-    for user_idx, random_user in enumerate(random_users):
-        
-        #print(f"User_idx = {user_idx}, user={random_user}")
-        
-        # If n_items_subset is specified, we take subset of items
-        if n_items_subset is None:
-            source_items = items
+
+    #print(f"User_idx = {user_idx}, user={random_user}")
+    
+    # If n_items_subset is specified, we take subset of items
+    if n_items_subset is None:
+        source_items = items
+    else:
+        if rnd_mixture:
+            assert n_items_subset % 2 == 0, f"When using random mixture we expect n_items_subset ({n_items_subset}) to be divisible by 2"
+            source_items = np.concatenate([sorted_relevances[:n_items_subset//2], np.random.choice(sorted_relevances[n_items_subset:], n_items_subset//2, replace=False)])
         else:
-            if rnd_mixture:
-                assert n_items_subset % 2 == 0, f"When using random mixture we expect n_items_subset ({n_items_subset}) to be divisible by 2"
-                source_items = np.concatenate([sorted_relevances[user_idx, :n_items_subset//2], np.random.choice(sorted_relevances[user_idx, n_items_subset:], n_items_subset//2, replace=False)])
-            else:
-                source_items = sorted_relevances[user_idx, :n_items_subset]
+            source_items = sorted_relevances[:n_items_subset]
 
-        # Mask-out seen items by multiplying with zero
-        # i.e. 1 is unseen
-        # 0 is seen
-        # Lets first set zeros everywhere
-        seen_items_mask = np.zeros(shape=(random_users.size, source_items.size), dtype=np.int8)
-        # And only put 1 to UNSEEN items in CANDIDATE (source_items) list
-        seen_items_mask[rating_matrix[np.ix_(random_users, source_items)] <= 0.0] = 1
-        print(f"### Unseen: {seen_items_mask.sum()} out of: {seen_items_mask.shape[0] * seen_items_mask.shape[1]}")
-        
-        # Build the recommendation incrementally
-        for i in range(k):
-            for objective_index, (objective, objective_mgain_cdf) in enumerate(objectives):
-                # Cache f_prev
-                f_prev = objective(top_k_lists[user_idx, :i])
+
+    # Mask-out seen items by multiplying with zero
+    # i.e. 1 is unseen
+    # 0 is seen
+    # Lets first set zeros everywhere
+    seen_items_mask = np.zeros(shape=(source_items.size, ), dtype=np.int8)
+    # And only put 1 to UNSEEN items in CANDIDATE (source_items) list
+    seen_items_mask[rating_row[source_items] <= 0.0] = 1
+    print(f"### Unseen: {seen_items_mask.sum()} out of: {seen_items_mask.size}")
+    
+    # Build the recommendation incrementally
+    for i in range(k):
+        for objective_index, objective_f in enumerate(objective_fs):
+            # Cache f_prev
+            f_prev = objective_f(top_k_list[:i])
+            
+            objective_cdf_train_data = []
+            # For every source item, try to add it and calculate its marginal gain
+            for j, item in enumerate(source_items):
+                top_k_list[i] = item # try extending the list
+                objective_cdf_train_data.append(objective_f(top_k_list[:i+1]) - f_prev)
+                mgains[objective_index, j] = objective_cdf_train_data[-1]
                 
-                # For every source item, try to add it and calculate its marginal gain
-                st = time.perf_counter()
-                for j, item in enumerate(source_items):
-                    top_k_lists[user_idx, i] = item # try extending the list
-                    mgains[objective_index, j] = (objective(top_k_lists[user_idx, :i+1]) - f_prev)
-                    
-                # If we should normalize, use cdf_div to normalize marginal gains
-                if do_normalize:
-                    # Reshape to N examples with single feature
-                    mgains[objective_index] = objective_mgain_cdf.transform(mgains[objective_index].reshape(-1, 1)).reshape(mgains[objective_index].shape)
-        
-            # Calculate scores
-            scores = algo(rel_scores_normed, mgains, target_weights)
+            # If we should normalize, use cdf_div to normalize marginal gains
+            if do_normalize:
+                # Reshape to N examples with single feature
+                mgains[objective_index] = QuantileTransformer().fit_transform(mgains[objective_index].reshape(-1, 1)).reshape(mgains[objective_index].shape)
+    
+        # Calculate scores
+        print(f"@@ Mgains shape: {mgains.shape}, seen_items_mask shape: {seen_items_mask}")
+        best_item_idx = algo(mgains, seen_items_mask)
+        best_item = source_items[best_item_idx]
+            
+        # Select the best item and append it to the recommendation list            
+        top_k_list[i] = best_item
+        # Mask out the item so that we do not recommend it again
+        seen_items_mask[best_item_idx] = 0
 
-            # Ensure seen items get lowest score of 0
-            # Just multiplying by zero does not work when scores are not normalized to be always positive
-            # because masked-out items will not have smallest score (some valid, non-masked ones can be negative)
-            # scores = scores * seen_items_mask[user_idx]
-            # So instead we do scores = scores * seen_items_mask[user_idx] + NEG_INF * (1 - seen_items_mask[user_idx])
-            min_score = scores.min()
-            # Unlike in predict_with_score, here we do not mandate NEG_INF to be strictly smaller
-            # because rel_scores may already contain some NEG_INF that was set by predict_with_score
-            # called previously -> so we allow <=.
-            assert NEG_INF <= min_score, f"min_score ({min_score}) is not smaller than NEG_INF ({NEG_INF})"
-            scores = scores * seen_items_mask[user_idx] + NEG_INF * (1 - seen_items_mask[user_idx])
-
-            # Get item with highest score
-            # But beware that this is index inside "scores"
-            # which has same size as subset of rnd_items
-            # so we need to map item index to actual item later on
-            best_item_idx = scores.argmax()
-            best_item = source_items[best_item_idx]
-                
-            # Select the best item and append it to the recommendation list            
-            top_k_lists[user_idx, i] = best_item
-            # Mask out the item so that we do not recommend it again
-            seen_items_mask[user_idx, best_item_idx] = 0
+        if i == 9:
+            print(f"Rel scores shape: {rel_scores.shape}")
+            print(f"### best item = {best_item}, mgains: {mgains[:, best_item_idx]}, rel: {rel_scores[best_item]}")
 
     print(f"Diversification took: {time.perf_counter() - start_time}")
-    return top_k_lists
+    return top_k_list
 
 
-# Greedy algorithm that just search items whose supports are 
-def greedy(mgains, target_weights):
-    n_objectives, n_items = mgains.shape
-    assert n_objectives == target_weights.size
-    # Convert distances to scores (the lower the distance, the higher the score)
-    scores = -1 * ((mgains - target_weights[:, np.newaxis]) ** 2).sum(axis=0)
-    assert scores.shape == np.shape([n_items, ])
+def mask_scores(scores, seen_items_mask):
+    # Ensure seen items get lowest score of 0
+    # Just multiplying by zero does not work when scores are not normalized to be always positive
+    # because masked-out items will not have smallest score (some valid, non-masked ones can be negative)
+    # scores = scores * seen_items_mask[user_idx]
+    # So instead we do scores = scores * seen_items_mask[user_idx] + NEG_INF * (1 - seen_items_mask[user_idx])
+    min_score = scores.min()
+    # Unlike in predict_with_score, here we do not mandate NEG_INF to be strictly smaller
+    # because rel_scores may already contain some NEG_INF that was set by predict_with_score
+    # called previously -> so we allow <=.
+    assert NEG_INF <= min_score, f"min_score ({min_score}) is not smaller than NEG_INF ({NEG_INF})"
+    scores = scores * seen_items_mask + NEG_INF * (1 - seen_items_mask)
     return scores
 
+class greedy:
+    def __init__(self, weights):
+        self.weights = weights
+        self.n_objectives = weights.size
+
+    def __call__(self, mgains, seen_items_mask):
+        # Greedy algorithm that just search items whose supports are
+        _, n_items = mgains.shape
+        assert self.n_objectives == mgains.shape[0], f"{self.n_objectives} != {mgains.shape}"
+        # Convert distances to scores (the lower the distance, the higher the score)
+        scores = -1 * ((mgains - self.weights[:, np.newaxis]) ** 2).sum(axis=0)
+        assert scores.shape == (n_items, ), f"{scores.shape} != {(n_items, )}"
+        print(f"Max score without masking = {scores.max()}, mgains: {mgains[:, scores.argmax()]}")
+        print(mgains)
+        scores = mask_scores(scores, seen_items_mask)
+        print(f"Max score = {scores.max()}, mgains: {mgains[:, scores.argmax()]}")
+        return scores.argmax()
 
 class rlprop_mod:
     def __init__(self, weights):
@@ -679,10 +753,11 @@ class rlprop_mod:
         self.TOT = 0.0
         self.gm = np.zeros(shape=(self.n_objectives, ), dtype=np.float32)
 
-    def __call__(self, mgains):
+    # Returns single item recommended at a given time
+    def __call__(self, mgains, seen_items_mask):
         _, n_items = mgains.shape
         assert np.all(mgains >= 0.0), "We expect all mgains to be normalized to be greater than 0"
-        tots = np.zeros(shape={n_items, }, dtype=np.float32)
+        tots = np.zeros(shape=(n_items, ), dtype=np.float32)
         remainder = np.zeros_like(self.gm)
         scores = np.zeros_like(tots)
         for item_idx in np.arange(n_items):
@@ -692,6 +767,13 @@ class rlprop_mod:
             # We want to push remainder to 0 by maximizing score (so we minimize its negative)
             scores[item_idx] = -remainder.sum()
 
+        scores = mask_scores(scores, seen_items_mask)
+        i_best = scores.argmax()
+
+        self.gm = self.gm + mgains[:, i_best]
+        self.TOT = np.clip(self.gm, 0.0, None).sum()
+
+        return i_best
 
 
 # Does not get throough morsify as this is end-to-end approach to MORS, not "diversification" or "morsification"
@@ -733,9 +815,17 @@ def mors_feedback():
     recommendation = {}
 
     items = np.arange(loader.rating_matrix.shape[1])
-    objectives = []
-    # Uniform target weights for now
-    target_weights = np.ones(shape=(len(objectives), ), dtype=np.float32) / len(objectives)
+    selected_metric_name = user_data['selected_metric_name']
+    if selected_metric_name == "CF-ILD":
+        div_f = intra_list_diversity(loader.distance_matrix)
+    elif selected_metric_name == "CB-ILD":
+        distance_matrix_cb = get_distance_matrix_cb(os.path.join(get_cache_path(get_semi_local_cache_name(loader)), "distance_matrix_text.npy"))
+        div_f = intra_list_diversity(distance_matrix_cb)
+    elif selected_metric_name == "BIN-DIV":
+        div_f = binomial_diversity(loader.all_categories, loader.get_item_index_categories, loader.rating_matrix, 0.0, loader.name())
+
+
+    cdf_div = load_cdf_cache(get_cache_path(get_semi_local_cache_name(loader)), selected_metric_name)
 
     k = 10
 
@@ -745,26 +835,60 @@ def mors_feedback():
     elicitation_selected = np.array(user_data['elicitation_selected_movies'])
     # Train the algorithm on all movies selected during preference elicitation
     # and all movies previously selected during recommendations made by current algorithm
-    training_selections = np.concat([elicitation_selected] + selected_items_history[cur_algorithm])
+    training_selections = np.concatenate([elicitation_selected] + [np.array(x, dtype=np.int32) for x in selected_items_history[cur_algorithm]], dtype=np.int32)
+    print(f"Training selections: {training_selections}, dtype={training_selections.dtype}, elicitation selected: {elicitation_selected.dtype}, history: {selected_items_history[cur_algorithm]}")
     rel_scores, user_vector, _ = ease.predict_with_score(training_selections, training_selections, k)
-    rel_scores = rel_scores[np.newaxis, :]
     cdf_rel = load_cdf_cache(get_cache_path(get_semi_local_cache_name(loader)), "REL")
     rel_scores_normed = cdf_rel.transform(rel_scores.reshape(-1, 1)).reshape(rel_scores.shape)
-    user_vector = user_vector[np.newaxis, :]
+    print(f"Rel scores normed: {rel_scores_normed}")
+    print(f"@@ Items shape={items.shape}, size={items.size}")
+    
+    target_weights = np.array([1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.0])
 
+    def relevance_f(top_k_list):
+        return rel_scores[top_k_list].sum()
+
+    uniformity_f = lambda x: -1 * div_f(x)
+    
+    popularity_f = item_popularity(loader.rating_matrix)
+    novelty_f = popularity_based_novelty(loader.rating_matrix)
+    exploration_f = exploration(user_vector, loader.distance_matrix)
+    exploitation_f = exploitation(user_vector, 1.0 - loader.distance_matrix)
+
+    objectives = [
+        relevance_f,
+
+        div_f,
+        uniformity_f,
+
+        popularity_f,
+        novelty_f,
+
+        exploration_f,
+        exploitation_f
+    ]
+
+    start_time = time.perf_counter()
     if cur_algorithm == "RLPROP":
-        top_k = np.random.choice(np.arange(15000), 10, replace=False)
-    elif cur_algorithm == "WA":
-        algo = greedy
+        algo = rlprop_mod(target_weights)
         top_k = morsify(
-            10, target_weights, np.array([0]), rel_scores_normed, algo,
-            items, objectives, user_vector, n_items_subset=5,
+            10, rel_scores, algo,
+            items, objectives, user_vector, n_items_subset=500,
+            do_normalize=True, rnd_mixture=True
+        )
+    elif cur_algorithm == "WA":
+        print(f"@@@ Greedy WA with target weights = {target_weights}")
+        algo = greedy(target_weights)
+        top_k = morsify(
+            10, rel_scores, algo,
+            items, objectives, user_vector, n_items_subset=500,
             do_normalize=True, rnd_mixture=True
         )
     elif cur_algorithm == "MOEA-RS":
         top_k = np.random.choice(np.arange(15000), 10, replace=False)
     else:
         assert False, f"Unknown algorithm: {cur_algorithm} for it={it}"
+    print(f"@@@ Morsify took: {time.perf_counter() - start_time}")
 
     recommendation[cur_algorithm] = {
         'movies': enrich_results(top_k, loader),
@@ -808,19 +932,102 @@ def mors():
 
     print(f"Algorithm = {cur_algorithm}")
 
-    if it >= N_ITERATIONS * len(ALGORITHMS):
-        continuation_url = url_for("journal.done")
+    # if it >= N_ITERATIONS * len(ALGORITHMS):
+    #     continuation_url = url_for("journal.done")
+    # else:
+    #     continuation_url = url_for("journal.mors_feedback")
+
+    # We are at the end of block
+    if it > 0 and it % N_ITERATIONS == 0:
+        continuation_url = url_for("journal.block_questionnaire")
     else:
         continuation_url = url_for("journal.mors_feedback")
 
+    tr = get_tr(languages, get_lang())
     # TODO replace random with user_data['movies'] which in turn should be filled in by recommendation algorithms
     params = {
         "continuation_url": continuation_url,
         "iteration": it,
-        "movies": get_val('recommendation')
+        "movies": get_val('recommendation'),
+        "like_nothing": tr("compare_like_nothing")
     }
     #assert session.modified == False
     return render_template("mors.html", **params)
+
+# TODO remove, temporary endpoint
+@bp.route("/greedy", methods=["GET", "POST"])
+def gr():
+    conf = load_user_study_config(session['user_study_id'])
+    
+    # Get a loader
+    loader_factory = load_data_loaders()[conf["selected_data_loader"]]
+    loader = loader_factory(**filter_params(conf["data_loader_parameters"], loader_factory))
+    loader = load_data_loader_cached(loader, session['user_study_guid'], loader_factory.name(), get_semi_local_cache_name(loader))
+
+    potter_movies = np.array([3161, 3948, 4882, 5524, 6452, 7193, 7538])
+    items = np.arange(loader.rating_matrix.shape[1])
+    algo = EASER_pretrained(items)
+    algo = algo.load(os.path.join(get_cache_path(get_semi_local_cache_name(loader)), "item_item.npy"))
+    rel_scores, user_vector, ease_pred = algo.predict_with_score(potter_movies, potter_movies, k=10)
+    ease_baseline = enrich_results(ease_pred, loader)
+    
+    cdf_rel = load_cdf_cache(get_cache_path(get_semi_local_cache_name(loader)), "REL")
+    #rel_scores_normed = cdf_rel.transform(rel_scores.reshape(-1, 1)).reshape(rel_scores.shape)
+
+    #diversity_f = intra_list_diversity(loader.distance_matrix)
+    diversity_f = binomial_diversity(loader.all_categories, loader.get_item_index_categories, loader.rating_matrix, 0.0, loader.name())
+    #cdf_diversity = load_cdf_cache(get_cache_path(get_semi_local_cache_name(loader)), "CF-ILD")
+    
+    uniformity_f = intra_list_diversity(1.0 - loader.distance_matrix)
+    #cdf_uniformity = load_cdf_cache
+
+    popularity_f = item_popularity(loader.rating_matrix)
+    novelty_f = popularity_based_novelty(loader.rating_matrix)
+    exploration_f = exploration(user_vector, loader.distance_matrix)
+    exploitation_f = exploitation(user_vector, 1.0 - loader.distance_matrix)
+
+
+    def relevance_f(top_k_list):
+        return rel_scores[top_k_list].sum()
+
+    objectives = [
+        relevance_f,
+
+        diversity_f,
+        uniformity_f,
+
+        popularity_f,
+        novelty_f,
+
+        exploration_f,
+        exploitation_f
+    ]
+
+    start_time = time.perf_counter()
+    algo = greedy(np.array([1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.0]))
+    greedy_top_k = morsify(
+        10, rel_scores, algo,
+        items, objectives, user_vector, n_items_subset=500,
+        do_normalize=True, rnd_mixture=True
+    )
+    print(f"Greedy morsify took: {time.perf_counter() - start_time}")
+
+    print(f"@@@ Greedy top k = {greedy_top_k}")
+
+
+    params = {
+        "movies": {
+            "EASE": {
+                "movies": ease_baseline,
+                "order": 0
+            },
+            "Greedy": {
+                "movies": enrich_results(greedy_top_k, loader),
+                "order": 1
+            }
+        }
+    }
+    return render_template("metric_assesment.html", **params)
 
 # Called as continuation of compare-alphas, redirects for compare-alphas (next step)
 # This is where we generate the results, compare-alphas then just shows them
@@ -867,10 +1074,7 @@ def metric_feedback():
     elif selected_metric_name == "BIN-DIV":
         div_f = binomial_diversity(loader.all_categories, loader.get_item_index_categories, loader.rating_matrix, 0.0, loader.name())
     else:
-        print("Should not get there")
-        selected_metric_name="CF-ILD"
-        div_f = intra_list_diversity(loader.distance_matrix)
-        #assert False
+        assert False
 
     params["movies"] = {}
 
