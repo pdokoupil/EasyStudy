@@ -42,7 +42,20 @@ from app import rds
 languages = load_languages(os.path.dirname(__file__))
 
 N_ITERATIONS = 6 # 6 iterations per block
-ALGORITHMS = ["WA", "RLPROP", "MOEA-RS"]
+#ALGORITHMS = ["WA", "RLPROP", "MOEA-RS"]
+# Algorithm matrix
+# Algorithms are divided in two dimensions: [MAX, EXACT] x [ITEM-WISE, GREEDY, EVOLUTIONARY]
+# We always select one row per user, so each user gets either ITEM-WISE, GREEDY or EVOLUTIONARY (in both MAX and EXACT variants) + Relevance baseline
+ALGORITHMS = ["ITEM-WISE-MAX", "ITEM-WISE-EXACT", "GREEDY-MAX", "GREEDY-EXACT", "EVOLUTIONARY-MAX", "EVOLUTIONARY-EXACT", "RELEVANCE-BASED"]
+ALGORITHM_ROWS = {
+    "ITEM-WISE": ["ITEM-WISE-MAX", "ITEM-WISE-EXACT"],
+    "GREEDY": ["GREEDY-MAX", "GREEDY-EXACT"],
+    "EVOLUTIONARY": ["EVOLUTIONARY-MAX", "EVOLUTIONARY-EXACT"]
+}
+# The mapping is not fixed between users
+ALGORITHM_ANON_NAMES = ["BETA", "GAMMA", "DELTA"]
+POSSIBLE_ALPHAS = [0.0, 0.01, 0.1, 0.25, 0.5, 0.75, 0.9, 0.99, 1.0]
+
 HIDE_LAST_K = 100000
 NEG_INF = int(-10e6)
 N_ALPHA_ITERS = 2
@@ -103,13 +116,13 @@ def create():
     params["cagliari_university"] = tr("footer_cagliari_university")
     params["t1"] = tr("footer_t1")
     params["t2"] = tr("footer_t2")
-    params["about_placeholder"] = tr("moo_create_about_placeholder")
-    params["override_informed_consent"] = tr("moo_create_override_informed_consent")
-    params["override_about"] = tr("moo_create_override_about")
-    params["show_final_statistics"] = tr("moo_create_show_final_statistics")
-    params["override_algorithm_comparison_hint"] = tr("moo_create_override_algorithm_comparison_hint")
-    params["algorithm_comparison_placeholder"] = tr("moo_create_algorithm_comparison_placeholder")
-    params["informed_consent_placeholder"] = tr("moo_create_informed_consent_placeholder")
+    params["about_placeholder"] = tr("fastcompare_create_about_placeholder")
+    params["override_informed_consent"] = tr("fastcompare_create_override_informed_consent")
+    params["override_about"] = tr("fastcompare_create_override_about")
+    params["show_final_statistics"] = tr("fastcompare_create_show_final_statistics")
+    params["override_algorithm_comparison_hint"] = tr("fastcompare_create_override_algorithm_comparison_hint")
+    params["algorithm_comparison_placeholder"] = tr("fastcompare_create_algorithm_comparison_placeholder")
+    params["informed_consent_placeholder"] = tr("fastcompare_create_informed_consent_placeholder")
 
     # TODO add tr(...) to make it translatable
     params["disable_relative_comparison"] = "Disable relative comparison"
@@ -181,7 +194,7 @@ def block_questionnaire_done():
     user_data = get_all(get_uname())
     it = user_data["iteration"]
     cur_block = it // N_ITERATIONS
-    cur_algorithm = ALGORITHMS[user_data['algorithm_order'][cur_block]]
+    cur_algorithm = user_data["selected_algorithms"][cur_block]
 
     if cur_block == len(ALGORITHMS):
         # We are done
@@ -255,24 +268,24 @@ def send_feedback():
 
     # Add default entries so that even the non-chosen algorithm has an empty entry
     # to unify later access
-    recommendations = {
-        x["displayed_name"]: [[]] for x in conf["algorithm_parameters"]
-    }
-    initial_weights_recommendation = {
-        x["displayed_name"]: [[]] for x in conf["algorithm_parameters"]
-    }
+    # recommendations = {
+    #     x["displayed_name"]: [[]] for x in conf["algorithm_parameters"]
+    # }
+    # initial_weights_recommendation = {
+    #     x["displayed_name"]: [[]] for x in conf["algorithm_parameters"]
+    # }
     
     # We filter out everything the user has selected during preference elicitation.
     # However, we allow future recommendation of SHOWN, NOT SELECTED (during elicitation, not comparison) altough these are quite rare
     filter_out_movies = selected_movies
 
-    prepare_recommendations(loader, conf, recommendations, selected_movies, filter_out_movies, k)
+    #prepare_recommendations(loader, conf, recommendations, selected_movies, filter_out_movies, k)
     #prepare_recommendations(weights, recommendations, initial_weights_recommendation, selected_movies, filter_out_movies, k)
-    print(f"Recommendations={recommendations}")
+    #print(f"Recommendations={recommendations}")
     
     set_mapping(get_uname(), {
-        'movies': recommendations,
-        'initial_weights_recommendation': initial_weights_recommendation,
+        # 'movies': recommendations,
+        # 'initial_weights_recommendation': initial_weights_recommendation,
         'iteration': 0, # Start with zero, because at the very beginning, mors_feedback is called, not mors and that generates recommendations for first iteration, but at the same time, increases the iteration
         'elicitation_selected_movies': selected_movies,
         'selected_movie_indices': []
@@ -289,35 +302,54 @@ def send_feedback():
     p = [1, 0, 2]    
     set_val("refinement_layout", refinement_layouts[refinement_layout_name])
 
-    elicitation_ended(
-        session['elicitation_movies'], selected_movies,
-        orig_permutation=p, displyed_name_mapping=displyed_name_mapping, refinement_layout=refinement_layout_name,
-        supports={key: np.round(value.astype(float), 4).tolist() for key, value in supports.items()}
-    )    
-
     #TODO log those into elicitation-ended
     ### Initialize stuff related to alpha comparison (after metric assesment step) ###
     # Permutation over alphas
-    possible_alphas = [0.0, 0.01, 0.1, 0.25, 0.5, 0.75, 0.9, 0.99, 1.0]
+    possible_alphas = POSSIBLE_ALPHAS[:]
     np.random.shuffle(possible_alphas)
     selected_alphas = possible_alphas[:6]
 
     ### Initialize MORS related stuff ###
-    algorithm_order = np.arange(len(ALGORITHMS))
-    np.random.shuffle(algorithm_order)
-    # ALGORITHM[0] has order ALGORITHM_ORDER[0]
-    
+    selected_algorithm_row = np.random.choice(list(ALGORITHM_ROWS.keys()))
+    selected_algorithms = ALGORITHM_ROWS[selected_algorithm_row] + ["RELEVANCE-BASED"]
+    # Shuffle algorithms
+    np.random.shuffle(selected_algorithms)
+    # Shuffle algorithm names
+    algorithm_names = ALGORITHM_ANON_NAMES[:]
+    np.random.shuffle(algorithm_names)
+    # Prepare mapping
+    algorithm_name_mapping = {
+        algorithm: algorithm_name for algorithm_name, algorithm in zip(algorithm_names, selected_algorithms)
+    }
+
     set_mapping(get_uname(), {
         "alphas_iteration": 1,
         "alphas_p": [selected_alphas[:3], selected_alphas[3:]],
-        "algorithm_order": algorithm_order,
+        "algorithm_row": selected_algorithm_row,
+        "selected_algorithms": selected_algorithms,
+        "algorithm_name_mapping": algorithm_name_mapping,
         "recommendations": {
-           algo: [] for algo in ALGORITHMS # For each algorithm and each iteration we hold the recommendation
+           algo: [] for algo in algorithm_name_mapping.keys() # For each algorithm and each iteration we hold the recommendation
         },
         "selected_items": {
-           algo: [] for algo in ALGORITHMS # For each algorithm and each iteration we hold the selected items
+           algo: [] for algo in algorithm_name_mapping.keys() # For each algorithm and each iteration we hold the selected items
+        },
+        "shown_items": {
+            algo: [] for algo in algorithm_name_mapping.keys() # For each algorithm and each iteration we hold the IDs of recommended items (for quick filtering)
+        },
+        "slider_values": {
+            "slider_relevance": [],
+            "slider_exploitation_exploration": [],
+            "slider_uniformity_diversity": [],
+            "slider_popularity_novelty": []
         }
     })
+
+    elicitation_ended(
+        session['elicitation_movies'], selected_movies,
+        orig_permutation=p, displyed_name_mapping=displyed_name_mapping, refinement_layout=refinement_layout_name,
+        supports={key: np.round(value.astype(float), 4).tolist() for key, value in supports.items()}
+    )  
 
     #return redirect(url_for("multiobjective.compare_and_refine"))
     return redirect(url_for("journal.metric_assesment"))
@@ -788,7 +820,7 @@ def mors_feedback():
     it = user_data["iteration"]
 
     cur_block = it // N_ITERATIONS
-    cur_algorithm = ALGORITHMS[user_data['algorithm_order'][cur_block]]
+    cur_algorithm = user_data["selected_algorithms"][cur_block]
 
     # Get selected items
     selected_items = request.form.get("selected_items")
@@ -809,6 +841,14 @@ def mors_feedback():
 
 
     #print(f"MORS-FEEDBACK IT before = {session['iteration']}")
+    print("@@@@ Received following params:")
+    print(request.form.get("selected_items"))
+    slider_relevance = float(request.form.get("slider_relevance"))
+    slider_exploitation_exploration = float(request.form.get("slider_exploitation_exploration"))
+    slider_uniformity_diversity = float(request.form.get("slider_uniformity_diversity"))
+    slider_popularity_novelty = float(request.form.get("slider_popularity_novelty"))
+    print(slider_relevance, slider_exploitation_exploration, slider_uniformity_diversity, slider_popularity_novelty)
+    print("@@@@")
     
     
     # Generate the actual recommendations
@@ -837,7 +877,10 @@ def mors_feedback():
     # and all movies previously selected during recommendations made by current algorithm
     training_selections = np.concatenate([elicitation_selected] + [np.array(x, dtype=np.int32) for x in selected_items_history[cur_algorithm]], dtype=np.int32)
     print(f"Training selections: {training_selections}, dtype={training_selections.dtype}, elicitation selected: {elicitation_selected.dtype}, history: {selected_items_history[cur_algorithm]}")
-    rel_scores, user_vector, _ = ease.predict_with_score(training_selections, training_selections, k)
+    print(f"Shown items so far: {user_data['shown_items']}")
+    print(f"Shown items from current algorithm so far: {user_data['shown_items'][cur_algorithm]}")
+    all_recommendations = sum(user_data["shown_items"][cur_algorithm], [])
+    rel_scores, user_vector, relevance_top_k = ease.predict_with_score(training_selections, all_recommendations, k)
     cdf_rel = load_cdf_cache(get_cache_path(get_semi_local_cache_name(loader)), "REL")
     rel_scores_normed = cdf_rel.transform(rel_scores.reshape(-1, 1)).reshape(rel_scores.shape)
     print(f"Rel scores normed: {rel_scores_normed}")
@@ -869,14 +912,14 @@ def mors_feedback():
     ]
 
     start_time = time.perf_counter()
-    if cur_algorithm == "RLPROP":
+    if cur_algorithm == "GREEDY-EXACT":
         algo = rlprop_mod(target_weights)
         top_k = morsify(
             10, rel_scores, algo,
             items, objectives, user_vector, n_items_subset=500,
             do_normalize=True, rnd_mixture=True
         )
-    elif cur_algorithm == "WA":
+    elif cur_algorithm == "ITEM-WISE-EXACT":
         print(f"@@@ Greedy WA with target weights = {target_weights}")
         algo = greedy(target_weights)
         top_k = morsify(
@@ -884,10 +927,19 @@ def mors_feedback():
             items, objectives, user_vector, n_items_subset=500,
             do_normalize=True, rnd_mixture=True
         )
-    elif cur_algorithm == "MOEA-RS":
+    elif cur_algorithm == "EVOLUTIONARY-EXACT":
         top_k = np.random.choice(np.arange(15000), 10, replace=False)
+    elif cur_algorithm == "GREEDY-MAX":
+        top_k = np.random.choice(np.arange(15000), 10, replace=False)
+    elif cur_algorithm == "ITEM-WISE-MAX":
+        top_k = np.random.choice(np.arange(15000), 10, replace=False)
+    elif cur_algorithm == "EVOLUTIONARY-MAX":
+        top_k = np.random.choice(np.arange(15000), 10, replace=False)
+    elif cur_algorithm == "RELEVANCE-BASED":
+        top_k = relevance_top_k
     else:
         assert False, f"Unknown algorithm: {cur_algorithm} for it={it}"
+
     print(f"@@@ Morsify took: {time.perf_counter() - start_time}")
 
     recommendation[cur_algorithm] = {
@@ -904,6 +956,17 @@ def mors_feedback():
     set_val('recommendations', recommendations)
 
     set_val('recommendation', recommendation)
+    
+    shown_items = get_val('shown_items')
+    shown_items[cur_algorithm].append(top_k.tolist())
+    set_val('shown_items', shown_items)
+
+    slider_values = get_val("slider_values")
+    slider_values["slider_relevance"].append(slider_relevance)
+    slider_values["slider_exploitation_exploration"].append(slider_exploitation_exploration)
+    slider_values["slider_uniformity_diversity"].append(slider_uniformity_diversity)
+    slider_values["slider_popularity_novelty"].append(slider_popularity_novelty)
+    set_val("slider_values", slider_values)
 
     #print(f"MORS feedback iter after: {session['iteration']} but should have been {it + 1}")
     #assert session.modified == True
@@ -919,16 +982,16 @@ def mors():
     print(f"MORS IT={it}")
 
     cur_block = (int(it) - 1) // N_ITERATIONS
-    cur_algorithm = ALGORITHMS[user_data['algorithm_order'][cur_block]]
+    cur_algorithm = user_data["selected_algorithms"][cur_block]
     
-    if cur_algorithm == "RLPROP":
-        pass
-    elif cur_algorithm == "WA":
-        pass
-    elif cur_algorithm == "MOEA-RS":
-        pass
-    else:
-        assert False, f"Unknown algorithm: {cur_algorithm} for it={it}"
+    # if cur_algorithm == "RLPROP":
+    #     pass
+    # elif cur_algorithm == "WA":
+    #     pass
+    # elif cur_algorithm == "MOEA-RS":
+    #     pass
+    # else:
+    #     assert False, f"Unknown algorithm: {cur_algorithm} for it={it}"
 
     print(f"Algorithm = {cur_algorithm}")
 
@@ -949,7 +1012,15 @@ def mors():
         "continuation_url": continuation_url,
         "iteration": it,
         "movies": get_val('recommendation'),
-        "like_nothing": tr("compare_like_nothing")
+        "like_nothing": tr("compare_like_nothing"),
+        "highly_popular_help": tr("journal_highly_popular_help"),
+        "highly_novel_help": tr("journal_highly_novel_help"),
+        "highly_diverse_help": tr("journal_highly_diverse_help"),
+        "highly_uniform_help": tr("journal_highly_uniform_help"),
+        "highly_explorational_help": tr("journal_highly_explorational_help"),
+        "highly_exploitational_help": tr("journal_highly_exploitational_help"),
+        "highly_relevant_help": tr("journal_highly_relevant_help"),
+        "little_relevant_help": tr("journal_little_relevant_help"),
     }
     #assert session.modified == False
     return render_template("mors.html", **params)

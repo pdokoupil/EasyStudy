@@ -119,57 +119,137 @@
                 <b-row align-v="center">
                     <b-col>
                         <b-form method="GET" action="{{ url_for('journal.mors_feedback') }}">
-                            <b-row align-h="center">
-                                <b-col class="text-center" align-v="center">
-                                    Relevance
+                            <b-row class="mb-2" align-v="center" style="vertical-align: middle;">
+                                <b-col align-v="center" class="text-right">
+                                    <b-row align-h="end">
+                                        <b-col cols="auto" align-v="center" class="text-right">
+                                            <b-icon class="h3" style="height: 100%;" id="little-relevant-help" icon="question-circle-fill" variant="primary"></b-icon>
+                                            <b-tooltip target="little-relevant-help" triggers="hover">{{little_relevant_help}}</b-tooltip>
+                                        </b-col>
+                                        <b-col cols="auto" align-v="center" class="text-right" style="display: table;">
+                                            <p style="display: table-cell; vertical-align: middle;">
+                                                Little Relevant
+                                            </p>
+                                        </b-col>
+                                    </b-row>
                                 </b-col>
-                            </b-row>
-                            <b-row class="mb-2" align-v="center">
-                                <b-col></b-col>
                                 <b-col class="text-center">
                                     <!-- <b-icon class="mr-1 h3" id="relevance-help" icon="question-circle-fill" variant="primary"></b-icon>
                                     <b-tooltip target="relevance-help" triggers="hover">{{relevance_explanation}}</b-tooltip> -->
-                                    <b-form-input style="height: 100%;" id="range-1" type="range"  step="0.01" min="0" max="1"></b-form-input>
+                                    <b-form-input style="height: 100%;" id="range-relevance" v-model="sliderRelevance" type="range" step="0.1" min="0" max="1"></b-form-input>
                                 </b-col>
-                                <b-col></b-col>
+                                <b-col>
+                                    <b-row align-h="start">
+                                        <b-col cols="auto" align-v="center" class="text-center" style="display: table;">
+                                            <p style="display: table-cell; vertical-align: middle;">
+                                                Highly Relevant
+                                            </p>
+                                        </b-col>
+                                        <b-col cols="auto" align-v="center" class="text-left">
+                                            <b-icon class="h3" style="height: 100%;" id="highly-relevant-help" icon="question-circle-fill" variant="primary"></b-icon>
+                                            <b-tooltip target="highly-relevant-help" triggers="hover">{{highly_relevant_help}}</b-tooltip>
+                                        </b-col>
+                                    </b-row>
+                                </b-col>
                             </b-row>
                             <b-row class="mb-2" align-v="center">
                                 <b-col align-v="center" class="text-right">
-                                    Uniformity
+                                    <b-row align-h="end">
+                                        <b-col cols="auto" align-v="center" class="text-right">
+                                            <b-icon class="h3" style="height: 100%;" id="highly-diverse-help" icon="question-circle-fill" variant="primary"></b-icon>
+                                            <b-tooltip target="highly-diverse-help" triggers="hover">{{highly_diverse_help}}</b-tooltip>
+                                        </b-col>
+                                        <b-col cols="auto" align-v="center" class="text-right" style="display: table;">
+                                            <p style="display: table-cell; vertical-align: middle;">
+                                                Highly Diverse
+                                            </p>
+                                        </b-col>
+                                    </b-row>
                                 </b-col>
                                 <b-col align-v="center" class="text-center" style="vertical-align: middle; text-align: center;">
                                     <!-- <b-icon class="mr-1 h3" id="relevance-help" icon="question-circle-fill" variant="primary"></b-icon>
                                     <b-tooltip target="relevance-help" triggers="hover">{{relevance_explanation}}</b-tooltip> -->
-                                    <b-form-input style="height: 100%;" id="range-1" type="range"  step="0.01" min="0" max="1"></b-form-input>
+                                    <b-form-input style="height: 100%;" id="range-uniformity-diversity" v-model="sliderUniformityDiversity" type="range" step="0.1" min="0" max="1"></b-form-input>
                                 </b-col>
-                                <b-col align-v="center"class="text-left">
-                                    Diversity
-                                </b-col>
-                            </b-row>
-                            <b-row class="mb-2" align-v="center">
-                                <b-col class="text-right">
-                                    Exploitation
-                                </b-col>
-                                <b-col class="text-center">
-                                    <!-- <b-icon class="mr-1 h3" id="relevance-help" icon="question-circle-fill" variant="primary"></b-icon>
-                                    <b-tooltip target="relevance-help" triggers="hover">{{relevance_explanation}}</b-tooltip> -->
-                                    <b-form-input style="height: 100%;" id="range-1" type="range"  step="0.01" min="0" max="1"></b-form-input>
-                                </b-col>
-                                <b-col class="text-left">
-                                    Exploration
+                                <b-col align-v="center" class="text-left">
+                                    <b-row align-h="start">
+                                        <b-col cols="auto" align-v="center" class="text-center" style="display: table;">
+                                            <p style="display: table-cell; vertical-align: middle;">
+                                                Highly Uniform
+                                            </p>
+                                        </b-col>
+                                        <b-col cols="auto" align-v="center" class="text-left">
+                                            <b-icon class="h3" style="height: 100%;" id="highly-uniform-help" icon="question-circle-fill" variant="primary"></b-icon>
+                                            <b-tooltip target="highly-uniform-help" triggers="hover">{{highly_uniform_help}}</b-tooltip>
+                                        </b-col>
+                                    </b-row>
                                 </b-col>
                             </b-row>
                             <b-row class="mb-2" align-v="center">
                                 <b-col class="text-right">
-                                    Popularity
+                                    <b-row align-h="end">
+                                        <b-col cols="auto" align-v="center" class="text-right">
+                                            <b-icon class="h3" style="height: 100%;" id="highly-explorational-help" icon="question-circle-fill" variant="primary"></b-icon>
+                                            <b-tooltip target="highly-explorational-help" triggers="hover">{{highly_explorational_help}}</b-tooltip>
+                                        </b-col>
+                                        <b-col cols="auto" align-v="center" class="text-right" style="display: table;">
+                                            <p style="display: table-cell; vertical-align: middle;">
+                                                Highly Explorational
+                                            </p>
+                                        </b-col>
+                                    </b-row>
                                 </b-col>
                                 <b-col class="text-center">
                                     <!-- <b-icon class="mr-1 h3" id="relevance-help" icon="question-circle-fill" variant="primary"></b-icon>
                                     <b-tooltip target="relevance-help" triggers="hover">{{relevance_explanation}}</b-tooltip> -->
-                                    <b-form-input style="height: 100%;" id="range-1" type="range"  step="0.01" min="0" max="1"></b-form-input>
+                                    <b-form-input style="height: 100%;" id="range-exploitation-exploration" v-model="sliderExploitationExploration" type="range" step="0.1" min="0" max="1"></b-form-input>
                                 </b-col>
                                 <b-col class="text-left">
-                                    Novelty
+                                    <b-row align-h="start">
+                                        <b-col cols="auto" align-v="center" class="text-center" style="display: table;">
+                                            <p style="display: table-cell; vertical-align: middle;">
+                                                Highly Exploitational
+                                            </p>
+                                            <!-- TODO Or exploitative? -->
+                                        </b-col>
+                                        <b-col cols="auto" align-v="center" class="text-left">
+                                            <b-icon class="h3" style="height: 100%;" id="highly-exploitational-help" icon="question-circle-fill" variant="primary"></b-icon>
+                                            <b-tooltip target="highly-exploitational-help" triggers="hover">{{highly_exploitational_help}}</b-tooltip>
+                                        </b-col>
+                                    </b-row>
+                                </b-col>
+                            </b-row>
+                            <b-row class="mb-2" align-v="center">
+                                <b-col class="text-right">
+                                    <b-row align-h="end">
+                                        <b-col cols="auto" align-v="center" class="text-right">
+                                            <b-icon class="h3" style="height: 100%;" id="highly-novel-help" icon="question-circle-fill" variant="primary"></b-icon>
+                                            <b-tooltip target="highly-novel-help" triggers="hover">{{highly_novel_help}}</b-tooltip>
+                                        </b-col>
+                                        <b-col cols="auto" align-v="center" class="text-right" style="display: table;">
+                                            <p style="display: table-cell; vertical-align: middle;">
+                                                Highly Novel
+                                            </p>
+                                        </b-col>
+                                    </b-row>
+                                </b-col>
+                                <b-col class="text-center">
+                                    <!-- <b-icon class="mr-1 h3" id="relevance-help" icon="question-circle-fill" variant="primary"></b-icon>
+                                    <b-tooltip target="relevance-help" triggers="hover">{{relevance_explanation}}</b-tooltip> -->
+                                    <b-form-input style="height: 100%;" id="range-popularity-novelty" v-model="sliderPopularityNovelty" type="range" step="0.1" min="0" max="1"></b-form-input>
+                                </b-col>
+                                <b-col class="text-left">
+                                    <b-row align-h="start">
+                                        <b-col cols="auto" align-v="center" class="text-center" style="display: table;">
+                                            <p style="display: table-cell; vertical-align: middle;">
+                                                Highly Popular
+                                            </p>
+                                        </b-col>
+                                        <b-col cols="auto" align-v="center" class="text-left">
+                                            <b-icon class="h3" style="height: 100%;" id="highly-popular-help" icon="question-circle-fill" variant="primary"></b-icon>
+                                            <b-tooltip target="highly-popular-help" triggers="hover">{{highly_popular_help}}</b-tooltip>
+                                        </b-col>
+                                    </b-row>
                                 </b-col>
                             </b-row>
                         </b-form>
@@ -184,13 +264,16 @@
                             <b-form method="POST" action="{{continuation_url}}">
                                 <input type="hidden" name="csrf_token" value="{{csrf_token()}}"/>
                                 <input type="hidden" name="selected_items" :value="selectedMovieIndices"/>
-                                <input type="hidden" name="wtf" value="Test"/>
+                                <input type="hidden" name="slider_relevance" :value="sliderRelevance"/>
+                                <input type="hidden" name="slider_popularity_novelty" :value="sliderPopularityNovelty"/>
+                                <input type="hidden" name="slider_uniformity_diversity" :value="sliderUniformityDiversity"/>
+                                <input type="hidden" name="slider_exploitation_exploration" :value="sliderExploitationExploration"/>
                                 <b-button variant="success" block type="submit">Continue</b-button>
                             </b-form>
                         </b-col>
                     </b-col>
                     <b-col>
-                        
+
                     </b-col>
                 </b-row>
             </b-card>
@@ -294,6 +377,10 @@
             selectedMetric: null,
             selectedMovieIndices: "",
             showRefinement: false,
+            sliderRelevance: 0.5,
+            sliderPopularityNovelty: 0.5,
+            sliderUniformityDiversity: 0.5,
+            sliderExploitationExploration: 0.5
 
         };
     },

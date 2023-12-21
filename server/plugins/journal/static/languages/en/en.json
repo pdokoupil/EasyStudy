@@ -142,5 +142,14 @@
     "metric_assesment_hint": "Please select a list that appear to be the most DIVERSE to you. TODO",
     "metric_assesment_title": "Metric assesment",
     "metric_assesment_header": "",
-    "metric_assesment_finish": "Finish metric assesment"
+    "metric_assesment_finish": "Finish metric assesment",
+
+    "journal_highly_popular_help": "TODO HIGHLY POPULAR",
+    "journal_highly_novel_help": "TODO HIGHLY NOVEL",
+    "journal_highly_diverse_help": "TODO HIGHLY DIVERSE",
+    "journal_highly_uniform_help": "TODO HIGHLY UNIFORM",
+    "journal_highly_explorational_help": "TODO HIGHLY EXPLORATIONAL",
+    "journal_highly_exploitational_help": "TODO HIGHLY EXPLOITATIONAL",
+    "journal_highly_relevant_help": "TODO HIGHLY RELEVANT",
+    "journal_little_relevant_help": "TODO LITTLE RELEVANT"
 }
