@@ -113,15 +113,27 @@
 
         <b-collapse id="collapse-1" v-model="showRefinement" class="mt-2">
             <b-card>
-                <b-row class="mb-3">
+                <b-row v-if="canFineTune" class="mb-3">
                     <b-col class="text-center">You can tweak the recommendation algorithm by fine-tuning the amount of attention it pays to different objectives. This will affect recommendations in the next step. Description of individual objectives is hidden under the questionmark icon. <strong>How much of the specified quality should be present in the next recommendation iteration?</strong></b-col>
                 </b-row>
-                <b-row align-v="center">
-                    <b-col>
+                <b-row v-else class="mb-3">
+                    <b-col class="text-center">This algorithm cannot be fine-tuned.</strong></b-col>
+                </b-row>
+                <!-- Two way version of the sliders -->
+                <b-row v-if="canFineTune" align-v="center">
+                    <b-col v-if="sliderVersion == 'TWO-WAY'">
                         <b-form method="GET" action="{{ url_for('journal.mors_feedback') }}">
                             <b-row class="mb-2" align-v="center" style="vertical-align: middle;">
                                 <b-col align-v="center" class="text-right">
                                     <b-row align-h="end">
+                                        <b-col cols="auto" align-v="center" class="text-left" style="display: table;">
+                                            <b-form-checkbox
+                                                v-model="ignoreRelevance"
+                                                style="display: table-cell; vertical-align: middle;"
+                                            >
+                                                Ignore objective
+                                            </b-form-checkbox>
+                                        </b-col>
                                         <b-col cols="auto" align-v="center" class="text-right">
                                             <b-icon class="h3" style="height: 100%;" id="little-relevant-help" icon="question-circle-fill" variant="primary"></b-icon>
                                             <b-tooltip target="little-relevant-help" triggers="hover">{{little_relevant_help}}</b-tooltip>
@@ -136,7 +148,7 @@
                                 <b-col class="text-center">
                                     <!-- <b-icon class="mr-1 h3" id="relevance-help" icon="question-circle-fill" variant="primary"></b-icon>
                                     <b-tooltip target="relevance-help" triggers="hover">{{relevance_explanation}}</b-tooltip> -->
-                                    <b-form-input style="height: 100%;" id="range-relevance" v-model="sliderRelevance" type="range" step="0.1" min="0" max="1"></b-form-input>
+                                    <b-form-input style="height: 100%;" id="range-relevance" v-model="sliderRelevance" type="range" step="0.1" min="0" max="1" :disabled="ignoreRelevance"></b-form-input>
                                 </b-col>
                                 <b-col>
                                     <b-row align-h="start">
@@ -155,6 +167,14 @@
                             <b-row class="mb-2" align-v="center">
                                 <b-col align-v="center" class="text-right">
                                     <b-row align-h="end">
+                                        <b-col cols="auto" align-v="center" class="text-left" style="display: table;">
+                                            <b-form-checkbox
+                                                v-model="ignoreUniformityDiversity"
+                                                style="display: table-cell; vertical-align: middle;"
+                                            >
+                                                Ignore objective
+                                            </b-form-checkbox>
+                                        </b-col>
                                         <b-col cols="auto" align-v="center" class="text-right">
                                             <b-icon class="h3" style="height: 100%;" id="highly-diverse-help" icon="question-circle-fill" variant="primary"></b-icon>
                                             <b-tooltip target="highly-diverse-help" triggers="hover">{{highly_diverse_help}}</b-tooltip>
@@ -169,7 +189,7 @@
                                 <b-col align-v="center" class="text-center" style="vertical-align: middle; text-align: center;">
                                     <!-- <b-icon class="mr-1 h3" id="relevance-help" icon="question-circle-fill" variant="primary"></b-icon>
                                     <b-tooltip target="relevance-help" triggers="hover">{{relevance_explanation}}</b-tooltip> -->
-                                    <b-form-input style="height: 100%;" id="range-uniformity-diversity" v-model="sliderUniformityDiversity" type="range" step="0.1" min="0" max="1"></b-form-input>
+                                    <b-form-input style="height: 100%;" id="range-uniformity-diversity" v-model="sliderUniformityDiversity" type="range" step="0.1" min="0" max="1" :disabled="ignoreUniformityDiversity"></b-form-input>
                                 </b-col>
                                 <b-col align-v="center" class="text-left">
                                     <b-row align-h="start">
@@ -188,6 +208,14 @@
                             <b-row class="mb-2" align-v="center">
                                 <b-col class="text-right">
                                     <b-row align-h="end">
+                                        <b-col cols="auto" align-v="center" class="text-left" style="display: table;">
+                                            <b-form-checkbox
+                                                v-model="ignoreExploitationExploration"
+                                                style="display: table-cell; vertical-align: middle;"
+                                            >
+                                                Ignore objective
+                                            </b-form-checkbox>
+                                        </b-col>
                                         <b-col cols="auto" align-v="center" class="text-right">
                                             <b-icon class="h3" style="height: 100%;" id="highly-explorational-help" icon="question-circle-fill" variant="primary"></b-icon>
                                             <b-tooltip target="highly-explorational-help" triggers="hover">{{highly_explorational_help}}</b-tooltip>
@@ -202,7 +230,7 @@
                                 <b-col class="text-center">
                                     <!-- <b-icon class="mr-1 h3" id="relevance-help" icon="question-circle-fill" variant="primary"></b-icon>
                                     <b-tooltip target="relevance-help" triggers="hover">{{relevance_explanation}}</b-tooltip> -->
-                                    <b-form-input style="height: 100%;" id="range-exploitation-exploration" v-model="sliderExploitationExploration" type="range" step="0.1" min="0" max="1"></b-form-input>
+                                    <b-form-input style="height: 100%;" id="range-exploitation-exploration" v-model="sliderExploitationExploration" type="range" step="0.1" min="0" max="1" :disabled="ignoreExploitationExploration"></b-form-input>
                                 </b-col>
                                 <b-col class="text-left">
                                     <b-row align-h="start">
@@ -222,6 +250,14 @@
                             <b-row class="mb-2" align-v="center">
                                 <b-col class="text-right">
                                     <b-row align-h="end">
+                                        <b-col cols="auto" align-v="center" class="text-left" style="display: table;">
+                                            <b-form-checkbox
+                                                v-model="ignorePopularityNovelty"
+                                                style="display: table-cell; vertical-align: middle;"
+                                            >
+                                                Ignore objective
+                                            </b-form-checkbox>
+                                        </b-col>
                                         <b-col cols="auto" align-v="center" class="text-right">
                                             <b-icon class="h3" style="height: 100%;" id="highly-novel-help" icon="question-circle-fill" variant="primary"></b-icon>
                                             <b-tooltip target="highly-novel-help" triggers="hover">{{highly_novel_help}}</b-tooltip>
@@ -236,7 +272,7 @@
                                 <b-col class="text-center">
                                     <!-- <b-icon class="mr-1 h3" id="relevance-help" icon="question-circle-fill" variant="primary"></b-icon>
                                     <b-tooltip target="relevance-help" triggers="hover">{{relevance_explanation}}</b-tooltip> -->
-                                    <b-form-input style="height: 100%;" id="range-popularity-novelty" v-model="sliderPopularityNovelty" type="range" step="0.1" min="0" max="1"></b-form-input>
+                                    <b-form-input style="height: 100%;" id="range-popularity-novelty" v-model="sliderPopularityNovelty" type="range" step="0.1" min="0" max="1" :disabled="ignorePopularityNovelty"></b-form-input>
                                 </b-col>
                                 <b-col class="text-left">
                                     <b-row align-h="start">
@@ -248,6 +284,176 @@
                                         <b-col cols="auto" align-v="center" class="text-left">
                                             <b-icon class="h3" style="height: 100%;" id="highly-popular-help" icon="question-circle-fill" variant="primary"></b-icon>
                                             <b-tooltip target="highly-popular-help" triggers="hover">{{highly_popular_help}}</b-tooltip>
+                                        </b-col>
+                                    </b-row>
+                                </b-col>
+                            </b-row>
+                        </b-form>
+                    </b-col>
+                    <!-- One-way version of the sliders -->
+                    <b-col v-else>
+                        <b-form method="GET" action="{{ url_for('journal.mors_feedback') }}">
+                            <b-row class="mb-2" align-v="center" style="vertical-align: middle;">
+                                <b-col align-v="center" class="text-right">
+                                    <b-row align-h="end">
+                                        <b-col cols="auto" align-v="center" class="text-left" style="display: table;">
+                                            <b-form-checkbox
+                                                v-model="ignoreRelevance"
+                                                style="display: table-cell; vertical-align: middle;"
+                                            >
+                                                Ignore objective
+                                            </b-form-checkbox>
+                                        </b-col>
+                                        <b-col cols="auto" align-v="center" class="text-right">
+                                            <b-icon class="h3" style="height: 100%;" id="little-relevant-help" icon="question-circle-fill" variant="primary"></b-icon>
+                                            <b-tooltip target="little-relevant-help" triggers="hover">{{little_relevant_help}}</b-tooltip>
+                                        </b-col>
+                                        <b-col cols="auto" align-v="center" class="text-right" style="display: table;">
+                                            <p style="display: table-cell; vertical-align: middle;">
+                                                Little Relevant
+                                            </p>
+                                        </b-col>
+                                    </b-row>
+                                </b-col>
+                                <b-col class="text-center">
+                                    <!-- <b-icon class="mr-1 h3" id="relevance-help" icon="question-circle-fill" variant="primary"></b-icon>
+                                    <b-tooltip target="relevance-help" triggers="hover">{{relevance_explanation}}</b-tooltip> -->
+                                    <b-form-input style="height: 100%;" id="range-relevance" v-model="sliderRelevance" type="range" step="0.1" min="0" max="1" :disabled="ignoreRelevance"></b-form-input>
+                                </b-col>
+                                <b-col>
+                                    <b-row align-h="start">
+                                        <b-col cols="auto" align-v="center" class="text-center" style="display: table;">
+                                            <p style="display: table-cell; vertical-align: middle;">
+                                                Highly Relevant
+                                            </p>
+                                        </b-col>
+                                        <b-col cols="auto" align-v="center" class="text-left">
+                                            <b-icon class="h3" style="height: 100%;" id="highly-relevant-help" icon="question-circle-fill" variant="primary"></b-icon>
+                                            <b-tooltip target="highly-relevant-help" triggers="hover">{{highly_relevant_help}}</b-tooltip>
+                                        </b-col>
+                                    </b-row>
+                                </b-col>
+                            </b-row>
+                            <b-row class="mb-2" align-v="center">
+                                <b-col align-v="center" class="text-right">
+                                    <b-row align-h="end">
+                                        <b-col cols="auto" align-v="center" class="text-left" style="display: table;">
+                                            <b-form-checkbox
+                                                v-model="ignoreUniformityDiversity"
+                                                style="display: table-cell; vertical-align: middle;"
+                                            >
+                                                Ignore objective
+                                            </b-form-checkbox>
+                                        </b-col>
+                                        <b-col cols="auto" align-v="center" class="text-right">
+                                            <b-icon class="h3" style="height: 100%;" id="little-diverse-help" icon="question-circle-fill" variant="primary"></b-icon>
+                                            <b-tooltip target="little-diverse-help" triggers="hover">{{little_diverse_help}}</b-tooltip>
+                                        </b-col>
+                                        <b-col cols="auto" align-v="center" class="text-right" style="display: table;">
+                                            <p style="display: table-cell; vertical-align: middle;">
+                                                Little Diverse
+                                            </p>
+                                        </b-col>
+                                    </b-row>
+                                </b-col>
+                                <b-col align-v="center" class="text-center" style="vertical-align: middle; text-align: center;">
+                                    <!-- <b-icon class="mr-1 h3" id="relevance-help" icon="question-circle-fill" variant="primary"></b-icon>
+                                    <b-tooltip target="relevance-help" triggers="hover">{{relevance_explanation}}</b-tooltip> -->
+                                    <b-form-input style="height: 100%;" id="range-diversity" v-model="sliderDiversity" type="range" step="0.1" min="0" max="1" :disabled="ignoreUniformityDiversity"></b-form-input>
+                                </b-col>
+                                <b-col align-v="center" class="text-left">
+                                    <b-row align-h="start">
+                                        <b-col cols="auto" align-v="center" class="text-center" style="display: table;">
+                                            <p style="display: table-cell; vertical-align: middle;">
+                                                Highly Diverse
+                                            </p>
+                                        </b-col>
+                                        <b-col cols="auto" align-v="center" class="text-left">
+                                            <b-icon class="h3" style="height: 100%;" id="highly-diverse-help" icon="question-circle-fill" variant="primary"></b-icon>
+                                            <b-tooltip target="highly-diverse-help" triggers="hover">{{highly_diverse_help}}</b-tooltip>
+                                        </b-col>
+                                    </b-row>
+                                </b-col>
+                            </b-row>
+                            <b-row class="mb-2" align-v="center">
+                                <b-col class="text-right">
+                                    <b-row align-h="end">
+                                        <b-col cols="auto" align-v="center" class="text-left" style="display: table;">
+                                            <b-form-checkbox
+                                                v-model="ignoreExploitationExploration"
+                                                style="display: table-cell; vertical-align: middle;"
+                                            >
+                                                Ignore objective
+                                            </b-form-checkbox>
+                                        </b-col>
+                                        <b-col cols="auto" align-v="center" class="text-right">
+                                            <b-icon class="h3" style="height: 100%;" id="little-explorational-help" icon="question-circle-fill" variant="primary"></b-icon>
+                                            <b-tooltip target="little-explorational-help" triggers="hover">{{little_explorational_help}}</b-tooltip>
+                                        </b-col>
+                                        <b-col cols="auto" align-v="center" class="text-right" style="display: table;">
+                                            <p style="display: table-cell; vertical-align: middle;">
+                                                Little Explorational
+                                            </p>
+                                        </b-col>
+                                    </b-row>
+                                </b-col>
+                                <b-col class="text-center">
+                                    <!-- <b-icon class="mr-1 h3" id="relevance-help" icon="question-circle-fill" variant="primary"></b-icon>
+                                    <b-tooltip target="relevance-help" triggers="hover">{{relevance_explanation}}</b-tooltip> -->
+                                    <b-form-input style="height: 100%;" id="range-exploration" v-model="sliderExploration" type="range" step="0.1" min="0" max="1" :disabled="ignoreExploitationExploration"></b-form-input>
+                                </b-col>
+                                <b-col class="text-left">
+                                    <b-row align-h="start">
+                                        <b-col cols="auto" align-v="center" class="text-center" style="display: table;">
+                                            <p style="display: table-cell; vertical-align: middle;">
+                                                Highly Explorational
+                                            </p>
+                                            <!-- TODO Or exploitative? -->
+                                        </b-col>
+                                        <b-col cols="auto" align-v="center" class="text-left">
+                                            <b-icon class="h3" style="height: 100%;" id="highly-explorational-help" icon="question-circle-fill" variant="primary"></b-icon>
+                                            <b-tooltip target="highly-explorational-help" triggers="hover">{{highly_explorational_help}}</b-tooltip>
+                                        </b-col>
+                                    </b-row>
+                                </b-col>
+                            </b-row>
+                            <b-row class="mb-2" align-v="center">
+                                <b-col class="text-right">
+                                    <b-row align-h="end">
+                                        <b-col cols="auto" align-v="center" class="text-left" style="display: table;">
+                                            <b-form-checkbox
+                                                v-model="ignorePopularityNovelty"
+                                                style="display: table-cell; vertical-align: middle;"
+                                            >
+                                                Ignore objective
+                                            </b-form-checkbox>
+                                        </b-col>
+                                        <b-col cols="auto" align-v="center" class="text-right">
+                                            <b-icon class="h3" style="height: 100%;" id="little-novel-help" icon="question-circle-fill" variant="primary"></b-icon>
+                                            <b-tooltip target="little-novel-help" triggers="hover">{{little_novel_help}}</b-tooltip>
+                                        </b-col>
+                                        <b-col cols="auto" align-v="center" class="text-right" style="display: table;">
+                                            <p style="display: table-cell; vertical-align: middle;">
+                                                Little Novel
+                                            </p>
+                                        </b-col>
+                                    </b-row>
+                                </b-col>
+                                <b-col class="text-center">
+                                    <!-- <b-icon class="mr-1 h3" id="relevance-help" icon="question-circle-fill" variant="primary"></b-icon>
+                                    <b-tooltip target="relevance-help" triggers="hover">{{relevance_explanation}}</b-tooltip> -->
+                                    <b-form-input style="height: 100%;" id="range-novelty" v-model="sliderNovelty" type="range" step="0.1" min="0" max="1" :disabled="ignorePopularityNovelty"></b-form-input>
+                                </b-col>
+                                <b-col class="text-left">
+                                    <b-row align-h="start">
+                                        <b-col cols="auto" align-v="center" class="text-center" style="display: table;">
+                                            <p style="display: table-cell; vertical-align: middle;">
+                                                Highly Novel
+                                            </p>
+                                        </b-col>
+                                        <b-col cols="auto" align-v="center" class="text-left">
+                                            <b-icon class="h3" style="height: 100%;" id="highly-novel-help" icon="question-circle-fill" variant="primary"></b-icon>
+                                            <b-tooltip target="highly-novel-help" triggers="hover">{{highly_novel_help}}</b-tooltip>
                                         </b-col>
                                     </b-row>
                                 </b-col>
@@ -268,6 +474,13 @@
                                 <input type="hidden" name="slider_popularity_novelty" :value="sliderPopularityNovelty"/>
                                 <input type="hidden" name="slider_uniformity_diversity" :value="sliderUniformityDiversity"/>
                                 <input type="hidden" name="slider_exploitation_exploration" :value="sliderExploitationExploration"/>
+                                <input type="hidden" name="slider_diversity" :value="sliderDiversity"/>
+                                <input type="hidden" name="slider_novelty" :value="sliderNovelty"/>
+                                <input type="hidden" name="slider_exploration" :value="sliderExploration"/>
+                                <input type="hidden" name="ignore_relevance" :value="ignoreRelevance"/>
+                                <input type="hidden" name="ignore_ropularity_novelty" :value="ignorePopularityNovelty"/>
+                                <input type="hidden" name="ignore_uniformity_diversity" :value="ignoreUniformityDiversity"/>
+                                <input type="hidden" name="ignore_exploitation_exploration" :value="ignoreExploitationExploration"/>
                                 <b-button variant="success" block type="submit">Continue</b-button>
                             </b-form>
                         </b-col>
@@ -292,7 +505,9 @@
     var resultLayout = "{{result_layout}}";
     var iteration = "{{iteration}}";
     var minIterationToCancel = "{{MIN_ITERATION_TO_CANCEL}}";
-    var csrfToken = "{{csrf_token()}}"
+    var csrfToken = "{{csrf_token()}}";
+    var canFineTune = "{{can_fine_tune}}" == "True" ? true : false;
+    var sliderVersion = "{{slider_version}}";
 
     var defaultComparisonValue = "{{disable_relative_comparison}}";
     var defaultComparisonValidation = defaultComparisonValue == "True" ? true : false;
@@ -380,8 +595,16 @@
             sliderRelevance: 0.5,
             sliderPopularityNovelty: 0.5,
             sliderUniformityDiversity: 0.5,
-            sliderExploitationExploration: 0.5
-
+            sliderExploitationExploration: 0.5,
+            sliderDiversity: 0.5,
+            sliderNovelty: 0.5,
+            sliderExploration: 0.5,
+            ignoreRelevance: false,
+            ignorePopularityNovelty: false,
+            ignoreUniformityDiversity: false,
+            ignoreExploitationExploration: false,
+            canFineTune: canFineTune,
+            sliderVersion: sliderVersion
         };
     },
     computed: {
