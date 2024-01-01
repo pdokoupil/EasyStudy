@@ -6,11 +6,15 @@
             {{hint}}
         </b-jumbotron>
     
-        <b-form method="GET" action="{{ continuation_url }}">
+        <b-form method="POST" action="{{ continuation_url }}">
+    
+
             <b-row class="mb-3" align-h="center">
-                <b-col cols="auto" >
+                <b-col></b-col>
+                
+                <b-col cols="8" >
                     <b-row align-v="center">
-                        <b-col class="mt-2" cols="auto">
+                        <!-- <b-col class="mt-2" cols="auto">
                             <b-row>
                                 <b-col>
                                     <b-icon class="h1" icon="grid"></b-icon>
@@ -21,36 +25,337 @@
                                     <b-icon class="h1" icon="grid"></b-icon>
                                 </b-col>
                             </b-row>
-                        </b-col>
+                        </b-col> -->
                         <b-col>
-                            <b-form-group name="q1" id="q1">
+                            <b-form-group>
                                 <b-label for="q1">
-                                    <strong>1. TODO Q1</strong>
+                                    <strong>1. Do you have some knowledge of what recommender systems are and how they function?</strong>
                                 </b-label>
-                                <b-form-radio-group name="q1" required>
-                                    <b-form-radio value="-2">Strongly Disagree</b-form-radio>
-                                    <b-form-radio value="-1">Disagree</b-form-radio>
-                                    <b-form-radio value="0">Neutral</b-form-radio>
-                                    <b-form-radio value="1">Agree</b-form-radio>
-                                    <b-form-radio value="2" class="mr-5">Strongly Agree</b-form-radio>
-                                    <b-form-radio value="3" class="ml-5">I don't understand</b-form-radio>
-                                </b-form-radio-group>
+                                <b-form-select name="q1" id="q1" :state="q1Validated" v-model="selectedQ1" :options="optionsQ1"></b-form-select>
+                            </b-form-group>
+                        </b-col>
+                    </b-row>
+                </b-col>
+                <b-col></b-col>
+            </b-row>
+
+
+            <b-row class="mb-3" align-h="center">
+                <b-col></b-col>
+                
+                <b-col cols="8" >
+                    <b-row align-v="center">
+                        <!-- <b-col class="mt-2" cols="auto">
+                            <b-row>
+                                <b-col>
+                                    <b-icon class="h1" icon="grid"></b-icon>
+                                </b-col>
+                            </b-row>
+                            <b-row>
+                                <b-col>
+                                    <b-icon class="h1" icon="grid"></b-icon>
+                                </b-col>
+                            </b-row>
+                        </b-col> -->
+                        <b-col>
+                            <b-form-group>
+                                <b-label for="q2">
+                                    <strong>2. Did you previously hear about the term <u>relevance</u> in the context of recommendations?</strong>
+                                </b-label>
+                                <b-form-select name="q2" id="q2" :state="q2Validated" v-model="selectedQ2" :options="optionsYesNo"></b-form-select>
+                            </b-form-group>
+                        </b-col>
+                    </b-row>
+                </b-col>
+                <b-col></b-col>
+            </b-row>
+
+            <b-row class="mb-3" align-h="center">
+                <b-col cols="8" >
+                    <b-row align-v="center">
+                        <!-- <b-col class="mt-2" cols="auto">
+                            <b-row>
+                                <b-col>
+                                    <b-icon class="h1" icon="grid"></b-icon>
+                                </b-col>
+                            </b-row>
+                            <b-row>
+                                <b-col>
+                                    <b-icon class="h1" icon="grid"></b-icon>
+                                </b-col>
+                            </b-row>
+                        </b-col> -->
+                        <b-col>
+                            <b-form-group>
+                                <b-label for="q3">
+                                    <strong>3. Did you previously hear about the term <u>diversity</u> in the context of recommendations?</strong>
+                                </b-label>
+                                <b-form-select name="q3" id="q3" :state="q3Validated" v-model="selectedQ3" :options="optionsYesNo"></b-form-select>
                             </b-form-group>
                         </b-col>
                     </b-row>
                 </b-col>
             </b-row>
-        </b-form>
 
-        <b-row align-h="center">
-            <b-col class="text-center">
-                <b-form method="POST" action="{{continuation_url}}">
+            <b-row class="mb-3" align-h="center">
+                <b-col cols="8" >
+                    <b-row align-v="center">
+                        <!-- <b-col class="mt-2" cols="auto">
+                            <b-row>
+                                <b-col>
+                                    <b-icon class="h1" icon="grid"></b-icon>
+                                </b-col>
+                            </b-row>
+                            <b-row>
+                                <b-col>
+                                    <b-icon class="h1" icon="grid"></b-icon>
+                                </b-col>
+                            </b-row>
+                        </b-col> -->
+                        <b-col>
+                            <b-form-group>
+                                <b-label for="q4">
+                                    <strong>4. Did you previously hear about the term <u>novelty</u> in the context of recommendations?</strong>
+                                </b-label>
+                                <b-form-select name="q4" id="q4" :state="q4Validated" v-model="selectedQ4" :options="optionsYesNo"></b-form-select>
+                            </b-form-group>
+                        </b-col>
+                    </b-row>
+                </b-col>
+            </b-row>
+
+            <b-row class="mb-3" align-h="center">
+                <b-col cols="8" >
+                    <b-row align-v="center">
+                        <!-- <b-col class="mt-2" cols="auto">
+                            <b-row>
+                                <b-col>
+                                    <b-icon class="h1" icon="grid"></b-icon>
+                                </b-col>
+                            </b-row>
+                            <b-row>
+                                <b-col>
+                                    <b-icon class="h1" icon="grid"></b-icon>
+                                </b-col>
+                            </b-row>
+                        </b-col> -->
+                        <b-col>
+                            <b-form-group>
+                                <b-label for="q5">
+                                    <strong>5. Did you previously hear about the term <u>exploration</u> in the context of recommendations?</strong>
+                                </b-label>
+                                <b-form-select name="q5" id="q5" :state="q5Validated" v-model="selectedQ5" :options="optionsYesNo"></b-form-select>
+                            </b-form-group>
+                        </b-col>
+                    </b-row>
+                </b-col>
+            </b-row>
+
+            <b-row class="mb-3" align-h="center">
+                <b-col cols="8" >
+                    <b-row align-v="center">
+                        <!-- <b-col class="mt-2" cols="auto">
+                            <b-row>
+                                <b-col>
+                                    <b-icon class="h1" icon="grid"></b-icon>
+                                </b-col>
+                            </b-row>
+                            <b-row>
+                                <b-col>
+                                    <b-icon class="h1" icon="grid"></b-icon>
+                                </b-col>
+                            </b-row>
+                        </b-col> -->
+                        <b-col>
+                            <b-form-group>
+                                <b-label for="q6">
+                                    <strong>6. Did you previously hear about the term <u>exploitation</u> in the context of recommendations?</strong>
+                                </b-label>
+                                <b-form-select name="q6" id="q6" :state="q6Validated" v-model="selectedQ6" :options="optionsYesNo"></b-form-select>
+                            </b-form-group>
+                        </b-col>
+                    </b-row>
+                </b-col>
+            </b-row>
+
+            <b-row class="mb-3" align-h="center">
+                <b-col cols="8" >
+                    <b-row align-v="center">
+                        <!-- <b-col class="mt-2" cols="auto">
+                            <b-row>
+                                <b-col>
+                                    <b-icon class="h1" icon="grid"></b-icon>
+                                </b-col>
+                            </b-row>
+                            <b-row>
+                                <b-col>
+                                    <b-icon class="h1" icon="grid"></b-icon>
+                                </b-col>
+                            </b-row>
+                        </b-col> -->
+                        <b-col>
+                            <b-form-group>
+                                <b-label for="q7">
+                                    <strong>7. Select the statement that best corresponds to what <u>relevant</u> recommendations mean to you</strong>
+                                </b-label>
+                                <b-form-select name="q7" id="q7" :state="q7Validated" v-model="selectedQ7" :options="optionsRelevance"></b-form-select>
+                                <b-input name="q7Other" id="q7Other" :state="otherTextQ7 != ''" v-if="selectedQ7 === 'other'" v-model="otherTextQ7" type="text" placeholder="Please specify"/>
+                            </b-form-group>
+                        </b-col>
+                    </b-row>
+                </b-col>
+            </b-row>
+
+
+            <b-row class="mb-3" align-h="center">
+                <b-col cols="8" >
+                    <b-row align-v="center">
+                        <!-- <b-col class="mt-2" cols="auto">
+                            <b-row>
+                                <b-col>
+                                    <b-icon class="h1" icon="grid"></b-icon>
+                                </b-col>
+                            </b-row>
+                            <b-row>
+                                <b-col>
+                                    <b-icon class="h1" icon="grid"></b-icon>
+                                </b-col>
+                            </b-row>
+                        </b-col> -->
+                        <b-col>
+                            <b-form-group>
+                                <b-label for="q8">
+                                    <strong>8. Select the statement that best corresponds to what <u>diverse</u> recommendations mean to you</strong>
+                                </b-label>
+                                <b-form-select name="q8" id="q8" :state="q8Validated" v-model="selectedQ8" :options="optionsCorrespondence"></b-form-select>
+                                <b-input name="q8Other" id="q8Other" :state="otherTextQ8 != ''" v-if="selectedQ8 === 'other'" v-model="otherTextQ8" type="text" placeholder="Please specify"/>
+                            </b-form-group>
+                        </b-col>
+                    </b-row>
+                </b-col>
+            </b-row>
+
+            <b-row class="mb-3" align-h="center">
+                <b-col cols="8" >
+                    <b-row align-v="center">
+                        <!-- <b-col class="mt-2" cols="auto">
+                            <b-row>
+                                <b-col>
+                                    <b-icon class="h1" icon="grid"></b-icon>
+                                </b-col>
+                            </b-row>
+                            <b-row>
+                                <b-col>
+                                    <b-icon class="h1" icon="grid"></b-icon>
+                                </b-col>
+                            </b-row>
+                        </b-col> -->
+                        <b-col>
+                            <b-form-group>
+                                <b-label for="q9">
+                                    <strong>9. Select the statement that best corresponds to what <u>novel</u> recommendations mean to you</strong>
+                                </b-label>
+                                <b-form-select name="q9" id="q9" :state="q9Validated" v-model="selectedQ9" :options="optionsCorrespondence"></b-form-select>
+                                <b-input name="q9Other" id="q9Other" :state="otherTextQ9 != ''" v-if="selectedQ9 === 'other'" v-model="otherTextQ9" type="text" placeholder="Please specify"/>
+                            </b-form-group>
+                        </b-col>
+                    </b-row>
+                </b-col>
+            </b-row>
+
+            <b-row class="mb-3" align-h="center">
+                <b-col cols="8" >
+                    <b-row align-v="center">
+                        <!-- <b-col class="mt-2" cols="auto">
+                            <b-row>
+                                <b-col>
+                                    <b-icon class="h1" icon="grid"></b-icon>
+                                </b-col>
+                            </b-row>
+                            <b-row>
+                                <b-col>
+                                    <b-icon class="h1" icon="grid"></b-icon>
+                                </b-col>
+                            </b-row>
+                        </b-col> -->
+                        <b-col>
+                            <b-form-group>
+                                <b-label for="q10">
+                                    <strong>10. Select the statement that best corresponds to what <u>exploratory</u> recommendations mean to you</strong>
+                                </b-label>
+                                <b-form-select name="q10" id="q10" :state="q10Validated" v-model="selectedQ10" :options="optionsCorrespondence"></b-form-select>
+                                <b-input name="q10Other" id="q10Other" :state="otherTextQ10 != ''" v-if="selectedQ10 === 'other'" v-model="otherTextQ10" type="text" placeholder="Please specify"/>
+                            </b-form-group>
+                        </b-col>
+                    </b-row>
+                </b-col>
+            </b-row>
+
+            <b-row class="mb-3" align-h="center">
+                <b-col cols="8" >
+                    <b-row align-v="center">
+                        <!-- <b-col class="mt-2" cols="auto">
+                            <b-row>
+                                <b-col>
+                                    <b-icon class="h1" icon="grid"></b-icon>
+                                </b-col>
+                            </b-row>
+                            <b-row>
+                                <b-col>
+                                    <b-icon class="h1" icon="grid"></b-icon>
+                                </b-col>
+                            </b-row>
+                        </b-col> -->
+                        <b-col>
+                            <b-form-group>
+                                <b-label for="q11">
+                                    <strong>11. Select the statement that best corresponds to what <u>exploitatory</u> recommendations mean to you</strong>
+                                </b-label>
+                                <b-form-select name="q11" id="q11" :state="q11Validated" v-model="selectedQ11" :options="optionsCorrespondence"></b-form-select>
+                                <b-input name="q11Other" id="q11Other" :state="otherTextQ11 != ''" v-if="selectedQ11 === 'other'" v-model="otherTextQ11" type="text" placeholder="Please specify"/>
+                            </b-form-group>
+                        </b-col>
+                    </b-row>
+                </b-col>
+            </b-row>
+
+            <!-- <b-row>
+                <b-col>
+                </b-col>
+          
+                <b-col>
+                  <div class="d-flex align-items-center">
+                    <span class="mr-2">Text 1:</span>
+                    <b-form-select v-model="selectedQ1" :options="optionsQ1"></b-form-select>
+                  </div>
+                </b-col>
+          
+                <b-col>
+                </b-col>
+              </b-row>
+          
+              <b-row>
+                <b-col>
+                </b-col>
+          
+                <b-col>
+                  <div class="d-flex align-items-center">
+                    <span class="mr-2">Text 2:</span>
+                    <b-form-select v-model="selectedQ2" :options="optionsQ2"></b-form-select>
+                  </div>
+                </b-col>
+          
+                <b-col>
+                </b-col>
+              </b-row> -->
+              <b-row align-h="center">
+                <b-col class="text-center">
                     <input type="hidden" name="csrf_token" value="{{csrf_token()}}"/>
                     <input type="hidden" name="final_questionnaire_data" value="final_questionnaire_data"/>
-                    <b-button variant="success" type="submit">{{finish}}</b-button>
-                </b-form>
-            </b-col>
-        </b-row>
+                    <b-button :disabled="!allValidated" variant="success" type="submit">{{finish}}</b-button>
+                </b-col>
+            </b-row>
+        </b-form>
         
         
 
@@ -70,11 +375,101 @@
     data: function() {
         
         return {
-            
+            selectedQ1: null,
+            selectedQ2: null,
+            selectedQ3: null,
+            selectedQ4: null,
+            selectedQ5: null,
+            selectedQ6: null,
+            selectedQ7: null,
+            selectedQ8: null,
+            selectedQ9: null,
+            selectedQ10: null,
+            selectedQ11: null,
+            otherTextQ7: '',
+            otherTextQ8: '',
+            otherTextQ9: '',
+            otherTextQ10: '',
+            otherTextQ11: '',
+            submitted: false,
+            optionsQ1: [
+                { value: null, text: 'Please select an option' },
+                { value: '-2', text: 'No' },
+                { value: '-1', text: 'A little' },
+                { value: '1', text: 'Substantial knowledge' },
+                { value: '2', text: 'Expert in the area' },
+            ],
+            optionsYesNo: [
+                { value: null, text: 'Please select an option' },
+                { value: '-2', text: 'No' },
+                { value: '2', text: 'Yes' },
+            ],
+            optionsRelevance: [
+                { value: null, text: 'Please select an option' },
+                { value: '0', text: 'Providing items that match my with my existing interests.' },
+                { value: '1', text: 'Providing items that I can utilize right now.' },
+                { value: '2', text: 'Helping me to understand the variety of the offer.' },
+                { value: '3', text: 'Helping me to find unexpected yet interesting items.' },
+                { value: 'other', text: 'Other' },
+            ],
+            optionsCorrespondence: [
+                { value: null, text: 'Please select an option' },
+                { value: '0', text: 'Providing items that are highly different from the ones you consumed so far (e.g., genres you never watched so far).' },
+                { value: '1', text: 'Showing you a selection of very heterogeneous items (e.g., each one having a different set of genres).' },
+                { value: '2', text: 'Providing niche items that are not much known in general.' },
+                { value: 'other', text: 'Other' },
+            ],
         };
     },
     methods: {
-        
+    },
+    computed: {
+        q1Validated() {
+            return this.selectedQ1 != null; // q1 validated
+        },
+        q2Validated() {
+            return this.selectedQ2 != null; // q2 validated
+        },
+        q3Validated() {
+            return this.selectedQ3 != null; // q3 validated
+        },
+        q4Validated() {
+            return this.selectedQ4 != null; // q4 validated
+        },
+        q5Validated() {
+            return this.selectedQ5 != null; // q5 validated
+        },
+        q6Validated() {
+            return this.selectedQ6 != null; // q6 validated
+        },
+        q7Validated() {
+            return this.selectedQ7 != null && ((this.selectedQ7 === 'other' && this.otherTextQ7 != '') || this.selectedQ7 != 'other');
+        },
+        q8Validated() {
+            return this.selectedQ8 != null && ((this.selectedQ8 === 'other' && this.otherTextQ8 != '') || this.selectedQ8 != 'other');
+        },
+        q9Validated() {
+            return this.selectedQ9 != null && ((this.selectedQ9 === 'other' && this.otherTextQ9 != '') || this.selectedQ9 != 'other');
+        },
+        q10Validated() {
+            return this.selectedQ10 != null && ((this.selectedQ10 === 'other' && this.otherTextQ10 != '') || this.selectedQ10 != 'other');
+        },
+        q11Validated() {
+            return this.selectedQ11 != null && ((this.selectedQ11 === 'other' && this.otherTextQ11 != '') || this.selectedQ11 != 'other');
+        },
+        allValidated() {
+            return this.q1Validated
+                && this.q2Validated
+                && this.q3Validated
+                && this.q4Validated
+                && this.q5Validated
+                && this.q6Validated
+                && this.q7Validated
+                && this.q8Validated
+                && this.q9Validated
+                && this.q10Validated
+                && this.q11Validated;
+        }
     },
     async mounted() {
         const btns = document.querySelectorAll("button");

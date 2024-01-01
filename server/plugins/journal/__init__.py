@@ -37,6 +37,8 @@ from plugins.journal.metrics import binomial_diversity, intra_list_diversity, it
 
 #from memory_profiler import profile
 
+from plugins.journal.algorithms import NEG_INF, evolutionary_exact, evolutionary_max, greedy_exact, greedy_max, item_wise_exact, item_wise_max
+
 from app import rds
 
 languages = load_languages(os.path.dirname(__file__))
@@ -55,9 +57,11 @@ ALGORITHM_ROWS = {
 # The mapping is not fixed between users
 ALGORITHM_ANON_NAMES = ["BETA", "GAMMA", "DELTA"]
 POSSIBLE_ALPHAS = [0.0, 0.01, 0.1, 0.25, 0.5, 0.75, 0.9, 0.99, 1.0]
+# one-way means there is single objective per slider, going from 0 to 1
+# two-way means there are two objectives, one at each side of the slider
+SLIDER_VERSIONS = ["TWO-WAY", "ONE-WAY"]
 
 HIDE_LAST_K = 100000
-NEG_INF = int(-10e6)
 N_ALPHA_ITERS = 2
 
 # Implementation of this function can differ among plugins
@@ -217,6 +221,12 @@ def pre_study_questionnaire():
 
 @bp.route("/pre-study-questionnaire-done", methods=["GET", "POST"])
 def pre_study_questionnaire_done():
+
+    data = {}
+    data.update(**request.form)
+
+    log_interaction(session["participation_id"], "pre-study-questionnaire", **data)
+
     return redirect(url_for("utils.preference_elicitation", continuation_url=url_for("journal.send_feedback"),
             consuming_plugin=__plugin_name__,
             initial_data_url=url_for('fastcompare.get_initial_data'),
@@ -312,6 +322,9 @@ def send_feedback():
     ### Initialize MORS related stuff ###
     selected_algorithm_row = np.random.choice(list(ALGORITHM_ROWS.keys()))
     selected_algorithms = ALGORITHM_ROWS[selected_algorithm_row] + ["RELEVANCE-BASED"]
+    # Select sliders
+    # TODO find a better way to do this
+    selected_slider_versions = ['ONE-WAY', 'ONE-WAY', 'TWO-WAY']
     # Shuffle algorithms
     np.random.shuffle(selected_algorithms)
     # Shuffle algorithm names
@@ -327,6 +340,7 @@ def send_feedback():
         "alphas_p": [selected_alphas[:3], selected_alphas[3:]],
         "algorithm_row": selected_algorithm_row,
         "selected_algorithms": selected_algorithms,
+        "selected_slider_versions": selected_slider_versions,
         "algorithm_name_mapping": algorithm_name_mapping,
         "recommendations": {
            algo: [] for algo in algorithm_name_mapping.keys() # For each algorithm and each iteration we hold the recommendation
@@ -346,8 +360,11 @@ def send_feedback():
     })
 
     elicitation_ended(
-        session['elicitation_movies'], selected_movies,
-        orig_permutation=p, displyed_name_mapping=displyed_name_mapping, refinement_layout=refinement_layout_name,
+        session['elicitation_movies'],
+        selected_movies,
+        orig_permutation=p,
+        displyed_name_mapping=displyed_name_mapping,
+        refinement_layout=refinement_layout_name,
         supports={key: np.round(value.astype(float), 4).tolist() for key, value in supports.items()}
     )  
 
@@ -667,7 +684,7 @@ def done():
 # w.r.t. algorithm passed as algo
 def morsify(k, rel_scores,
             algo, items, objective_fs,
-            rating_row, n_items_subset=None,
+            rating_row, filter_out_items, n_items_subset=None,
             do_normalize=False, rnd_mixture=False):
     ####TODO REMOVE SEED SETTING!!!
     random.seed(42)
@@ -685,6 +702,7 @@ def morsify(k, rel_scores,
     # marginal gains for relevance are calculated separate, this is optimization and brings some savings when compared to naive calculation
 
     # Sort relevances
+    # Filter_out_items are already propageted into rel_scores (have lowest score)
     sorted_relevances = np.argsort(-rel_scores, axis=-1)
    
 
@@ -692,11 +710,25 @@ def morsify(k, rel_scores,
     
     # If n_items_subset is specified, we take subset of items
     if n_items_subset is None:
+        # Mgain masking will ensure we do not select items in filter_out_items set
         source_items = items
     else:
         if rnd_mixture:
             assert n_items_subset % 2 == 0, f"When using random mixture we expect n_items_subset ({n_items_subset}) to be divisible by 2"
-            source_items = np.concatenate([sorted_relevances[:n_items_subset//2], np.random.choice(sorted_relevances[n_items_subset:], n_items_subset//2, replace=False)])
+            # Here we need to ensure that we do not include already seen items among source_items
+            # so we have to filter out 'filter_out_items' out of the set
+
+            # We know items from filter_out_items have very low relevances
+            # so here we are safe w.r.t. filter_out_movies because those will be at the end of the sorted list
+            relevance_half = sorted_relevances[:n_items_subset//2]
+            # However, for the random half, we have to ensure we do not sample movies from filter_out_movies because this can lead to issues
+            # especially when n_items_subset is small and filter_out_items is large (worst case is that we will sample exactly those items that should have been filtered out)
+            random_candidates = np.setdiff1d(sorted_relevances[n_items_subset//2], filter_out_items)
+            random_half = np.random.choice(random_candidates, n_items_subset//2, replace=False)
+            source_items = np.concatenate([
+                relevance_half, 
+                random_half
+            ])
         else:
             source_items = sorted_relevances[:n_items_subset]
 
@@ -746,67 +778,6 @@ def morsify(k, rel_scores,
     return top_k_list
 
 
-def mask_scores(scores, seen_items_mask):
-    # Ensure seen items get lowest score of 0
-    # Just multiplying by zero does not work when scores are not normalized to be always positive
-    # because masked-out items will not have smallest score (some valid, non-masked ones can be negative)
-    # scores = scores * seen_items_mask[user_idx]
-    # So instead we do scores = scores * seen_items_mask[user_idx] + NEG_INF * (1 - seen_items_mask[user_idx])
-    min_score = scores.min()
-    # Unlike in predict_with_score, here we do not mandate NEG_INF to be strictly smaller
-    # because rel_scores may already contain some NEG_INF that was set by predict_with_score
-    # called previously -> so we allow <=.
-    assert NEG_INF <= min_score, f"min_score ({min_score}) is not smaller than NEG_INF ({NEG_INF})"
-    scores = scores * seen_items_mask + NEG_INF * (1 - seen_items_mask)
-    return scores
-
-class greedy:
-    def __init__(self, weights):
-        self.weights = weights
-        self.n_objectives = weights.size
-
-    def __call__(self, mgains, seen_items_mask):
-        # Greedy algorithm that just search items whose supports are
-        _, n_items = mgains.shape
-        assert self.n_objectives == mgains.shape[0], f"{self.n_objectives} != {mgains.shape}"
-        # Convert distances to scores (the lower the distance, the higher the score)
-        scores = -1 * ((mgains - self.weights[:, np.newaxis]) ** 2).sum(axis=0)
-        assert scores.shape == (n_items, ), f"{scores.shape} != {(n_items, )}"
-        print(f"Max score without masking = {scores.max()}, mgains: {mgains[:, scores.argmax()]}")
-        print(mgains)
-        scores = mask_scores(scores, seen_items_mask)
-        print(f"Max score = {scores.max()}, mgains: {mgains[:, scores.argmax()]}")
-        return scores.argmax()
-
-class rlprop_mod:
-    def __init__(self, weights):
-        self.weights = weights
-        self.n_objectives = weights.size
-        self.TOT = 0.0
-        self.gm = np.zeros(shape=(self.n_objectives, ), dtype=np.float32)
-
-    # Returns single item recommended at a given time
-    def __call__(self, mgains, seen_items_mask):
-        _, n_items = mgains.shape
-        assert np.all(mgains >= 0.0), "We expect all mgains to be normalized to be greater than 0"
-        tots = np.zeros(shape=(n_items, ), dtype=np.float32)
-        remainder = np.zeros_like(self.gm)
-        scores = np.zeros_like(tots)
-        for item_idx in np.arange(n_items):
-            tots[item_idx] = max(self.TOT, self.TOT + mgains[:, item_idx].sum())
-            remainder = (tots[item_idx] * self.weights - self.gm) ** 2
-            assert remainder.shape == (self.n_objectives,)
-            # We want to push remainder to 0 by maximizing score (so we minimize its negative)
-            scores[item_idx] = -remainder.sum()
-
-        scores = mask_scores(scores, seen_items_mask)
-        i_best = scores.argmax()
-
-        self.gm = self.gm + mgains[:, i_best]
-        self.TOT = np.clip(self.gm, 0.0, None).sum()
-
-        return i_best
-
 
 # Does not get throough morsify as this is end-to-end approach to MORS, not "diversification" or "morsification"
 def moea():
@@ -841,14 +812,23 @@ def mors_feedback():
 
 
     #print(f"MORS-FEEDBACK IT before = {session['iteration']}")
-    print("@@@@ Received following params:")
-    print(request.form.get("selected_items"))
-    slider_relevance = float(request.form.get("slider_relevance"))
-    slider_exploitation_exploration = float(request.form.get("slider_exploitation_exploration"))
-    slider_uniformity_diversity = float(request.form.get("slider_uniformity_diversity"))
-    slider_popularity_novelty = float(request.form.get("slider_popularity_novelty"))
-    print(slider_relevance, slider_exploitation_exploration, slider_uniformity_diversity, slider_popularity_novelty)
-    print("@@@@")
+    if it % N_ITERATIONS == 0:
+        # Very first iteration of the block, we get to mors-feedback before sliders are shown for the first time
+        # TODO calculate weight estimate?
+        # or just use relevance only baseline?
+        slider_relevance = \
+        slider_exploitation_exploration = \
+        slider_uniformity_diversity = \
+        slider_popularity_novelty = 0.5
+    else:
+        print("@@@@ Received following params:")
+        print(request.form.get("selected_items"))
+        slider_relevance = float(request.form.get("slider_relevance"))
+        slider_exploitation_exploration = float(request.form.get("slider_exploitation_exploration"))
+        slider_uniformity_diversity = float(request.form.get("slider_uniformity_diversity"))
+        slider_popularity_novelty = float(request.form.get("slider_popularity_novelty"))
+        print(slider_relevance, slider_exploitation_exploration, slider_uniformity_diversity, slider_popularity_novelty)
+        print("@@@@")
     
     
     # Generate the actual recommendations
@@ -865,7 +845,7 @@ def mors_feedback():
         div_f = binomial_diversity(loader.all_categories, loader.get_item_index_categories, loader.rating_matrix, 0.0, loader.name())
 
 
-    cdf_div = load_cdf_cache(get_cache_path(get_semi_local_cache_name(loader)), selected_metric_name)
+    #cdf_div = load_cdf_cache(get_cache_path(get_semi_local_cache_name(loader)), selected_metric_name)
 
     k = 10
 
@@ -886,6 +866,10 @@ def mors_feedback():
     print(f"Rel scores normed: {rel_scores_normed}")
     print(f"@@ Items shape={items.shape}, size={items.size}")
     
+
+    # Note that "all_recommendations" already includes items selected during the study (except those selected during elicitattion which we are thus adding)
+    filter_out_items = np.concatenate([all_recommendations, elicitation_selected])
+
     target_weights = np.array([1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.0])
 
     def relevance_f(top_k_list):
@@ -913,28 +897,39 @@ def mors_feedback():
 
     start_time = time.perf_counter()
     if cur_algorithm == "GREEDY-EXACT":
-        algo = rlprop_mod(target_weights)
+        algo = greedy_exact(target_weights)
         top_k = morsify(
             10, rel_scores, algo,
-            items, objectives, user_vector, n_items_subset=500,
+            items, objectives, user_vector, filter_out_items, n_items_subset=500,
             do_normalize=True, rnd_mixture=True
         )
     elif cur_algorithm == "ITEM-WISE-EXACT":
-        print(f"@@@ Greedy WA with target weights = {target_weights}")
-        algo = greedy(target_weights)
+        algo = item_wise_exact(target_weights)
         top_k = morsify(
             10, rel_scores, algo,
-            items, objectives, user_vector, n_items_subset=500,
+            items, objectives, user_vector, filter_out_items, n_items_subset=500,
             do_normalize=True, rnd_mixture=True
         )
     elif cur_algorithm == "EVOLUTIONARY-EXACT":
-        top_k = np.random.choice(np.arange(15000), 10, replace=False)
+        algo = evolutionary_exact(target_weights, rel_scores, user_vector, objectives, relevance_top_k, filter_out_items, k=k, time_limit_seconds=4)
+        top_k = algo()
     elif cur_algorithm == "GREEDY-MAX":
-        top_k = np.random.choice(np.arange(15000), 10, replace=False)
+        algo = greedy_max(target_weights)
+        top_k = morsify(
+            10, rel_scores, algo,
+            items, objectives, user_vector, filter_out_items, n_items_subset=500,
+            do_normalize=True, rnd_mixture=True
+        )
     elif cur_algorithm == "ITEM-WISE-MAX":
-        top_k = np.random.choice(np.arange(15000), 10, replace=False)
+        algo = item_wise_max(target_weights)
+        top_k = morsify(
+            10, rel_scores, algo,
+            items, objectives, user_vector, filter_out_items, n_items_subset=500,
+            do_normalize=True, rnd_mixture=True
+        )
     elif cur_algorithm == "EVOLUTIONARY-MAX":
-        top_k = np.random.choice(np.arange(15000), 10, replace=False)
+        algo = evolutionary_max(target_weights, rel_scores, user_vector, objectives, relevance_top_k, filter_out_items, k=k, time_limit_seconds=4)
+        top_k = algo()
     elif cur_algorithm == "RELEVANCE-BASED":
         top_k = relevance_top_k
     else:
@@ -958,7 +953,8 @@ def mors_feedback():
     set_val('recommendation', recommendation)
     
     shown_items = get_val('shown_items')
-    shown_items[cur_algorithm].append(top_k.tolist())
+    top_k_list = top_k if isinstance(top_k, list) else top_k.tolist()
+    shown_items[cur_algorithm].append(top_k_list)
     set_val('shown_items', shown_items)
 
     slider_values = get_val("slider_values")
@@ -983,6 +979,7 @@ def mors():
 
     cur_block = (int(it) - 1) // N_ITERATIONS
     cur_algorithm = user_data["selected_algorithms"][cur_block]
+    cur_slider_version = user_data["selected_slider_versions"][cur_block]
     
     # if cur_algorithm == "RLPROP":
     #     pass
@@ -1021,6 +1018,11 @@ def mors():
         "highly_exploitational_help": tr("journal_highly_exploitational_help"),
         "highly_relevant_help": tr("journal_highly_relevant_help"),
         "little_relevant_help": tr("journal_little_relevant_help"),
+        "little_novel_help": tr("journal_little_novel_help"),
+        "little_diverse_help": tr("journal_little_diverse_help"),
+        "little_explorational_help": tr("journal_little_explorational_help"),
+        "can_fine_tune": cur_algorithm != "RELEVANCE-BASED",
+        "slider_version": cur_slider_version
     }
     #assert session.modified == False
     return render_template("mors.html", **params)
@@ -1075,7 +1077,7 @@ def gr():
     ]
 
     start_time = time.perf_counter()
-    algo = greedy(np.array([1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.0]))
+    algo = item_wise_exact(np.array([1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.0]))
     greedy_top_k = morsify(
         10, rel_scores, algo,
         items, objectives, user_vector, n_items_subset=500,

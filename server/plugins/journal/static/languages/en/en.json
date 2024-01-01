@@ -151,5 +151,8 @@
     "journal_highly_explorational_help": "TODO HIGHLY EXPLORATIONAL",
     "journal_highly_exploitational_help": "TODO HIGHLY EXPLOITATIONAL",
     "journal_highly_relevant_help": "TODO HIGHLY RELEVANT",
-    "journal_little_relevant_help": "TODO LITTLE RELEVANT"
+    "journal_little_relevant_help": "TODO LITTLE RELEVANT",
+    "journal_little_diverse_help": "TODO LITTLE DIVERSITY",
+    "journal_little_novel_help": "TODO LITTLE NOVELTY",
+    "journal_little_explorational_help": "TODO LITTLE EXPLORATION"
 }
