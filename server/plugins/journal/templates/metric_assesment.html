@@ -19,8 +19,17 @@
 </style>
 <div id="app">
     <b-container fluid>
-        <b-jumbotron style="max-height: 7vh;" class="smallJumbotron" header="{{header}}" lead="">
+        <!-- <b-jumbotron style="max-height: 10vh;" class="smallJumbotron" header="{{header}} ({{iteration}}/{{n_iterations}})" lead="" header-level="4">
             {{hint}}
+        </b-jumbotron> -->
+
+        <b-jumbotron style="max-height: 10vh;" class="smallJumbotron" header-level="8">
+            <template #header>
+                <h1 style="font-size: 1.0rem; margin-bottom: -0.5em; padding: 0;">{{header}} ({{iteration}}/{{n_iterations}})</h1>
+            </template>
+            <p style="margin-top: 0px;">
+                {{hint}}
+            </p>
         </b-jumbotron>
     
         <!-- <b-row align-h="center">
@@ -34,18 +43,23 @@
             </b-col>
         </b-row> -->
 
-        <b-row align-h="center" style="max-height: 3vh;">
+        <!-- <b-row align-h="center" style="max-height: 3vh;">
             <b-col class="text-center">
                 <h5>Alpha = {{alpha}}</h5>
             </b-col>
-        </b-row>
+        </b-row> -->
         
-        <b-row class="ml-1 mr-1" style="height: 85vh;">
-            <!-- Prevent the column from overflow in vertical direction -->
-            <b-col class="row-container" style="display: flex; flex-direction: column; overflow: hidden; height: 100%;" v-for="variantResults in variantsResults" :set="algoIdx = variantsResults.indexOf(variantResults)" :id="variantNames[algoIdx]" :class="variantsResults.indexOf(variantResults) != 0 ? 'verticalSeparator' : ''">
+        <b-row>
+            <b-col v-for="variantResults in variantsResults" :set="algoIdx = variantsResults.indexOf(variantResults)">
                 <b-row style="flex: 1; display: flex; align-items: stretch;" align-h="center">
                     <h5>{{algorithm}} [[ variantNames[algoIdx] ]]</h5>
                 </b-row>
+            </b-col>
+        </b-row>
+
+        <b-row class="ml-1 mr-1" style="height: 75vh;">
+            <!-- Prevent the column from overflow in vertical direction -->
+            <b-col class="row-container" style="display: flex; flex-direction: column; overflow: hidden; height: 100%;" v-for="variantResults in variantsResults" :set="algoIdx = variantsResults.indexOf(variantResults)" :id="variantNames[algoIdx]" :class="variantsResults.indexOf(variantResults) != 0 ? 'verticalSeparator' : ''">
                 <b-row align-h="center" class="custom-row" v-for="row in variantResults">
                     <b-col cols="auto" style="height: 100%; margin-left: 1px; margin-right: 1px; padding-left: 0; padding-right: 0;" class="align-middle" v-for="col in row">
                             <b-popover @show="popoverShown" @hidden="popoverHidden" :target="variantNames[algoIdx] + '_' + col.movie_idx" triggers="hover" placement="right">
@@ -67,11 +81,11 @@
         
         <b-row align-h="center">
             <b-col class="text-center">
-                <b-form v-if="selectedMetric != null" method="POST" action="{{url_for('journal.metric_feedback')}}">
+                <b-form method="POST" action="{{url_for('journal.metric_feedback')}}">
                     <input type="hidden" name="csrf_token" value="{{csrf_token()}}"/>
-                    <input type="hidden" name="selected_metric_name" :value="selectedMetric.variantName"/>
-                    <input type="hidden" name="selected_metric_index" :value="selectedMetric.variant"/>
-                    <b-button variant="success" type="submit">Continue</b-button>
+                    <input type="hidden" name="selected_metric_name" :value="selectedMetric == null ? null : selectedMetric.variantName"/>
+                    <input type="hidden" name="selected_metric_index" :value="selectedMetric == null ? null : selectedMetric.variant"/>
+                    <b-button :disabled="selectedMetric == null" variant="success" class="mt-1 mb-1" type="submit">Continue</b-button>
                 </b-form>
             </b-col>
         </b-row>
@@ -295,7 +309,9 @@
             reportOnInput("/utils/on-input", csrfToken, "popover-shown", {
                 "target": {
                     "id": event.target.id,
-                    "name": event.target.name
+                    "name": event.target.name,
+                    "alt": event.target.alt,
+                    "title": event.target.title
                 }
             });
         },
@@ -303,7 +319,9 @@
             reportOnInput("/utils/on-input", csrfToken, "popover-hidden", {
                 "target": {
                     "id": event.target.id,
-                    "name": event.target.name
+                    "name": event.target.name,
+                    "alt": event.target.alt,
+                    "title": event.target.title
                 }
             });
         },
@@ -311,7 +329,9 @@
             reportOnInput("/utils/on-input", csrfToken, "mouse-enter", {
                 "target": {
                     "id": event.target.id,
-                    "name": event.target.name
+                    "name": event.target.name,
+                    "alt": event.target.alt,
+                    "title": event.target.title
                 }
             });
         },
@@ -319,7 +339,9 @@
             reportOnInput("/utils/on-input", csrfToken, "mouse-leave", {
                 "target": {
                     "id": event.target.id,
-                    "name": event.target.name
+                    "name": event.target.name,
+                    "alt": event.target.alt,
+                    "title": event.target.title
                 }
             });
         },
@@ -338,7 +360,7 @@
         registerClickedRadioReporting("/utils/on-input", csrfToken, radios);
         registerClickedCheckboxReporting("/utils/on-input", csrfToken, checkboxes);
         registerChangedSelectionReporting("/utils/on-input", csrfToken, selects);
-        reportLoadedPage(`/utils/loaded-page`, csrfToken, "final_questionnaire");
+        reportLoadedPage(`/utils/loaded-page`, csrfToken, "metric_assesment");
 
         this.setRowHeights();
         window.addEventListener('resize', this.setRowHeights);
@@ -358,7 +380,7 @@
 })
 </script>
 
-{% if footer_override is defined and footer_override is not none %}
+<!-- {% if footer_override is defined and footer_override is not none %}
   <div class="footerDiv mt-3">
     {{ footer_override | safe}}
   </div>
@@ -366,4 +388,4 @@
 </html>
 {% else %}
 {% include 'footer.html' %}
-{% endif %}
+{% endif %} -->

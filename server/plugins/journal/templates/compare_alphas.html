@@ -1,11 +1,11 @@
 {% include 'header.html' %}
 <style>
     .verticalSeparator {
-        border-left: 10px solid red;
+        border-left: 5px solid red;
     }
 
     .horizontalSeparator {
-        border-top: 10px solid red;
+        border-top: 5px solid red;
     }
 
     .footerDiv {
@@ -21,18 +21,57 @@
         outline-offset: -5px;
     }
 
-    .draggableSquare {
-        width: 150px;
-        padding: 10px;
-        margin: 5px;
+    .draggable {
+        width: 100px;
+        height: 10px;
+        margin: 2px;
         color: white;
         text-align:center;
-        border-radius: 0.75em;
+        border-radius: 0.5em;
         touch-action: none;
         user-select: none;
         transform: translate(0px, 0px);
         font-size: large;
         font-weight: bold;
+    }
+
+    .dropzone {
+        background-color: #cecfd0;
+        border: dashed 4px transparent;
+        border-radius: 4px;
+        width: 80%;
+        transition: background-color 0.3s;
+    }
+
+    .drop-active {
+        border-color: #aaa;
+    }
+
+    .drop-target {
+        background-color: #88898a;
+        border-color: #fff;
+        border-style: solid;
+    }
+
+    .drag-drop {
+        display: inline-block;
+        min-width: 40px;
+        padding: 2em 0.5em;
+        margin: 1rem 0 0 1rem;
+
+        color: #fff;
+        background-color: #29e;
+        border: solid 2px #fff;
+
+        touch-action: none;
+        transform: translate(0px, 0px);
+
+        transition: background-color 0.3s;
+    }
+
+    .drag-drop.can-drop {
+        color: #000;
+        background-color: #4e4;
     }
 </style>
 <script src="https://unpkg.com/interactjs@1.10.26/dist/interact.min.js"></script>
@@ -107,15 +146,15 @@ interact('.draggable')
     inertia: false,
     // keep the element within the area of it's parent
     modifiers: [
-    //    interact.modifiers.snap({
-    //     targets: [
-    //       interact.snappers.grid({ x: 30, y: 15 })
-    //     ],
-    //     range: Infinity,
-    //     relativePoints: [ { x: 0, y: 0 } ]
-    //   }),
+       interact.modifiers.snap({
+        targets: [
+          interact.snappers.grid({ x: 30, y: 15 })
+        ],
+        range: Infinity,
+        relativePoints: [ { x: 0, y: 0 } ]
+      }),
       interact.modifiers.restrictRect({
-        restriction: 'parent',
+        restriction: '#dragWrapper',
         endOnly: true
       })
     ],
@@ -134,6 +173,44 @@ interact('.draggable')
       }   
     }
   })
+
+interact('.dropzone').dropzone({
+    overlap: 0.75,
+    ondropactivate: function (event) {
+        // add active dropzone feedback
+        event.target.classList.add('drop-active')
+    },
+    ondragenter: function (event) {
+        var draggableElement = event.relatedTarget
+        var dropzoneElement = event.target
+
+        // feedback the possibility of a drop
+        dropzoneElement.classList.add('drop-target')
+        draggableElement.classList.add('can-drop')
+    },
+    ondragleave: function (event) {
+        // remove the drop feedback style
+        event.target.classList.remove('drop-target')
+        event.relatedTarget.classList.remove('can-drop')
+        app.dragAndDropValidated[event.relatedTarget.id] = false;
+    },
+    ondrop: function (event) {
+        app.dragAndDropValidated[event.relatedTarget.id] = true;
+        let dragAndDropPos = getElementBoundingBox(event.relatedTarget);
+        app.dragAndDropPositions[event.relatedTarget.id] = dragAndDropPos;
+        reportOnInput("/utils/on-input", csrfToken, "on-drag-drop", {
+                "dropzone": this.dropzonePosition,
+                "target":  dragAndDropPos,
+                "name": event.relatedTarget.name,
+                "id": event.relatedTarget.id
+            });
+    },
+    ondropdeactivate: function (event) {
+        // remove active dropzone feedback
+        event.target.classList.remove('drop-active')
+        event.target.classList.remove('drop-target')
+    }
+})
 
 function dragMoveListener (event) {
     var target = event.target
@@ -154,8 +231,13 @@ window.dragMoveListener = dragMoveListener;
 </script>
 <div id="app">
     <b-container fluid>
-        <b-jumbotron style="max-height: 7vh;" class="smallJumbotron" header="{{header}}" lead="">
-            {{hint}}
+        <b-jumbotron style="max-height: 7vh;" class="smallJumbotron" header-level="8">
+            <template #header>
+                <h1 style="font-size: 1.0rem; margin-bottom: -0.5em; padding: 0;">{{header}} ({{iteration}}/{{n_iterations}})</h1>
+            </template>
+            <p style="margin-top: 0px;">
+                {{hint}}
+            </p>
         </b-jumbotron>
     
         <!-- <b-row align-h="center">
@@ -194,31 +276,48 @@ window.dragMoveListener = dragMoveListener;
                                     </div>
                                     
                             </b-popover>
-                            <b-img @mouseenter="itemMouseEnter" @mouseleave="itemMouseLeave" :id="variantNames[algoIdx] + '_' + col.movie_idx" style="height: 99%;" block center :src="col.url" v-on:click="onSelectMovie($event, col, variantsResults.indexOf(variantResults))" :name="col.movie_idx" :alt="col.movie" />
+                            <!-- <b-img
+                                @mouseenter="itemMouseEnter" @mouseleave="itemMouseLeave"
+                                :id="variantNames[algoIdx] + '_' + col.movie_idx" style="height: 99%;"
+                                block center :src="col.url"
+                                v-on:click="onSelectMovie($event, col, variantsResults.indexOf(variantResults))"
+                                :name="col.movie_idx" :alt="col.movie"
+                            /> -->
+                            <b-img
+                                @mouseenter="itemMouseEnter" @mouseleave="itemMouseLeave"
+                                :id="variantNames[algoIdx] + '_' + col.movie_idx" style="height: 99%;"
+                                block center :src="col.url"
+                                :name="col.movie_idx" :alt="col.movie"
+                            />
                     </b-col>
                 </b-row>
             </b-col>
         </b-row>
         <b-form method="POST" action="{{continuation_url}}">
-            <b-row class="horizontalSeparator mt-1 pt-1" align-h="center" align-v="center">
-                <b-col class="text-right" style="font-size: large;">
-                    🡸 Least Diverse 🡸
+            <b-row class="horizontalSeparator mt-1" style="height: 15vh;" align-h="center" align-v="center">
+                <b-col cols="4" class="text-center" style="height: auto;">
+                    {{drag}}
                 </b-col>
-                <b-col class="text-center">
-                    <div style="width: 100%; height: 100%; background-color: rgb(214, 210, 210);">
-                        <!-- <b-row > -->
-                            <div class="draggable draggableSquare" :style="{'background-color': variantColors[variantNames.indexOf(variantName)]}" style="color: black;" v-for="variantName in variantNames">
+                <b-col cols="6" class="text-center" style="height: 100%;" id="dragWrapper">
+
+                    <div style="display: flex; height: 100%;">
+                        <div style="display: flex; flex-direction: column; height: 100%;">
+                            <div class="draggable" :style="{'background-color': variantColors[variantNames.indexOf(variantName)]}" style="color: black; height: 30px;" :id="variantName" v-for="variantName in variantNames">
                                 [[variantName]]
                             </div>
-                        <!-- </b-row> -->
+                        </div>
+                        <div style="display: flex; flex-direction: column; width: 100%; height: 100%;">
+                            <div class="dropzone" id="dropzone" style="display: flex; justify-content: center; align-items: center; width: 100%; height: 100%">
+
+                            </div>
+                            <div style="display: flex; flex-direction: row; justify-content: space-between; align-items: center; font-weight: bold;">
+                                <span class="ml-2"><b-icon class="mr-3" scale="2.5" icon="arrow-left"></b-icon>Least Diverse</span>
+                                <span class="mr-2">Most Diverse<b-icon class="ml-3" scale="2.5" icon="arrow-right"></b-icon></span>
+                            </div>
+                        </div>
                     </div>
                     
-                    <!-- <div style="width: 100%; height: 100%; background-color: rgb(168, 164, 164);">
-                        
-                    </div> -->
-                </b-col>
-                <b-col class="text-left" style="font-size: large;">
-                    🡺 Most Diverse 🡺
+                    
                 </b-col>
             </b-row>
             <!-- <b-row align-h="center" style="max-height: 3vh;">
@@ -248,7 +347,9 @@ window.dragMoveListener = dragMoveListener;
             <b-row align-h="center">
                 <b-col class="text-center">
                     <input type="hidden" name="csrf_token" value="{{csrf_token()}}"/>
-                    <b-button variant="success" type="submit">Continue</b-button>
+                    <input type="hidden" name="drag_and_drop_positions" :value="JSON.stringify(dragAndDropPositions)"/>
+                    <input type="hidden" name="dropzone_position" :value="JSON.stringify(dropzonePosition)"/>
+                    <b-button :disabled="!Object.values(dragAndDropValidated).every(value => value === true)" class="mb-1" variant="success" type="submit">Continue</b-button>
                 </b-col>
             </b-row>
         </b-form>
@@ -326,12 +427,17 @@ window.dragMoveListener = dragMoveListener;
         ];
 
         let variantColors = availColors.slice(0, numAlgorithms);
+        let dragAndDropValidated = {};
+        let dragAndDropPositions = {};
 
         let colorIdx = 0;
         for (variantIdx in movies) {
             let variantResults = movies[variantIdx]["movies"];
             let order = parseInt(movies[variantIdx]["order"]);
             variantNames[order] = variantIdx.toUpperCase();
+
+            dragAndDropValidated[variantNames[order]] = false;
+            dragAndDropPositions[variantNames[order]] = null;
 
             console.log(variantIdx);
             console.log(variantResults);
@@ -362,7 +468,10 @@ window.dragMoveListener = dragMoveListener;
             selectedMetric: null,
             mostDiverse: null,
             leastDiverse: null,
-            bgColor: "red"
+            dragAndDropValidated: dragAndDropValidated,
+            dragAndDropPositions: dragAndDropPositions,
+            bgColor: "red",
+            dropzonePosition: null
         };
     },
     computed: {
@@ -502,7 +611,9 @@ window.dragMoveListener = dragMoveListener;
             reportOnInput("/utils/on-input", csrfToken, "popover-shown", {
                 "target": {
                     "id": event.target.id,
-                    "name": event.target.name
+                    "name": event.target.name,
+                    "alt": event.target.alt,
+                    "title": event.target.title
                 }
             });
         },
@@ -510,7 +621,9 @@ window.dragMoveListener = dragMoveListener;
             reportOnInput("/utils/on-input", csrfToken, "popover-hidden", {
                 "target": {
                     "id": event.target.id,
-                    "name": event.target.name
+                    "name": event.target.name,
+                    "alt": event.target.alt,
+                    "title": event.target.title
                 }
             });
         },
@@ -518,7 +631,9 @@ window.dragMoveListener = dragMoveListener;
             reportOnInput("/utils/on-input", csrfToken, "mouse-enter", {
                 "target": {
                     "id": event.target.id,
-                    "name": event.target.name
+                    "name": event.target.name,
+                    "alt": event.target.alt,
+                    "title": event.target.title
                 }
             });
         },
@@ -526,7 +641,9 @@ window.dragMoveListener = dragMoveListener;
             reportOnInput("/utils/on-input", csrfToken, "mouse-leave", {
                 "target": {
                     "id": event.target.id,
-                    "name": event.target.name
+                    "name": event.target.name,
+                    "alt": event.target.alt,
+                    "title": event.target.title
                 }
             });
         },
@@ -538,6 +655,8 @@ window.dragMoveListener = dragMoveListener;
         const textboxes = document.querySelectorAll("input[type=text]");
         const selects = document.querySelectorAll("select");
         
+        this.dropzonePosition = getElementBoundingBox(document.getElementById("dropzone"));
+        
         // Register the handlers for event reporting
         startViewportChangeReportingWithLimit(`/utils/changed-viewport`, csrfToken, 1.0, true);
         startScrollReportingWithLimit(`/utils/changed-viewport`, csrfToken, 1.0, document.getElementsByName("scrollableDiv"));
@@ -545,7 +664,7 @@ window.dragMoveListener = dragMoveListener;
         registerClickedRadioReporting("/utils/on-input", csrfToken, radios);
         registerClickedCheckboxReporting("/utils/on-input", csrfToken, checkboxes);
         registerChangedSelectionReporting("/utils/on-input", csrfToken, selects);
-        reportLoadedPage(`/utils/loaded-page`, csrfToken, "final_questionnaire");
+        reportLoadedPage(`/utils/loaded-page`, csrfToken, "compare_alphas");
 
         this.setRowHeights();
         window.addEventListener('resize', this.setRowHeights);
@@ -565,7 +684,7 @@ window.dragMoveListener = dragMoveListener;
 })
 </script>
 
-{% if footer_override is defined and footer_override is not none %}
+<!-- {% if footer_override is defined and footer_override is not none %}
   <div class="footerDiv mt-3">
     {{ footer_override | safe}}
   </div>
@@ -573,4 +692,4 @@ window.dragMoveListener = dragMoveListener;
 </html>
 {% else %}
 {% include 'footer.html' %}
-{% endif %}
+{% endif %} -->

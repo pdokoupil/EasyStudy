@@ -38,18 +38,6 @@ from jmetal.util.termination_criterion import StoppingByEvaluations, StoppingByT
 from jmetal.core.problem import IntegerProblem
 from jmetal.core.solution import IntegerSolution
 
-# A simple wrapper class for a recommendation objective (adds name to it)
-class ObjectiveWrapper:
-    def __init__(self, f, name):
-        self.f = f
-        self.obj_name = name
-        
-    def __call__(self, rec_list, **kwargs):
-        return self.f(rec_list, **kwargs)
-    
-    def name(self):
-        return self.obj_name
-
 class RecommendationProblemExact(IntegerProblem):
     def __init__(self, k, objs, user_idx, relevance_scores, user_vector, relevance_top_k, filter_out_items, target_weights):
         super(RecommendationProblemExact, self).__init__()
@@ -62,10 +50,14 @@ class RecommendationProblemExact(IntegerProblem):
         self.obj_labels = ["dist"]
 
         # Total number of items (before filtering seen items)
-        n_all_items = relevance_scores.shape[1]
+        assert relevance_scores.ndim == 1
+        n_all_items = relevance_scores.size
         self.items = np.setdiff1d(np.arange(n_all_items), filter_out_items)
         # Number of items after filtering!
         self.n_items = self.items.size
+
+        assert self.n_items <= n_all_items, f"{self.n_items} <= {n_all_items}"
+        self.item_indices = np.arange(self.n_items)
 
         self.lower_bound = [0] * self.number_of_variables
         # Upper bound equals new number of items (i.e. after filtering)
@@ -87,11 +79,12 @@ class RecommendationProblemExact(IntegerProblem):
         # During evaluation we need to map items, note that item 0 corresponds to actual item being self.items[0] (due to filtering)
         # We need to perform evaluation on original items instead of just their indices
         top_k_mapped = self.items[top_k_list]
-        objective_0 = self.objs[0](top_k_mapped, user_idx=self.user_idx)
-        objective_1 = self.objs[1](top_k_mapped)
+        obj_vals = np.zeros(shape=(len(self.objs),), dtype=np.float32)
+        for i, obj in enumerate(self.objs):
+            obj_vals[i] = obj(top_k_mapped)
         
         # Our objective is distance between actual and target weights
-        solution.objectives = [((np.array([objective_0, objective_1]) - self.target_weights) ** 2).sum()]
+        solution.objectives = [((obj_vals - self.target_weights) ** 2).sum()]
 
         assert solution is not None
         return solution
@@ -108,9 +101,21 @@ class RecommendationProblemExact(IntegerProblem):
         # Instead of generating new solution from random variables, we start with relevance only recommendation
         new_solution.variables = self.relevance_top_k.copy()
         rnd_idx = np.random.randint(low=0, high=self.relevance_top_k.size)
-        rnd_item = np.random.choice(self.items)
+        rnd_item = np.random.choice(self.item_indices)
         new_solution.variables[rnd_idx] = rnd_item
-        return repair_duplicates(self.items, new_solution)
+        return repair_duplicates(self.item_indices, new_solution)
+    
+    def number_of_variables(self):
+        return self.number_of_variables
+    
+    def number_of_objectives(self):
+        return self.number_of_objectives
+    
+    def number_of_constraints(self):
+        return self.number_of_constraints
+    
+    def name(self) -> str:
+        return self.__name__
 
 # Abstraction of Recommendation problem (as integer problem from jmetalpy)
 class RecommendationProblemMax(IntegerProblem):
@@ -123,12 +128,16 @@ class RecommendationProblemMax(IntegerProblem):
         self.number_of_variables = k
         
         # Total number of items (before filtering seen items)
-        n_all_items = relevance_scores.shape[1]
+        assert relevance_scores.ndim == 1
+        n_all_items = relevance_scores.size
 
         self.items = np.setdiff1d(np.arange(n_all_items), filter_out_items)
         # Number of items after filtering!
         self.n_items = self.items.size
         self.relevance_scores = relevance_scores
+
+        assert self.n_items <= n_all_items, f"{self.n_items} <= {n_all_items}"
+        self.item_indices = np.arange(self.n_items)
         
         self.user_idx = user_idx
         self.objs = objs
@@ -151,8 +160,8 @@ class RecommendationProblemMax(IntegerProblem):
         # During evaluation we need to map items, note that item 0 corresponds to actual item being self.items[0] (due to filtering)
         # We need to perform evaluation on original items instead of just their indices
         top_k_mapped = self.items[top_k_list]
-        solution.objectives[0] = self.objs[0](top_k_mapped, user_idx=self.user_idx)
-        solution.objectives[1] = self.objs[1](top_k_mapped)
+        for i, obj in enumerate(self.objs):
+            solution.objectives[i] = obj(top_k_mapped)
         
         assert solution is not None
         return solution
@@ -169,9 +178,9 @@ class RecommendationProblemMax(IntegerProblem):
         # Instead of generating new solution from random variables, we start with relevance only recommendation
         new_solution.variables = self.relevance_top_k.copy()
         rnd_idx = np.random.randint(low=0, high=self.relevance_top_k.size)
-        rnd_item = np.random.choice(self.items)
+        rnd_item = np.random.choice(self.item_indices)
         new_solution.variables[rnd_idx] = rnd_item
-        return repair_duplicates(self.items, new_solution)
+        return repair_duplicates(self.item_indices, new_solution)
         
         
         #return new_solution
@@ -206,9 +215,9 @@ def repair_duplicates(all_items, res: IntegerSolution):
 # Same as IntegerPolynomialMutation, but does "repair" the solution
 # by removing duplicates
 class FixingMutation(IntegerPolynomialMutation):
-    def __init__(self, relevance_scores, *args, **kwargs):
+    def __init__(self, items, relevance_scores, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.items = np.arange(relevance_scores.shape[-1])
+        self.items = items
     
     def execute(self, solution: IntegerSolution) -> IntegerSolution:
         res = super().execute(solution)
@@ -217,9 +226,9 @@ class FixingMutation(IntegerPolynomialMutation):
 # Same as IntegerSBXCrossover, but does "repair" the solution
 # by removing duplicates
 class FixingCrossover(IntegerSBXCrossover):
-    def __init__(self, relevance_scores, *args, **kwargs):
+    def __init__(self, items, relevance_scores, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.items = np.arange(relevance_scores.shape[-1])
+        self.items = items
 
     def execute(self, parents: List[IntegerSolution]) -> List[IntegerSolution]:
         res = super().execute(parents)
@@ -250,8 +259,8 @@ class evolutionary_max:
             problem=self.problem,
             population_size=10,
             offspring_population_size=10,
-            mutation=FixingMutation(relevance_estimates, probability=self.p_mutation, distribution_index=20),
-            crossover=FixingCrossover(relevance_estimates, probability=self.p_crossover, distribution_index=20),
+            mutation=FixingMutation(self.problem.item_indices, relevance_estimates, probability=self.p_mutation, distribution_index=20),
+            crossover=FixingCrossover(self.problem.item_indices, relevance_estimates, probability=self.p_crossover, distribution_index=20),
             #mutation=IntegerPolynomialMutation(probability=p_mutation),
             #crossover=IntegerSBXCrossover(probability=p_crossover),
             #termination_criterion=StoppingByEvaluations(max_evaluations=25000),
@@ -264,7 +273,7 @@ class evolutionary_max:
         min_dist_idx = None
 
         for idx, solution in enumerate(front):
-            dist = ((solution.objectives - self.target_weights) ** 2).sum()
+            dist = ((solution.objectives - self.weights) ** 2).sum()
             if min_dist_idx is None or dist < min_dist:
                 min_dist_idx = idx
                 min_dist = dist
@@ -290,15 +299,16 @@ class evolutionary_exact:
             user_idx=0, # We expect a single user
             user_vector=user_vector,
             relevance_top_k=relevance_top_k,
-            filter_out_items=filter_out_items
+            filter_out_items=filter_out_items,
+            target_weights=weights
         )
 
         self.algorithm = NSGAII(
             problem=self.problem,
             population_size=10,
             offspring_population_size=10,
-            mutation=FixingMutation(relevance_estimates, probability=self.p_mutation, distribution_index=20),
-            crossover=FixingCrossover(relevance_estimates, probability=self.p_crossover, distribution_index=20),
+            mutation=FixingMutation(self.problem.item_indices, relevance_estimates, probability=self.p_mutation, distribution_index=20),
+            crossover=FixingCrossover(self.problem.item_indices, relevance_estimates, probability=self.p_crossover, distribution_index=20),
             #mutation=IntegerPolynomialMutation(probability=p_mutation),
             #crossover=IntegerSBXCrossover(probability=p_crossover),
             #termination_criterion=StoppingByEvaluations(max_evaluations=25000),

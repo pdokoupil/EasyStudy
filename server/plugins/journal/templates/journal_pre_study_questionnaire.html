@@ -2,10 +2,18 @@
 
 <div id="app">
     <b-container fluid>
-        <b-jumbotron class="smallJumbotron" header="{{header}}" lead="">
+        <!-- <b-jumbotron class="smallJumbotron" header="{{header}}" lead="">
             {{hint}}
+        </b-jumbotron> -->
+        <b-jumbotron style="max-height: 7vh;" class="smallJumbotron" header-level="8">
+            <template #header>
+                <h1 style="font-size: 1.0rem; margin-bottom: -0.5em; padding: 0;">{{header}}</h1>
+            </template>
+            <p style="margin-top: 0px;">
+                {{hint}}
+            </p>
         </b-jumbotron>
-    
+
         <b-form method="POST" action="{{ continuation_url }}">
     
 
@@ -169,7 +177,7 @@
                         <b-col>
                             <b-form-group>
                                 <b-label for="q6">
-                                    <strong>6. Did you previously hear about the term <u>exploitation</u> in the context of recommendations?</strong>
+                                    <strong>6. Did you previously hear about the term <u>exploitation (familiarity)</u> in the context of recommendations?</strong>
                                 </b-label>
                                 <b-form-select name="q6" id="q6" :state="q6Validated" v-model="selectedQ6" :options="optionsYesNo"></b-form-select>
                             </b-form-group>
@@ -309,7 +317,7 @@
                         <b-col>
                             <b-form-group>
                                 <b-label for="q11">
-                                    <strong>11. Select the statement that best corresponds to what <u>exploitatory</u> recommendations mean to you</strong>
+                                    <strong>11. Select the statement that best corresponds to what <u>exploitational (familiar)</u> recommendations mean to you</strong>
                                 </b-label>
                                 <b-form-select name="q11" id="q11" :state="q11Validated" v-model="selectedQ11" :options="optionsCorrespondence"></b-form-select>
                                 <b-input name="q11Other" id="q11Other" :state="otherTextQ11 != ''" v-if="selectedQ11 === 'other'" v-model="otherTextQ11" type="text" placeholder="Please specify"/>
@@ -351,7 +359,7 @@
               <b-row align-h="center">
                 <b-col class="text-center">
                     <input type="hidden" name="csrf_token" value="{{csrf_token()}}"/>
-                    <input type="hidden" name="final_questionnaire_data" value="final_questionnaire_data"/>
+                    <!-- <input type="hidden" name="final_questionnaire_data" value="final_questionnaire_data"/> -->
                     <b-button :disabled="!allValidated" variant="success" type="submit">{{finish}}</b-button>
                 </b-col>
             </b-row>
@@ -417,6 +425,7 @@
                 { value: '0', text: 'Providing items that are highly different from the ones you consumed so far (e.g., genres you never watched so far).' },
                 { value: '1', text: 'Showing you a selection of very heterogeneous items (e.g., each one having a different set of genres).' },
                 { value: '2', text: 'Providing niche items that are not much known in general.' },
+                { value: '3', text: 'Providing items that are very similar to the ones you consumed so far (e.g., genres you are used to watch).' },
                 { value: 'other', text: 'Other' },
             ],
         };
@@ -485,12 +494,12 @@
         registerClickedRadioReporting("/utils/on-input", csrfToken, radios);
         registerClickedCheckboxReporting("/utils/on-input", csrfToken, checkboxes);
         registerChangedSelectionReporting("/utils/on-input", csrfToken, selects);
-        reportLoadedPage(`/utils/loaded-page`, csrfToken, "final_questionnaire");
+        reportLoadedPage(`/utils/loaded-page`, csrfToken, "pre_study_questionnaire");
     }
 })
 </script>
 
-{% if footer_override is defined and footer_override is not none %}
+<!-- {% if footer_override is defined and footer_override is not none %}
   <div class="footerDiv mt-3">
     {{ footer_override | safe}}
   </div>
@@ -498,4 +507,4 @@
 </html>
 {% else %}
 {% include 'footer.html' %}
-{% endif %}
+{% endif %} -->

@@ -50,7 +50,7 @@
     See https://stackoverflow.com/questions/46758441/preventing-vue-from-aggresively-reusing-dom-elements -->
     <b-row class="mb-3" align-h="center" align-content="center" v-for="row in rows">
       <b-col class="mb-3" class="align-middle" v-for="col in row">
-        <b-img :key="col.movie.idx" class="mb-3" style="width: 175px; height: auto;" center :src="col.movie.url" v-on:click="onSelectMovie($event, col)" :id="col.movie.idx" :alt="col.movieName" v-b-tooltip.hover :title="col.movieName" />
+        <b-img @mouseenter="itemMouseEnter" @mouseleave="itemMouseLeave" :key="col.movie.idx" class="mb-3" style="width: 175px; height: auto;" center :src="col.movie.url" v-on:click="onSelectMovie($event, col)" :id="col.movie.idx" :alt="col.movieName" v-b-tooltip.hover :title="col.movieName" />
       </b-col>
     </b-row>
     <b-row align-h="center">
