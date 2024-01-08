@@ -222,6 +222,26 @@ window.app = new Vue({
             form.appendChild(selectedMoviesTag);
 
             form.submit();
-        }
+        },
+        itemMouseEnter(event) {
+            reportOnInput("/utils/on-input", csrfToken, "mouse-enter", {
+                "target": {
+                    "id": event.target.id,
+                    "name": event.target.name,
+                    "alt": event.target.alt,
+                    "title": event.target.title
+                }
+            });
+        },
+        itemMouseLeave(event) {
+            reportOnInput("/utils/on-input", csrfToken, "mouse-leave", {
+                "target": {
+                    "id": event.target.id,
+                    "name": event.target.name,
+                    "alt": event.target.alt,
+                    "title": event.target.title
+                }
+            });
+        },
     }
 })

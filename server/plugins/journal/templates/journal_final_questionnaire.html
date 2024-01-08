@@ -2,45 +2,24 @@
 
 <div id="app">
     <b-container fluid>
-        <b-jumbotron class="smallJumbotron" header="{{header}}" lead="">
+        <!-- <b-jumbotron class="smallJumbotron" header="{{header}}" lead="">
             {{hint}}
+        </b-jumbotron> -->
+        <b-jumbotron style="max-height: 7vh;" class="smallJumbotron" header-level="8">
+            <template #header>
+                <h1 style="font-size: 1.0rem; margin-bottom: -0.5em; padding: 0;">{{header}}</h1>
+            </template>
+            <p style="margin-top: 0px;">
+                {{hint}}
+            </p>
         </b-jumbotron>
     
-        <b-form method="GET" action="{{ continuation_url }}">
+        <b-form method="POST" action="{{ continuation_url }}">
             <b-row class="mb-3" align-h="center">
                 <b-col cols="auto" >
-                    <b-row align-v="center">
-                        <b-col class="mt-2" cols="auto">
-                            <b-row>
-                                <b-col>
-                                    <b-icon class="h1" icon="grid"></b-icon>
-                                </b-col>
-                            </b-row>
-                            <b-row>
-                                <b-col>
-                                    <b-icon class="h1" icon="grid"></b-icon>
-                                </b-col>
-                            </b-row>
-                        </b-col>
-                        <b-col>
-                            <b-form-group name="q1" id="q1">
-                                <b-label for="q1">
-                                    <strong>1. TODO Q1</strong>
-                                </b-label>
-                                <b-form-radio-group name="q1" required>
-                                    <b-form-radio value="-2">Strongly Disagree</b-form-radio>
-                                    <b-form-radio value="-1">Disagree</b-form-radio>
-                                    <b-form-radio value="0">Neutral</b-form-radio>
-                                    <b-form-radio value="1">Agree</b-form-radio>
-                                    <b-form-radio value="2" class="mr-5">Strongly Agree</b-form-radio>
-                                    <b-form-radio value="3" class="ml-5">I don't understand</b-form-radio>
-                                </b-form-radio-group>
-                            </b-form-group>
-                        </b-col>
-                    </b-row>
                     
-                    <b-row class="mt-5" align-v="center">
-                        <b-col class="mt-2" cols="auto">
+                    <b-row class="mt-5" align-v="center" v-for="(q, index) in questions" :key="index">
+                        <b-col v-if="q.icon == 'grid'" class="mt-2" cols="auto">
                             <b-row>
                                 <b-col>
                                     <b-icon class="h1" icon="grid"></b-icon>
@@ -52,15 +31,18 @@
                                 </b-col>
                             </b-row>
                         </b-col>
+                        <b-col v-else class="mt-2" cols="auto">
+                            <b-icon class="h1" :icon="q.icon"></b-icon>
+                        </b-col>
                         <b-col>
-                            <b-form-group name="q2" id="q2">
-                                <b-label for="q2">
-                                    <strong>2. TODO Q2</strong>
+                            <b-form-group :name="q.name + 'g'" id="q.name + 'g'">
+                                <b-label :for="q.name">
+                                    <strong>[[index + 1]]. [[q.text]]</strong>
+                                    <br v-if="q.text2"><strong class="ml-3" v-if="q.text2">[[q.text2]]</strong>
                                 </b-label>
-                                <b-form-radio-group name="q2" required>
+                                <b-form-radio-group :name="q.name" required>
                                     <b-form-radio value="-2">Strongly Disagree</b-form-radio>
                                     <b-form-radio value="-1">Disagree</b-form-radio>
-                                    <b-form-radio value="0">Neutral</b-form-radio>
                                     <b-form-radio value="1">Agree</b-form-radio>
                                     <b-form-radio value="2" class="mr-5">Strongly Agree</b-form-radio>
                                     <b-form-radio value="3" class="ml-5">I don't understand</b-form-radio>
@@ -71,17 +53,17 @@
 
                 </b-col>
             </b-row>
-        </b-form>
 
-        <b-row align-h="center">
-            <b-col class="text-center">
-                <b-form method="POST" action="{{continuation_url}}">
-                    <input type="hidden" name="csrf_token" value="{{csrf_token()}}"/>
-                    <input type="hidden" name="final_questionnaire_data" value="final_questionnaire_data"/>
-                    <b-button variant="success" type="submit">{{finish}}</b-button>
-                </b-form>
-            </b-col>
-        </b-row>
+            <b-row align-h="center">
+                <b-col class="text-center">
+                    <!-- <b-form method="POST" action="{{continuation_url}}"> -->
+                        <input type="hidden" name="csrf_token" value="{{csrf_token()}}"/>
+                        <!-- <input type="hidden" name="final_questionnaire_data" value="final_questionnaire_data"/> -->
+                        <b-button variant="success" type="submit">{{finish}}</b-button>
+                    <!-- </b-form> -->
+                </b-col>
+            </b-row>
+        </b-form>
         
         
 
@@ -101,7 +83,7 @@
     data: function() {
         
         return {
-            
+            questions: null
         };
     },
     methods: {
@@ -109,24 +91,34 @@
     },
     async mounted() {
         const btns = document.querySelectorAll("button");
-        const radios = document.querySelectorAll("input[type=radio]");
         const checkboxes = document.querySelectorAll("input[type=checkbox]");
         const textboxes = document.querySelectorAll("input[type=text]");
         const selects = document.querySelectorAll("select");
         
-        // Register the handlers for event reporting
-        startViewportChangeReportingWithLimit(`/utils/changed-viewport`, csrfToken, 1.0, true);
-        startScrollReportingWithLimit(`/utils/changed-viewport`, csrfToken, 1.0, document.getElementsByName("scrollableDiv"));
-        registerClickedButtonReporting(`/utils/on-input`, csrfToken, btns);
-        registerClickedRadioReporting("/utils/on-input", csrfToken, radios);
-        registerClickedCheckboxReporting("/utils/on-input", csrfToken, checkboxes);
-        registerChangedSelectionReporting("/utils/on-input", csrfToken, selects);
-        reportLoadedPage(`/utils/loaded-page`, csrfToken, "final_questionnaire");
+        this.questions = await fetch("{{url_for('journal.get_final_questions')}}")
+                            .then(response => {
+                                if (!response.ok) {
+                                    console.log("Erorr");
+                                }
+                                return response.json();
+                            });
+        
+        this.$nextTick(() => {
+            const radios = document.querySelectorAll("input[type=radio]");
+            // Register the handlers for event reporting
+            startViewportChangeReportingWithLimit(`/utils/changed-viewport`, csrfToken, 1.0, true);
+            startScrollReportingWithLimit(`/utils/changed-viewport`, csrfToken, 1.0, document.getElementsByName("scrollableDiv"));
+            registerClickedButtonReporting(`/utils/on-input`, csrfToken, btns);
+            registerClickedRadioReporting("/utils/on-input", csrfToken, radios);
+            registerClickedCheckboxReporting("/utils/on-input", csrfToken, checkboxes);
+            registerChangedSelectionReporting("/utils/on-input", csrfToken, selects);
+            reportLoadedPage(`/utils/loaded-page`, csrfToken, "final_questionnaire");
+        });
     }
 })
 </script>
 
-{% if footer_override is defined and footer_override is not none %}
+<!-- {% if footer_override is defined and footer_override is not none %}
   <div class="footerDiv mt-3">
     {{ footer_override | safe}}
   </div>
@@ -134,4 +126,4 @@
 </html>
 {% else %}
 {% include 'footer.html' %}
-{% endif %}
+{% endif %} -->

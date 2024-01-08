@@ -1,5 +1,6 @@
 from abc import ABC
 import functools
+import json
 import pickle
 import random
 import sys
@@ -9,7 +10,7 @@ import time
 import flask
 from sklearn.preprocessing import QuantileTransformer
 
-from plugins.fastcompare.algo.wrappers.data_loadering import MLGenomeDataLoader
+from plugins.fastcompare.algo.wrappers.data_loadering import MLGenomeDataLoader, GoodBooksFilteredDataLoader
 
 
 
@@ -42,27 +43,56 @@ from plugins.journal.algorithms import NEG_INF, evolutionary_exact, evolutionary
 from app import rds
 
 languages = load_languages(os.path.dirname(__file__))
-
+N_BLOCKS = 3
 N_ITERATIONS = 6 # 6 iterations per block
 #ALGORITHMS = ["WA", "RLPROP", "MOEA-RS"]
 # Algorithm matrix
 # Algorithms are divided in two dimensions: [MAX, EXACT] x [ITEM-WISE, GREEDY, EVOLUTIONARY]
 # We always select one row per user, so each user gets either ITEM-WISE, GREEDY or EVOLUTIONARY (in both MAX and EXACT variants) + Relevance baseline
-ALGORITHMS = ["ITEM-WISE-MAX", "ITEM-WISE-EXACT", "GREEDY-MAX", "GREEDY-EXACT", "EVOLUTIONARY-MAX", "EVOLUTIONARY-EXACT", "RELEVANCE-BASED"]
-ALGORITHM_ROWS = {
-    "ITEM-WISE": ["ITEM-WISE-MAX", "ITEM-WISE-EXACT"],
-    "GREEDY": ["GREEDY-MAX", "GREEDY-EXACT"],
-    "EVOLUTIONARY": ["EVOLUTIONARY-MAX", "EVOLUTIONARY-EXACT"]
-}
+ALGORITHMS = [
+    "ITEM-WISE-MAX-1W", "ITEM-WISE-MAX-2W", "ITEM-WISE-EXACT-1W",
+    "GREEDY-MAX-1W", "GREEDY-MAX-2W", "GREEDY-EXACT-1W",
+    "EVOLUTIONARY-MAX-1W", "EVOLUTIONARY-MAX-2W", "EVOLUTIONARY-EXACT-1W",
+    "RELEVANCE-BASED"
+]
+
+# ALGORITHM_ROWS = {
+#     "ITEM-WISE": ["ITEM-WISE-MAX", "ITEM-WISE-EXACT"],
+#     "GREEDY": ["GREEDY-MAX", "GREEDY-EXACT"],
+#     "EVOLUTIONARY": ["EVOLUTIONARY-MAX", "EVOLUTIONARY-EXACT"]
+# }
+
+OPTIMIZATION_TYPE = ["MAX", "EXACT"]
+
+ALGORITHM_FAMILY = [
+    "ITEM-WISE",
+    "GREEDY",
+    "EVOLUTIONARY"
+]
+
+# "Backend slider" used for "MAX" variants of the algorithms
+# Note that for EXACT, these two are essentially same, se we ignore this (and always use 1W)
+BACKEND_SLIDER = [
+    "1W", # 1-way slider -> we use 4 objectives for the algorithm
+    "2W"  # 2-way slider -> we use all 7 objectives for the algorithm
+]
+
 # The mapping is not fixed between users
-ALGORITHM_ANON_NAMES = ["BETA", "GAMMA", "DELTA"]
+ALGORITHM_ANON_NAMES = ["ALPHA", "BETA", "GAMMA"]
 POSSIBLE_ALPHAS = [0.0, 0.01, 0.1, 0.25, 0.5, 0.75, 0.9, 0.99, 1.0]
 # one-way means there is single objective per slider, going from 0 to 1
 # two-way means there are two objectives, one at each side of the slider
 SLIDER_VERSIONS = ["TWO-WAY", "ONE-WAY"]
 
+
 HIDE_LAST_K = 100000
 N_ALPHA_ITERS = 2
+
+
+def algo_name(family, optim_type, backend_slider):
+    name = f"{family}-{optim_type}-{backend_slider}"
+    assert name in ALGORITHMS, f"name={name} not in {ALGORITHMS}"
+    return name
 
 # Implementation of this function can differ among plugins
 def get_lang():
@@ -106,6 +136,9 @@ def get_all(name):
 def incr(key):
     x = get_val(key)
     set_val(key, x + 1)
+
+def is_books(conf):
+    return "Goodbooks" in conf["selected_data_loader"]
 
 @bp.route("/create")
 @multi_lang
@@ -187,9 +220,10 @@ def item_search():
 def block_questionnaire():
     params = {
         "continuation_url": url_for("journal.block_questionnaire_done"),
-        "header": "Per-Block questionnaire",
-        "hint": "Fill-in the questionnaire",
-        "finish": "Continue"
+        "header": "After-recommendation block questionnaire",
+        "hint": "Please answer the questions below before proceeding with the next step of the user study.",
+        "finish": "Continue",
+        "title": "Questionnaire"
     }
     return render_template("journal_block_questionnaire.html", **params)
 
@@ -197,25 +231,35 @@ def block_questionnaire():
 def block_questionnaire_done():
     user_data = get_all(get_uname())
     it = user_data["iteration"]
-    cur_block = it // N_ITERATIONS
+    cur_block = (int(it) - 1) // N_ITERATIONS
     cur_algorithm = user_data["selected_algorithms"][cur_block]
 
-    if cur_block == len(ALGORITHMS):
+    # TODO log interaction
+    data = {
+        "block": cur_block,
+        "algorithm": cur_algorithm,
+        "iteration": it
+    }
+    data.update(**request.form)
+
+    log_interaction(session["participation_id"], "after-block-questionnaire", **data)
+
+    if cur_block == N_BLOCKS - 1:
         # We are done
         return redirect(url_for("journal.done"))
     else:
         # Otherwise continue with next block
         return redirect(url_for("journal.mors_feedback"))
-    
 
 
 @bp.route("/pre-study-questionnaire", methods=["GET", "POST"])
 def pre_study_questionnaire():
     params = {
         "continuation_url": url_for("journal.pre_study_questionnaire_done"),
-        "header": "Pre study questionnaire",
-        "hint": "Fill-in the questionnaire",
-        "finish": "Proceed to user study"
+        "header": "Pre-study questionnaire",
+        "hint": "Please answer the questions below before starting the user study.",
+        "finish": "Proceed to user study",
+        "title": "Pre-study questionnaire"
     }
     return render_template("journal_pre_study_questionnaire.html", **params)
 
@@ -237,14 +281,20 @@ def final_questionnaire():
     params = {
         "continuation_url": url_for("journal.finish_user_study"),
         "header": "Final questionnaire",
-        "hint": "Fill-in the questionnaire",
-        "finish": "Finish"
+        "hint": "Please answer the questions below before finishing the user study.",
+        "finish": "Finish",
+        "title": "Final questionnaire"
     }
     return render_template("journal_final_questionnaire.html", **params)
 
 @bp.route("/finish-user-study", methods=["GET", "POST"])
 def finish_user_study():
     # TODO handle final questionnaire feedback
+
+    data = {}
+    data.update(**request.form)
+    log_interaction(session["participation_id"], "final-questionnaire", **data)
+
     session["iteration"] = get_val("iteration")
     return redirect(url_for("utils.finish"))
 
@@ -266,15 +316,42 @@ def send_feedback():
     selected_movies = [int(m) for m in selected_movies]
 
     # Calculate weights based on selection and shown movies during preference elicitation
-    weights, supports = calculate_weight_estimate(loader, selected_movies, session['elicitation_movies'], return_supports=True)
-    weights /= weights.sum()
-    weights = weights.tolist()
+    diversity_f = intra_list_diversity(loader.distance_matrix)
+    novelty_f = popularity_based_novelty(loader.rating_matrix)
+    relevances = loader.rating_matrix.mean(axis=0)
+
+    def relevance_f(top_k_list):
+        return relevances[top_k_list].sum()
+    
+    def relevance_w(top_k_list, *args, **kwargs):
+        return relevance_f(top_k_list)
+    
+    # Wrapped diversity
+    def diversity_w(top_k_list, *args, **kwargs):
+        return diversity_f(top_k_list)
+    
+    def novelty_w(top_k_list, *args, **kwargs):
+        return novelty_f(top_k_list)
+
+    def exploration_w(top_k_list, user_vector_list, *args, **kwargs):
+        f = exploration(np.array([]), loader.distance_matrix)
+        f.user_vector = np.array(user_vector_list, dtype=np.int32) # fixup
+        return f(top_k_list)
+
+    objectives = [
+        ObjectiveWrapper(relevance_w, "relevance"),
+        ObjectiveWrapper(diversity_w, "diversity"),
+        ObjectiveWrapper(novelty_w, "novelty"),
+        ObjectiveWrapper(exploration_w, "exploration")
+    ]
+    weights, supports = calculate_weight_estimate_generic(loader, objectives, selected_movies, session['elicitation_movies'], return_supports=True)
+    # weights /= weights.sum()
+    #weights = weights.tolist()
     # weights = {
     #     algo_displayed_name: weights for algo_displayed_name in displyed_name_mapping.values()
     # }
     #rds.hset(f"user:weights:{session['uuid']}:", mapping=weights)
-    print(f"Weights initialized to {weights}")
-
+    print(f"Weights initialized to {weights}, supports: {supports}")
 
     # Add default entries so that even the non-chosen algorithm has an empty entry
     # to unify later access
@@ -296,6 +373,7 @@ def send_feedback():
     set_mapping(get_uname(), {
         # 'movies': recommendations,
         # 'initial_weights_recommendation': initial_weights_recommendation,
+        'initial_weights': weights,
         'iteration': 0, # Start with zero, because at the very beginning, mors_feedback is called, not mors and that generates recommendations for first iteration, but at the same time, increases the iteration
         'elicitation_selected_movies': selected_movies,
         'selected_movie_indices': []
@@ -320,11 +398,21 @@ def send_feedback():
     selected_alphas = possible_alphas[:6]
 
     ### Initialize MORS related stuff ###
-    selected_algorithm_row = np.random.choice(list(ALGORITHM_ROWS.keys()))
-    selected_algorithms = ALGORITHM_ROWS[selected_algorithm_row] + ["RELEVANCE-BASED"]
+    # "Algorithm family" is between-user variable
+    selected_algorithm_family = np.random.choice(ALGORITHM_FAMILY)
+    # We always select RELEVANCE-BASED, then EXACT (thus EXACT-1W as we only consider 1W for EXACT) from the given family
+    # and then randomly either MAX-1W or MAX-2W
+    selected_algorithms = [
+        algo_name(selected_algorithm_family, "EXACT", "1W"),
+        np.random.choice([
+            algo_name(selected_algorithm_family, "MAX", "1W"),
+            algo_name(selected_algorithm_family, "MAX", "2W")
+        ]),
+        "RELEVANCE-BASED"
+    ]
     # Select sliders
-    # TODO find a better way to do this
-    selected_slider_versions = ['ONE-WAY', 'ONE-WAY', 'TWO-WAY']
+    # "Front-end slider" is between-user variable
+    selected_slider_versions = [np.random.choice(SLIDER_VERSIONS)] * N_BLOCKS
     # Shuffle algorithms
     np.random.shuffle(selected_algorithms)
     # Shuffle algorithm names
@@ -338,7 +426,7 @@ def send_feedback():
     set_mapping(get_uname(), {
         "alphas_iteration": 1,
         "alphas_p": [selected_alphas[:3], selected_alphas[3:]],
-        "algorithm_row": selected_algorithm_row,
+        "algorithm_family": selected_algorithm_family,
         "selected_algorithms": selected_algorithms,
         "selected_slider_versions": selected_slider_versions,
         "algorithm_name_mapping": algorithm_name_mapping,
@@ -359,13 +447,22 @@ def send_feedback():
         }
     })
 
+    weights_with_list = {}
+    weights_with_list["values"] = {key: val.astype(float) for key, val in weights["values"].items()}
+    weights_with_list["vec"] = weights["vec"].tolist()
     elicitation_ended(
         session['elicitation_movies'],
         selected_movies,
         orig_permutation=p,
         displyed_name_mapping=displyed_name_mapping,
         refinement_layout=refinement_layout_name,
-        supports={key: np.round(value.astype(float), 4).tolist() for key, value in supports.items()}
+        supports={key: np.round(value.astype(float), 4).tolist() for key, value in supports.items()},
+        alphas_p=[selected_alphas[:3], selected_alphas[3:]],
+        algorithm_family=selected_algorithm_family,
+        selected_algorithms=selected_algorithms,
+        selected_slider_versions=selected_slider_versions,
+        algorithm_name_mapping=algorithm_name_mapping,
+        initial_weights=weights_with_list
     )  
 
     #return redirect(url_for("multiobjective.compare_and_refine"))
@@ -606,7 +703,7 @@ def load_cdf_cache(base_path, metric_name):
 # Here we are sure that we are inside this particular plugin
 # thus we have a particular data loader and can use some of its internals
 def enrich_results(top_k, loader, support=None):
-    assert isinstance(loader, MLGenomeDataLoader), f"Loader name: {loader.name()} type: {type(loader)}"
+    assert isinstance(loader, MLGenomeDataLoader) or isinstance(loader, GoodBooksFilteredDataLoader), f"Loader name: {loader.name()} type: {type(loader)}"
     top_k_ids = [loader.get_item_id(movie_idx) for movie_idx in top_k]
     top_k_description = [loader.items_df_indexed.loc[movie_id].title for movie_id in top_k_ids]
     top_k_genres = [loader.get_item_id_categories(movie_id) for movie_id in top_k_ids]
@@ -723,7 +820,7 @@ def morsify(k, rel_scores,
             relevance_half = sorted_relevances[:n_items_subset//2]
             # However, for the random half, we have to ensure we do not sample movies from filter_out_movies because this can lead to issues
             # especially when n_items_subset is small and filter_out_items is large (worst case is that we will sample exactly those items that should have been filtered out)
-            random_candidates = np.setdiff1d(sorted_relevances[n_items_subset//2], filter_out_items)
+            random_candidates = np.setdiff1d(sorted_relevances[n_items_subset//2:], filter_out_items)
             random_half = np.random.choice(random_candidates, n_items_subset//2, replace=False)
             source_items = np.concatenate([
                 relevance_half, 
@@ -783,6 +880,18 @@ def morsify(k, rel_scores,
 def moea():
     pass
 
+# A simple wrapper class for a recommendation objective (adds name to it)
+class ObjectiveWrapper:
+    def __init__(self, f, name):
+        self.f = f
+        self.obj_name = name
+        
+    def __call__(self, rec_list, *args, **kwargs):
+        return self.f(rec_list, *args, **kwargs)
+    
+    def name(self):
+        return self.obj_name
+
 ##### End of algorithms #####
 
 @bp.route("/mors-feedback", methods=["GET", "POST"])
@@ -790,8 +899,21 @@ def mors_feedback():
     user_data = get_all(get_uname())
     it = user_data["iteration"]
 
+    if it == 0:
+        # At the very beginning, we mark end of compare-alphas step
+        drag_and_drop_positions = json.loads(request.form.get("drag_and_drop_positions"))
+        dropzone_position = json.loads(request.form.get("dropzone_position"))
+        log_interaction(session["participation_id"],
+                        "compare-alphas-ended",
+                        iteration=user_data['alphas_iteration'],
+                        drag_and_drop_positions=drag_and_drop_positions,
+                        dropzone_position=dropzone_position)
+    else:
+        log_interaction(session["participation_id"], "mors-recommendation-ended", iteration=it - 1)
+
     cur_block = it // N_ITERATIONS
     cur_algorithm = user_data["selected_algorithms"][cur_block]
+    cur_slider_version = user_data["selected_slider_versions"][cur_block]
 
     # Get selected items
     selected_items = request.form.get("selected_items")
@@ -816,10 +938,16 @@ def mors_feedback():
         # Very first iteration of the block, we get to mors-feedback before sliders are shown for the first time
         # TODO calculate weight estimate?
         # or just use relevance only baseline?
-        slider_relevance = \
-        slider_exploitation_exploration = \
-        slider_uniformity_diversity = \
-        slider_popularity_novelty = 0.5
+        weights = get_val("initial_weights")
+        relevance_weight = weights["values"]["relevance"]
+        diversity_weight = weights["values"]["diversity"]
+        novelty_weight = weights["values"]["novelty"]
+        exploration_weight = weights["values"]["exploration"]
+        print(f"Using initial weights again: {relevance_weight, diversity_weight, novelty_weight, exploration_weight}")
+        slider_relevance = slider_uniformity_diversity = slider_popularity_novelty = slider_exploitation_exploration = None
+
+        # No sliders were shown, we have to set False to any objective ignoring for now
+        ignore_exploitation_exploration = ignore_uniformity_diversity = ignore_popularity_novelty = ignore_relevance = False
     else:
         print("@@@@ Received following params:")
         print(request.form.get("selected_items"))
@@ -830,7 +958,25 @@ def mors_feedback():
         print(slider_relevance, slider_exploitation_exploration, slider_uniformity_diversity, slider_popularity_novelty)
         print("@@@@")
     
-    
+        # Map the slider values to actual criteria weights
+        relevance_weight = slider_relevance
+        diversity_weight = slider_uniformity_diversity
+        novelty_weight = slider_popularity_novelty
+        exploration_weight = slider_exploitation_exploration
+
+        # Get options regarding objective ignoring
+        ignore_exploitation_exploration = request.form.get("ignore_exploitation_exploration") == "true"
+        ignore_uniformity_diversity = request.form.get("ignore_uniformity_diversity") == "true"
+        ignore_popularity_novelty = request.form.get("ignore_popularity_novelty") == "true"
+        ignore_relevance = request.form.get("ignore_relevance") == "true"
+
+        print(f"Ignoring options: [{ignore_relevance}, {ignore_uniformity_diversity}, {ignore_popularity_novelty}, {ignore_exploitation_exploration}]")
+
+    # Set weights for inverse objectives
+    uniformity_weight = 1.0 - diversity_weight
+    popularity_weight = 1.0 - novelty_weight
+    exploitation_weight = 1.0 - exploration_weight
+
     # Generate the actual recommendations
     recommendation = {}
 
@@ -870,8 +1016,6 @@ def mors_feedback():
     # Note that "all_recommendations" already includes items selected during the study (except those selected during elicitattion which we are thus adding)
     filter_out_items = np.concatenate([all_recommendations, elicitation_selected])
 
-    target_weights = np.array([1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.0])
-
     def relevance_f(top_k_list):
         return rel_scores[top_k_list].sum()
 
@@ -882,53 +1026,106 @@ def mors_feedback():
     exploration_f = exploration(user_vector, loader.distance_matrix)
     exploitation_f = exploitation(user_vector, 1.0 - loader.distance_matrix)
 
-    objectives = [
-        relevance_f,
+    if "EXACT" in cur_algorithm or "1W" in cur_algorithm:
+        # We use one-way backend version of the slider and just 4 objectives
+        target_weights = [
+            relevance_weight    if not ignore_relevance else None,
+            diversity_weight    if not ignore_uniformity_diversity else None,
+            novelty_weight      if not ignore_popularity_novelty else None,
+            exploration_weight  if not ignore_exploitation_exploration else None
+        ]
+        objectives = [
+            ObjectiveWrapper(relevance_f, "relevance")      if not ignore_relevance else None,
+            ObjectiveWrapper(div_f, "diversity")            if not ignore_uniformity_diversity else None,
+            ObjectiveWrapper(novelty_f, "novelty")          if not ignore_popularity_novelty else None,
+            ObjectiveWrapper(exploration_f, "exploration")  if not ignore_exploitation_exploration else None
+        ]
+    elif "MAX" in cur_algorithm:
+        # We use two-way backend version of the slider and all 4 objectives
+        target_weights = [
+            relevance_weight    if not ignore_relevance else None,
+            diversity_weight    if not ignore_uniformity_diversity else None,
+            novelty_weight      if not ignore_popularity_novelty else None,
+            exploration_weight  if not ignore_exploitation_exploration else None,
+            uniformity_weight   if not ignore_uniformity_diversity else None,
+            popularity_weight   if not ignore_popularity_novelty else None,
+            exploitation_weight if not ignore_exploitation_exploration else None
+        ]
+        objectives = [
+            ObjectiveWrapper(relevance_f, "relevance")          if not ignore_relevance else None,
+            ObjectiveWrapper(div_f, "diversity")                if not ignore_uniformity_diversity else None,
+            ObjectiveWrapper(novelty_f, "novelty")              if not ignore_popularity_novelty else None,
+            ObjectiveWrapper(exploration_f, "exploration")      if not ignore_exploitation_exploration else None,
+            ObjectiveWrapper(uniformity_f, "uniformity")        if not ignore_uniformity_diversity else None,
+            ObjectiveWrapper(popularity_f, "popularity")        if not ignore_popularity_novelty else None,
+            ObjectiveWrapper(exploitation_f, "exploitation")    if not ignore_exploitation_exploration else None
+        ]
+    else:
+        # Not really used explicitly, we only keep it for logging that
+        # takes place at the end of this function
+        target_weights = [1.0]
+        objectives = [
+            ObjectiveWrapper(relevance_f, "relevance")
+        ]
 
-        div_f,
-        uniformity_f,
-
-        popularity_f,
-        novelty_f,
-
-        exploration_f,
-        exploitation_f
-    ]
+    # Do the actual filtering of objectives -> get rid of "None" places
+    objectives = [obj for obj in objectives if obj is not None]
+    target_weights = np.array([w for w in target_weights if w is not None])
 
     start_time = time.perf_counter()
-    if cur_algorithm == "GREEDY-EXACT":
+    if cur_algorithm == "GREEDY-EXACT-1W":
         algo = greedy_exact(target_weights)
         top_k = morsify(
             10, rel_scores, algo,
             items, objectives, user_vector, filter_out_items, n_items_subset=500,
             do_normalize=True, rnd_mixture=True
         )
-    elif cur_algorithm == "ITEM-WISE-EXACT":
+    elif cur_algorithm == "ITEM-WISE-EXACT-1W":
         algo = item_wise_exact(target_weights)
         top_k = morsify(
             10, rel_scores, algo,
             items, objectives, user_vector, filter_out_items, n_items_subset=500,
             do_normalize=True, rnd_mixture=True
         )
-    elif cur_algorithm == "EVOLUTIONARY-EXACT":
-        algo = evolutionary_exact(target_weights, rel_scores, user_vector, objectives, relevance_top_k, filter_out_items, k=k, time_limit_seconds=4)
+    elif cur_algorithm == "EVOLUTIONARY-EXACT-1W":
+        objectives[0] = ObjectiveWrapper(lambda x: rel_scores_normed[x].sum(), "relevance-normed")
+        algo = evolutionary_exact(target_weights, rel_scores, user_vector, objectives, np.array(relevance_top_k), filter_out_items, k=k, time_limit_seconds=4)
         top_k = algo()
-    elif cur_algorithm == "GREEDY-MAX":
+    elif cur_algorithm == "GREEDY-MAX-1W":
         algo = greedy_max(target_weights)
         top_k = morsify(
             10, rel_scores, algo,
             items, objectives, user_vector, filter_out_items, n_items_subset=500,
             do_normalize=True, rnd_mixture=True
         )
-    elif cur_algorithm == "ITEM-WISE-MAX":
+    elif cur_algorithm == "GREEDY-MAX-2W":
+        algo = greedy_max(target_weights)
+        top_k = morsify(
+            10, rel_scores, algo,
+            items, objectives, user_vector, filter_out_items, n_items_subset=500,
+            do_normalize=True, rnd_mixture=True
+        )
+    elif cur_algorithm == "ITEM-WISE-MAX-1W":
         algo = item_wise_max(target_weights)
         top_k = morsify(
             10, rel_scores, algo,
             items, objectives, user_vector, filter_out_items, n_items_subset=500,
             do_normalize=True, rnd_mixture=True
         )
-    elif cur_algorithm == "EVOLUTIONARY-MAX":
-        algo = evolutionary_max(target_weights, rel_scores, user_vector, objectives, relevance_top_k, filter_out_items, k=k, time_limit_seconds=4)
+    elif cur_algorithm == "ITEM-WISE-MAX-2W":
+        algo = item_wise_max(target_weights)
+        top_k = morsify(
+            10, rel_scores, algo,
+            items, objectives, user_vector, filter_out_items, n_items_subset=500,
+            do_normalize=True, rnd_mixture=True
+        )
+    elif cur_algorithm == "EVOLUTIONARY-MAX-1W":
+        objectives[0] = ObjectiveWrapper(lambda x: rel_scores_normed[x].sum(), "relevance-normed")
+        algo = evolutionary_max(target_weights, rel_scores, user_vector, objectives, np.array(relevance_top_k), filter_out_items, k=k, time_limit_seconds=4)
+        top_k = algo()
+    elif cur_algorithm == "EVOLUTIONARY-MAX-2W":
+        objectives[0] = ObjectiveWrapper(lambda x: rel_scores_normed[x].sum(), "relevance-normed")
+        algo = evolutionary_max(target_weights, rel_scores, user_vector, objectives, np.array(relevance_top_k), filter_out_items, k=k, time_limit_seconds=4)
         top_k = algo()
     elif cur_algorithm == "RELEVANCE-BASED":
         top_k = relevance_top_k
@@ -937,7 +1134,8 @@ def mors_feedback():
 
     print(f"@@@ Morsify took: {time.perf_counter() - start_time}")
 
-    recommendation[cur_algorithm] = {
+    algorithm_anon_name = f"ALGORITHM {ALGORITHM_ANON_NAMES[cur_block]}"
+    recommendation[algorithm_anon_name] = {
         'movies': enrich_results(top_k, loader),
         'order': 0
     }
@@ -967,6 +1165,33 @@ def mors_feedback():
     #print(f"MORS feedback iter after: {session['iteration']} but should have been {it + 1}")
     #assert session.modified == True
     #session.modified = True
+
+    # We log beginning of mors iteration
+    data = {
+        "iteration": it,
+        "cur_block": cur_block,
+        "cur_algorithm": cur_algorithm,
+        "cur_slider_version": cur_slider_version,
+        "selected_items_history": selected_items_history,
+        "algorithm_anon_name": algorithm_anon_name,
+        "top_k": top_k_list,
+        "weights": target_weights.tolist(),
+        "objective_names": [obj.name() for obj in objectives],
+        "selected_metric_name": selected_metric_name,
+        "raw_slider_values": {
+            "relevance": slider_relevance,
+            "diversity": slider_uniformity_diversity,
+            "novelty": slider_popularity_novelty,
+            "exploration": slider_exploitation_exploration
+        },
+        "ignore_objectives": {
+            "relevance": ignore_relevance,
+            "diversity": ignore_uniformity_diversity,
+            "novelty": ignore_popularity_novelty,
+            "exploration": ignore_exploitation_exploration
+        }
+    }
+    log_interaction(session["participation_id"], "mors-recommendation-started", **data)
     return flask.Flask.redirect(flask.current_app, url_for("journal.mors"))
 
 @bp.route("/mors", methods=["GET", "POST"])
@@ -975,12 +1200,29 @@ def mors():
     user_data = get_all(get_uname())
     it = user_data["iteration"]
 
-    print(f"MORS IT={it}")
+    print(f"MORS IT={it}, mod={int(it) - 1 % N_ITERATIONS}")
 
     cur_block = (int(it) - 1) // N_ITERATIONS
     cur_algorithm = user_data["selected_algorithms"][cur_block]
     cur_slider_version = user_data["selected_slider_versions"][cur_block]
-    
+
+    if (int(it) - 1) % N_ITERATIONS == 0:
+        # Initialize sliders on the frontend to estimated weights
+        weights = get_val("initial_weights")
+        slider_relevance = weights["values"]["relevance"]
+        slider_uniformity_diversity = weights["values"]["diversity"]
+        slider_popularity_novelty = weights["values"]["novelty"]
+        slider_exploitation_exploration = weights["values"]["exploration"]
+        print(f"Setting sliders to initial estimate {[slider_relevance, slider_uniformity_diversity, slider_popularity_novelty, slider_exploitation_exploration]}")
+    else:
+        # Otherwise get values previously set by the user
+        slider_values = get_val("slider_values")
+        slider_relevance = slider_values["slider_relevance"][-1]
+        slider_exploitation_exploration = slider_values["slider_exploitation_exploration"][-1]
+        slider_uniformity_diversity = slider_values["slider_uniformity_diversity"][-1]
+        slider_popularity_novelty = slider_values["slider_popularity_novelty"][-1]
+        print(f"Setting sliders to previous values: {[slider_relevance, slider_uniformity_diversity, slider_popularity_novelty, slider_exploitation_exploration]}")
+
     # if cur_algorithm == "RLPROP":
     #     pass
     # elif cur_algorithm == "WA":
@@ -992,6 +1234,7 @@ def mors():
 
     print(f"Algorithm = {cur_algorithm}")
 
+    conf = load_user_study_config(session['user_study_id'])
     # if it >= N_ITERATIONS * len(ALGORITHMS):
     #     continuation_url = url_for("journal.done")
     # else:
@@ -1008,22 +1251,56 @@ def mors():
     params = {
         "continuation_url": continuation_url,
         "iteration": it,
+        "n_iterations": N_ITERATIONS * N_BLOCKS,
         "movies": get_val('recommendation'),
         "like_nothing": tr("compare_like_nothing"),
-        "highly_popular_help": tr("journal_highly_popular_help"),
-        "highly_novel_help": tr("journal_highly_novel_help"),
-        "highly_diverse_help": tr("journal_highly_diverse_help"),
-        "highly_uniform_help": tr("journal_highly_uniform_help"),
-        "highly_explorational_help": tr("journal_highly_explorational_help"),
-        "highly_exploitational_help": tr("journal_highly_exploitational_help"),
-        "highly_relevant_help": tr("journal_highly_relevant_help"),
-        "little_relevant_help": tr("journal_little_relevant_help"),
-        "little_novel_help": tr("journal_little_novel_help"),
-        "little_diverse_help": tr("journal_little_diverse_help"),
-        "little_explorational_help": tr("journal_little_explorational_help"),
         "can_fine_tune": cur_algorithm != "RELEVANCE-BASED",
-        "slider_version": cur_slider_version
+        "slider_version": cur_slider_version,
+        "slider_relevance": slider_relevance,
+        "slider_uniformity_diversity": slider_uniformity_diversity,
+        "slider_popularity_novelty": slider_popularity_novelty,
+        "slider_exploitation_exploration": slider_exploitation_exploration,
     }
+
+    if is_books(conf):
+        params["title"] = tr("journal_recommendation_title_books")
+        params["header"] = tr("journal_recommendation_header_books")
+        params["hint"] = tr("journal_recommendation_hint_books")
+        params["highly_popular_help"] = tr("journal_highly_popular_help_books")
+        params["highly_novel_help"] = tr("journal_highly_novel_help_books")
+        params["highly_diverse_help"] = tr("journal_highly_diverse_help_books")
+        params["highly_uniform_help"] = tr("journal_highly_uniform_help_books")
+        params["highly_explorative_help"] = tr("journal_highly_explorative_help_books")
+        params["highly_exploitative_help"] = tr("journal_highly_exploitative_help_books")
+        params["highly_relevant_help"] = tr("journal_highly_relevant_help_books")
+        params["less_relevant_help"] = tr("journal_less_relevant_help_books")
+        params["less_novel_help"] = tr("journal_less_novel_help_books")
+        params["less_diverse_help"] = tr("journal_less_diverse_help_books")
+        params["less_explorative_help"] = tr("journal_less_explorative_help_books")
+        params["more_relevant_help"] = tr("journal_more_relevant_help_books")
+        params["more_novel_help"] = tr("journal_more_novel_help_books")
+        params["more_diverse_help"] = tr("journal_more_diverse_help_books")
+        params["more_explorative_help"] = tr("journal_more_explorative_help_books")
+    else:
+        params["title"] = tr("journal_recommendation_title_movies")
+        params["header"] = tr("journal_recommendation_header_movies")
+        params["hint"] = tr("journal_recommendation_hint_movies")
+        params["highly_popular_help"] = tr("journal_highly_popular_help_movies")
+        params["highly_novel_help"] = tr("journal_highly_novel_help_movies")
+        params["highly_diverse_help"] = tr("journal_highly_diverse_help_movies")
+        params["highly_uniform_help"] = tr("journal_highly_uniform_help_movies")
+        params["highly_explorative_help"] = tr("journal_highly_explorative_help_movies")
+        params["highly_exploitative_help"] = tr("journal_highly_exploitative_help_movies")
+        params["highly_relevant_help"] = tr("journal_highly_relevant_help_movies")
+        params["less_relevant_help"] = tr("journal_less_relevant_help_movies")
+        params["less_novel_help"] = tr("journal_less_novel_help_movies")
+        params["less_diverse_help"] = tr("journal_less_diverse_help_movies")
+        params["less_explorative_help"] = tr("journal_less_explorative_help_movies")
+        params["more_relevant_help"] = tr("journal_more_relevant_help_movies")
+        params["more_novel_help"] = tr("journal_more_novel_help_movies")
+        params["more_diverse_help"] = tr("journal_more_diverse_help_movies")
+        params["more_explorative_help"] = tr("journal_more_explorative_help_movies")
+
     #assert session.modified == False
     return render_template("mors.html", **params)
 
@@ -1110,22 +1387,37 @@ def metric_feedback():
 
     # We are before first iteration
     cur_iter = user_data['alphas_iteration']
+
+    # Take alpha values to be shown in the current step
+    current_alphas = user_data['alphas_p'][cur_iter - 1]
+
     print(f"METRIC FEEDBACK step 1 = {cur_iter}")
     if cur_iter == 1:
+        # We need to map back from "hidden name", e.g. "List A" to actual name of the diversity metric
         selected_metric_name = request.form.get("selected_metric_name")
+        mapping = get_val("metric_assesment_list_to_diversity")
+        selected_metric_name = mapping[selected_metric_name]
+
         #selected_metric_index = request.form.get("selected_metric_index")
         set_val('selected_metric_name', selected_metric_name)
+        # Mark end of metric assesment here
+        log_interaction(session["participation_id"], "metric-assesment-ended", selected_metric_name=selected_metric_name)
     else:
         selected_metric_name = user_data['selected_metric_name']
+        # Here we first mark end of previous iteration, then start of current iteration
+        drag_and_drop_positions = json.loads(request.form.get("drag_and_drop_positions"))
+        dropzone_position = json.loads(request.form.get("dropzone_position"))
+        log_interaction(session["participation_id"],
+                        "compare-alphas-ended",
+                        iteration=cur_iter - 1,
+                        drag_and_drop_positions=drag_and_drop_positions,
+                        dropzone_position=dropzone_position)
     
     if cur_iter >= N_ALPHA_ITERS:
         continuation_url = url_for("journal.mors_feedback")
     else:
         continuation_url = url_for("journal.metric_feedback")
 
-
-    # Take alpha values to be shown in the current step
-    current_alphas = user_data['alphas_p'][cur_iter - 1]
 
     #@profile
     #def compare_alphas_x():
@@ -1137,7 +1429,14 @@ def metric_feedback():
     loader = loader_factory(**filter_params(conf["data_loader_parameters"], loader_factory))
     loader = load_data_loader_cached(loader, session['user_study_guid'], loader_factory.name(), get_semi_local_cache_name(loader))
 
-    alpha_orders = np.arange(len(current_alphas))
+    # Mapping is implicit, position 0 means "current_alphas[0]", position 2 is "current_alphas[2]"
+    # as the alphas are already shuffled
+    # We just shuffle the algorithms so that what is displayed below "LIST A" is random
+    algorithm_name_mapping = {
+        current_alphas[0]: "LIST 1",
+        current_alphas[1]: "LIST 2",
+        current_alphas[2]: "LIST 3"
+    }
 
     if selected_metric_name == "CF-ILD":
         div_f = intra_list_diversity(loader.distance_matrix)
@@ -1164,7 +1463,8 @@ def metric_feedback():
 
 
     cdf_div = load_cdf_cache(get_cache_path(get_semi_local_cache_name(loader)), selected_metric_name)
-    for alpha_order, alpha in zip(alpha_orders, current_alphas):
+    rec_lists = dict()
+    for alpha_order, alpha in enumerate(current_alphas):
 
         rec_list = get_diversified_top_k_lists(k, np.array([0]), rel_scores, rel_scores_normed,
                                         alpha=alpha, items=items, diversity_function=div_f, diversity_cdf=cdf_div,
@@ -1172,8 +1472,9 @@ def metric_feedback():
                                         n_items_subset=500, do_normalize=True, unit_normalize=True, rnd_mixture=True)
 
         rec_list = enrich_results(rec_list[0], loader)
+        rec_lists[algorithm_name_mapping[alpha]] = rec_list[0]
 
-        params["movies"][str(alpha)] = {
+        params["movies"][algorithm_name_mapping[alpha]] = {
             "movies": rec_list,
             "order": str(alpha_order)
         }
@@ -1182,6 +1483,14 @@ def metric_feedback():
     set_mapping(get_uname() + ":alpha_movies", {
         "movies": params["movies"]
     })
+
+    # Mark start of the first iteration for compare-alphas
+    log_interaction(session["participation_id"], "compare-alphas-started",
+                    alphas=current_alphas,
+                    iteration=cur_iter,
+                    algorithm_name_mapping=algorithm_name_mapping,
+                    selected_metric_name=selected_metric_name,
+                    elicitation_selected=user_data['elicitation_selected_movies'])
 
     cur_iter += 1
     #session['alphas_iteration'] = cur_iter
@@ -1192,10 +1501,17 @@ def metric_feedback():
 @bp.route("/compare-alphas", methods=["GET", "POST"])
 def compare_alphas():
     continuation_url = request.args.get("continuation_url")
+    tr = get_tr(languages, get_lang())
     #params = session['alpha_movies']
     u_key = f"user:{session['uuid']}"
     params = get_all(u_key + ":alpha_movies")
     params["continuation_url"] = continuation_url
+    params["hint"] = tr("journal_compare_alphas_hint")
+    params["header"] = tr("journal_compare_alphas_header")
+    params["title"] = tr("journal_compare_alphas_title")
+    params["drag"] = tr("journal_compare_alphas_drag")
+    params["n_iterations"] = 1 + N_ALPHA_ITERS # We have 1 iteration for actual metric assesment followed bz N_ALPHA_ITERS iterations for comparing alphas
+    params["iteration"] = get_val("alphas_iteration")
     return render_template("compare_alphas.html", **params)
 
 @bp.route("/metric-assesment", methods=["GET"])
@@ -1215,7 +1531,7 @@ def metric_assesment():
     algo = EASER_pretrained(items)
     algo = algo.load(os.path.join(get_cache_path(get_semi_local_cache_name(loader)), "item_item.npy"))
     print(f"Took 2+:", time.perf_counter() - start_time)
-    print(f"@@ {loader.get_item_id(270)}, {loader.get_item_index(333)}, {loader.get_item_index_description(270)}, {loader.get_item_id_description(333)}")
+    #print(f"@@ {loader.get_item_id(270)}, {loader.get_item_index(333)}, {loader.get_item_index_description(270)}, {loader.get_item_id_description(333)}")
     # Movie indices of selected movies
     elicitation_selected = np.array(get_val("elicitation_selected_movies"))
     rel_scores, user_vector, ease_pred = algo.predict_with_score(elicitation_selected, elicitation_selected, k)
@@ -1275,26 +1591,53 @@ def metric_assesment():
     r4 = enrich_results(r4[0], loader)
     print(f"Predicting r4 took: {time.perf_counter() - start_time}")
 
+    # Mapping is implicit, position 0 means "LIST A", position 2 is "LIST C"
+    # We just shuffle the algorithms so that what is displayed below "LIST A" is random
+    lists = ["CB-ILD", "CF-ILD", "BIN-DIV"]
+    list_name_to_rec = {
+        "CF-ILD": r2,
+        "CB-ILD": r3,
+        "BIN-DIV": r4
+    }
+    np.random.shuffle(lists)
+    algorithm_name_mapping = {
+        lists[0]: "LIST A",
+        lists[1]: "LIST B",
+        lists[2]: "LIST C"
+    }
+
     params = {
         "movies": {
-            "EASE": {
-                "movies": ease_baseline,
+            # "EASE": {
+            #     "movies": ease_baseline,
+            #     "order": 0
+            # },
+            algorithm_name_mapping[lists[0]]: {
+                "movies": list_name_to_rec[lists[0]],
                 "order": 0
             },
-            "CB-ILD": {
-                "movies": r2,
+            algorithm_name_mapping[lists[1]]: {
+                "movies": list_name_to_rec[lists[1]],
                 "order": 1
             },
-            "CF-ILD": {
-                "movies": r3,
+            algorithm_name_mapping[lists[2]]: {
+                "movies": list_name_to_rec[lists[2]],
                 "order": 2
-            },
-            "BIN-DIV": {
-                "movies": r4,
-                "order": 3
             }
         }
     }
+
+    data = {
+        "list_permutation": lists,
+        "algorithm_name_mapping": algorithm_name_mapping,
+        "list_name_to_rec": list_name_to_rec
+    }
+    log_interaction(session["participation_id"], "metric-assesment-started", **data)
+
+    # We need to store inverse mapping
+    # in the form of "list name" : "diversity name"
+    set_val("metric_assesment_list_to_diversity", { list_name : diversity_name for diversity_name, list_name in algorithm_name_mapping.items() })
+
     print(f"Took 4:", time.perf_counter() - start_time)
     tr = get_tr(languages, get_lang())
     params["contacts"] = tr("footer_contacts")
@@ -1303,11 +1646,13 @@ def metric_assesment():
     params["cagliari_university"] = tr("footer_cagliari_university")
     params["t1"] = tr("footer_t1")
     params["t2"] = tr("footer_t2")
-    params["title"] = tr("metric_assesment_title")
-    params["header"] = tr("metric_assesment_header")
-    params["hint"] = tr("metric_assesment_hint")
+    params["title"] = tr("journal_metric_assesment_title")
+    params["header"] = tr("journal_metric_assesment_header")
+    params["hint"] = tr("journal_metric_assesment_hint")
     params["continuation_url"] = request.args.get("continuation_url")
     params["finish"] = tr("metric_assesment_finish")
+    params["iteration"] = 1
+    params["n_iterations"] = 1 + N_ALPHA_ITERS # We have 1 iteration for actual metric assesment followed bz N_ALPHA_ITERS iterations for comparing alphas
     print(f"Took 5:", time.perf_counter() - start_time)
     # Handle overrides
     params["footer_override"] = None
@@ -1339,3 +1684,284 @@ def register():
     return {
         "bep": dict(blueprint=bp, prefix=None),
     }
+
+@bp.route("/get-block-questions", methods=["GET"])
+def get_block_questions():
+   
+    user_data = get_all(get_uname())
+    it = user_data["iteration"]
+    cur_block = (int(it) - 1) // N_ITERATIONS
+    cur_algorithm = user_data["selected_algorithms"][cur_block]
+    print(f"IT={it}, cur_block={cur_block}, cur_algorithm={cur_algorithm}")
+
+    conf = load_user_study_config(session['user_study_id'])
+
+    if "Goodbooks" in conf["selected_data_loader"]:
+        item_text = "books"
+        popular_text = "bestsellers"
+    else:
+        item_text = "movies"
+        popular_text = "blockbusters"
+
+    questions = [
+        {
+            "text": f"The {item_text} recommended to me matched my interests.",
+            "name": "q1",
+            "icon": "grid"
+        },
+        {
+            "text": f"The recommended {item_text} were mostly novel to me.",
+            "name": "q2",
+            "icon": "grid"
+        },
+        {
+            "text": f"The recommended {item_text} were highly different from each other.",
+            "name": "q3",
+            "icon": "grid"
+        },
+        {
+            "text": f"The recommended {item_text} were unexpected yet interesting to me.",
+            "name": "q4",
+            "icon": "grid"
+        },
+        {
+            "text": f"The recommended {item_text} were mostly different from what I usually watch.",
+            "name": "q5",
+            "icon": "grid"
+        },
+        {
+            "text": f"The recommended {item_text} were mostly similar to what I usually watch.",
+            "name": "q6",
+            "icon": "grid"
+        },
+        {
+            "text": f"The recommended {item_text} were mostly popular (i.e., {popular_text}).",
+            "name": "q7",
+            "icon": "grid"
+        },
+        {
+            "text": f"The recommended {item_text} were mostly similar to each other",
+            "name": "q8",
+            "icon": "grid"
+        },
+        {
+            "text": f"Overall, I am satisfied with the recommended {item_text}.",
+            "name": "q9",
+            "icon": "grid"
+        },
+        {
+            "text": "The initial values of sliders already provided good recommendations.",
+            "name": "q10",
+            "icon": "sliders"
+        },
+        {
+            "text": "Being able to change objective criteria (relevance, diversity, etc.) was useful for me.",
+            "name": "q11",
+            "icon": "sliders"
+        },
+        {
+            "text": "Overall, after modifying the objective criteria, recommendations improved.",
+            "name": "q12",
+            "icon": "sliders"
+        },
+        {
+            "text": "The mechanism (slider) was sufficient to tell the system what recommendations I wanted.",
+            "name": "q13",
+            "icon": "sliders"
+        },
+        {
+            "text": "I was able to describe my preferences w.r.t. supported objective criteria.",
+            "name": "q14",
+            "icon": "sliders"
+        },
+        {
+            "text": "Appropriate values of the objective criteria were easy to set.",
+            "name": "q15",
+            "icon": "sliders"
+        }
+    ]
+
+    attention_checks = [
+        {
+            "text": "I believe recommender systems can be very useful to people. To answer ",
+            "text2": "this attention check question correctly, you must select 'Agree'.",
+            "name": "qs1",
+            "icon": "grid"
+        },
+        {
+            "text": "Using this recommender system was entertaining and I would recommend it to my friends. To answer ",
+            "text2": "this attention check question correctly, you must select 'Strongly Disagree'.",
+            "name": "qs2",
+            "icon": "sliders"
+        },
+        {
+            "text": "This recommender system provided me with many tips for interesting computer games.",
+            "name": "qs3",
+            "icon": "sliders",
+            "atn": "true"
+        },
+        {
+            "text": "The recommendations I got from this system provided me with great recipes for exotic cuisines.",
+            "name": "qs4",
+            "icon": "sliders",
+            "atn": "true"
+        }
+    ]
+
+    # Mapping blocks to indices at which we place attention checks
+    atn_check_indices = {
+        0: 7,
+        1: 11,
+        2: 15,
+        3: 14
+    }
+
+    if cur_algorithm == "RELEVANCE-BASED":
+        # If this is the case, we only show first 9 questions
+        questions = questions[:9]
+        # However, this also means that we have to redistribute attention checks!
+        atn_check_indices = {
+            0: 1,
+            1: 6,
+            2: 9,
+            3: 8
+        }
+        # No sliders icon for relevance-only so having different icon for attention check would make it too easy
+        attention_checks[3]["icon"] = "grid"
+        attention_checks[2]["icon"] = "grid"
+        attention_checks[1]["icon"] = "grid"
+
+    # Use first attention check
+    questions.insert(atn_check_indices[cur_block], attention_checks[cur_block])
+    if cur_block == 1:
+        # For second block we have two attention checks
+        questions.insert(atn_check_indices[3], attention_checks[3])
+    assert cur_block >= 0 and cur_block < N_BLOCKS, f"cur_block == {cur_block}"
+
+    return jsonify(questions)
+
+@bp.route("/get-final-questions", methods=["GET"])
+def get_final_questions():
+    conf = load_user_study_config(session['user_study_id'])
+
+    if "Goodbooks" in conf["selected_data_loader"]:
+        item_text = "books"
+        production = "Amazon, GoodReads"
+        ic = "book"
+    else:
+        item_text = "movies"
+        production = "Netflix, Disney+"
+        ic = "collection-play"
+
+    questions = [
+        {
+            "text": f"The information provided for the recommended {item_text} was sufficient to judge whether I gonna like them.",
+            "name": "q1",
+            "icon": "chat-left-text"
+        },
+        {
+            "text": "The description of objective criteria (relevance, diversity, etc.) was clear and sufficient.",
+            "name": "q2",
+            "icon": "sliders"
+        },
+        {
+            "text": "I understood the purpose of tweaking objective criteria.",
+            "name": "q3",
+            "icon": "sliders"
+        },
+        {
+            "text": f"I would like to have a similar objective tweaking mechanism in production systems (e.g., {production}) too.",
+            "name": "q4",
+            "icon": ic
+        }
+    ]
+    return jsonify(questions)
+
+
+
+# If exact = True, then we are in "exact" algorithm world as apposed to "max", this also means that we do not normalize weights to sum to 1
+# selected_movies -> movies selected during elicitation
+# elicitation_movies -> movies displayed during elicitation
+# Note that we DO NOT NORMALIZE the WEIGHTS here
+def calculate_weight_estimate_generic(loader, objectives, selected_movies, elicitation_movies, return_supports=False):
+    
+    n_objectives = len(objectives)
+    if not selected_movies:
+        x = {
+            "vec": np.array([1.0] * n_objectives, dtype=np.float32),
+            "values": {
+                obj.name(): 1.0 for obj in objectives
+            }
+        }
+        if return_supports:
+            return x, {}
+        else:
+            return x
+
+    if type(elicitation_movies[0]) == int:
+        movie_indices = np.unique(elicitation_movies)
+    elif type(elicitation_movies[0]) == dict:
+        movie_indices = np.unique([int(movie["movie_idx"]) for movie in elicitation_movies])
+    else:
+        assert False
+
+    # We treat movie_indices as one long recommendation list and try to reconstruct it, calculating
+    # intermediate marginal gains for all the items
+    # We then estimate the gains from the weights
+    # We opt for optimization by doing the expansion (incrementally adding) s
+    mgains = np.zeros(shape=(len(objectives), len(movie_indices)), dtype=np.float32)
+    selected_mgains = [[] for _ in objectives]
+    # As the users are selecting the movies during elicitation, we can treat this as incrementally
+    # growing user profile (vector of selections)
+    user_vector_incremental = []
+    objective_index_to_name = []
+    for obj_idx, obj in enumerate(objectives):
+        objective_index_to_name.append(obj.name())
+        for idx, movie_idx in enumerate(movie_indices):
+            if movie_idx in selected_movies:
+                # We will end up in this place exactly len(objectives)-times, so we only append for the first time
+                if obj_idx == 0:
+                    user_vector_incremental.append(movie_idx)
+                # Since we added new item, we have to take updated user vector into an account
+                mgains[obj_idx, idx] = obj(movie_indices[:idx+1], user_vector_incremental) - obj(movie_indices[:idx], user_vector_incremental[:-1])
+                selected_mgains[obj_idx].append(mgains[obj_idx, idx])
+            else:
+                # We did not select anything, so user vector stays intact
+                mgains[obj_idx, idx] = obj(movie_indices[:idx+1], user_vector_incremental) - obj(movie_indices[:idx], user_vector_incremental)
+
+    obj_cdf = QuantileTransformer().fit(mgains.T)
+    selected_mgains = np.array(selected_mgains)
+    if selected_mgains.size == 0:
+        x = {
+            "vec": np.array([1.0] * n_objectives, dtype=np.float32),
+            "values": {
+                obj.name(): 1.0 for obj in objectives
+            }
+        }
+        if return_supports:
+            return x, {}
+        else:
+            return x
+
+
+    selected_mgains_normed = obj_cdf.transform(selected_mgains.T)
+    result_weight_vec = selected_mgains_normed.mean(axis=0)
+    result = {
+            "vec": result_weight_vec,
+            "values": {
+                obj.name(): result_weight_vec[obj_idx] for obj_idx, obj in enumerate(objectives)
+            }
+        }
+
+    if return_supports:
+        supports = {
+            "elicitation_movies": np.squeeze(movie_indices),
+            "selected_movies": np.array(selected_movies),
+            "selected_mgains": selected_mgains,
+            "selected_mgains_normed": selected_mgains_normed,
+            "mgains": mgains,
+            "rating_matrix_shape": np.array(loader.rating_matrix.shape)
+        }
+        return result, supports
+
+    return result
