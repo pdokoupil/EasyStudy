@@ -238,13 +238,14 @@ def block_questionnaire_done():
     }
     data.update(**request.form)
 
-    log_interaction(session["participation_id"], "after-block-questionnaire", **data)
-
     if cur_block == N_BLOCKS - 1:
-        # We are done
+        # We are done, do not forget to mark last iteration as ended
+        log_interaction(session["participation_id"], "mors-recommendation-ended", iteration=it - 1)
+        log_interaction(session["participation_id"], "after-block-questionnaire", **data)
         return redirect(url_for("journal.done"))
     else:
         # Otherwise continue with next block
+        log_interaction(session["participation_id"], "after-block-questionnaire", **data)
         return redirect(url_for("journal.mors_feedback"))
 
 # Endpoint for pre-study questionnaire
@@ -431,21 +432,21 @@ def send_feedback():
     cdf_cf_div = load_cdf_cache(get_cache_path(get_semi_local_cache_name(loader)), "CF-ILD")
     r2 = get_diversified_top_k_lists(assesment_k, np.array([0]), rel_scores, rel_scores_normed,
                                 alpha=alpha, items=items, diversity_function=cf_ild, diversity_cdf=cdf_cf_div,
-                                rating_matrix=user_vector,
+                                rating_matrix=user_vector, filter_out_items=elicitation_selected,
                                 n_items_subset=500, do_normalize=True, unit_normalize=True, rnd_mixture=True)
     r2 = enrich_results(r2[0], loader)
     print(f"Predicting r2 took: {time.perf_counter() - start_time}")
     cdf_cb_div = load_cdf_cache(get_cache_path(get_semi_local_cache_name(loader)), "CB-ILD")
     r3 = get_diversified_top_k_lists(assesment_k, np.array([0]), rel_scores, rel_scores_normed,
                                 alpha=alpha, items=items, diversity_function=cb_ild, diversity_cdf=cdf_cb_div,
-                                rating_matrix=user_vector,
+                                rating_matrix=user_vector, filter_out_items=elicitation_selected,
                                 n_items_subset=500, do_normalize=True, unit_normalize=True, rnd_mixture=True)
     r3 = enrich_results(r3[0], loader)
     print(f"Predicting r3 took: {time.perf_counter() - start_time}")
     cdf_bin_div = load_cdf_cache(get_cache_path(get_semi_local_cache_name(loader)), "BIN-DIV")
     r4 = get_diversified_top_k_lists(assesment_k, np.array([0]), rel_scores, rel_scores_normed,
                                 alpha=alpha, items=items, diversity_function=bin_div, diversity_cdf=cdf_bin_div,
-                                rating_matrix=user_vector,
+                                rating_matrix=user_vector, filter_out_items=elicitation_selected,
                                 n_items_subset=500, do_normalize=True, unit_normalize=True, rnd_mixture=True)
     r4 = enrich_results(r4[0], loader)
     print(f"Predicting r4 took: {time.perf_counter() - start_time}")
@@ -570,11 +571,13 @@ class EASER_pretrained:
         return self.predict_with_score(selected_items, filter_out_items, k)[2]
 
 
-# If all_items is false, we only look into 1000 items with highest relevance score
+# If all_items is false, we only look into n_items_subset items with highest relevance score
+# If also rnd_mixture is true than we only look into n_items_subset // 2 items with highest relevance
+# score and mix them with n_items_subset // 2 items randomly sampled from the rest of items
 # do_normalize -> whether we normalize the diversity support
 def get_diversified_top_k_lists(k, random_users, rel_scores, rel_scores_normed,
                                 alpha, items, diversity_function, diversity_cdf,
-                                rating_matrix,
+                                rating_matrix, filter_out_items,
                                 n_items_subset=None, do_normalize=False, unit_normalize=False, rnd_mixture=False):
     start_time = time.perf_counter()
     top_k_lists = np.zeros(shape=(random_users.size, k), dtype=np.int32)
@@ -602,9 +605,18 @@ def get_diversified_top_k_lists(k, random_users, rel_scores, rel_scores_normed,
             source_items = items
         else:
             if rnd_mixture:
-                #print(f"Using random mixture")
                 assert n_items_subset % 2 == 0, f"When using random mixture we expect n_items_subset ({n_items_subset}) to be divisible by 2"
-                source_items = np.concatenate([sorted_relevances[user_idx, :n_items_subset//2], np.random.choice(sorted_relevances[user_idx, n_items_subset:], n_items_subset//2, replace=False)])
+                #source_items = np.concatenate([sorted_relevances[user_idx, :n_items_subset//2], np.random.choice(sorted_relevances[user_idx, n_items_subset:], n_items_subset//2, replace=False)])
+
+                relevance_half = sorted_relevances[:n_items_subset//2]
+                # However, for the random half, we have to ensure we do not sample movies from filter_out_movies because this can lead to issues
+                # especially when n_items_subset is small and filter_out_items is large (worst case is that we will sample exactly those items that should have been filtered out)
+                random_candidates = np.setdiff1d(sorted_relevances[n_items_subset//2:], filter_out_items)
+                random_half = np.random.choice(random_candidates, n_items_subset//2, replace=False)
+                source_items = np.concatenate([
+                    relevance_half, 
+                    random_half
+                ])
             else:
                 source_items = sorted_relevances[user_idx, :n_items_subset]
             
@@ -663,8 +675,8 @@ def get_diversified_top_k_lists(k, random_users, rel_scores, rel_scores_normed,
             best_item_idx = scores.argmax()
             best_item = source_items[best_item_idx]
             #print(f"Best item idx = {best_item_idx}, best item: {best_item}, best item score={scores[best_item_idx]}, mgain: {mgains[best_item_idx]}, rel: {rel_scores[user_idx, best_item_idx]}")
-            
-            # Select the best item and append it to the recommendation list            
+
+            # Select the best item and append it to the recommendation list
             top_k_lists[user_idx, i] = best_item
             # Mask out the item so that we do not recommend it again
             seen_items_mask[user_idx, best_item_idx] = 0
@@ -672,19 +684,26 @@ def get_diversified_top_k_lists(k, random_users, rel_scores, rel_scores_normed,
     print(f"Diversification took: {time.perf_counter() - start_time}")
     return top_k_lists
 
+# Get content based distance matrix from a given path
+# this function is cached, so the matrix file is read just once
 @functools.lru_cache(maxsize=None)
 def get_distance_matrix_cb(path):
     return np.load(path)
 
+# Get cdf cache for a given metric
+# this function is cached, so the cdf file is read just once
 @functools.lru_cache(maxsize=None)
 def load_cdf_cache(base_path, metric_name):
     with open(os.path.join(base_path, "cdf", f"{metric_name}.pckl"), "rb") as f:
         return pickle.load(f)
 
-# Plugin specific version of enrich_results
+# Plugin specific version of enrich_results (transforming list of item indices into structured dict with additional item metadata)
 # Here we are sure that we are inside this particular plugin
 # thus we have a particular data loader and can use some of its internals
 def enrich_results(top_k, loader, support=None):
+    # This plugin is currently supposed to work with MLGenomeDataLoader and GoodBooksFilteredDataLoader
+    # this is just a temporary safety check, should be removed in the future as there are no valid reasons
+    # why this plugin should not work with other datasets
     assert isinstance(loader, MLGenomeDataLoader) or isinstance(loader, GoodBooksFilteredDataLoader), f"Loader name: {loader.name()} type: {type(loader)}"
     top_k_ids = [loader.get_item_id(movie_idx) for movie_idx in top_k]
     top_k_description = [loader.items_df_indexed.loc[movie_id].title for movie_id in top_k_ids]
@@ -737,28 +756,14 @@ def enrich_results(top_k, loader, support=None):
             zip(top_k_description, top_k_url, top_k, top_k_ids, top_k_genres, top_k_trailers, top_k_plots, range(len(top_k_ids)))
     ]
 
-# TODO remove
-@bp.route("/reset", methods=["GET", "POST"])
-def reset():
-    set_val("iteration", 0)
-    return redirect(url_for("journal.mors_feedback"))
-
 @bp.route("/done", methods=["GET", "POST"])
 def done():
-    # #it = session['iteration']
-    # #it += 1
-    # #session.modified = True
-    # print(f"Sess id={request.cookies['something']}")
-    # # Start with zero, because at the very beginning, mors_feedback is called, not mors and that generates recommendations for first iteration, but at the same time, increases the iteration
-    # set_val("iteration", 0)
-
-    # return f"DONE, it={get_val('iteration')}"
     return redirect(url_for("journal.final_questionnaire"))
 
 #####    Algorithms     #####
 # TODO move algorithms to shared common
 
-# Some common abstraction
+# Some common abstraction about "morsification" (like diversification, but with multiple objectives)
 # Runs diversification on a relevance based recommendation
 # w.r.t. algorithm passed as algo
 def morsify(k, rel_scores,
@@ -851,12 +856,6 @@ def morsify(k, rel_scores,
 
     print(f"Diversification took: {time.perf_counter() - start_time}")
     return top_k_list
-
-
-
-# Does not get throough morsify as this is end-to-end approach to MORS, not "diversification" or "morsification"
-def moea():
-    pass
 
 # A simple wrapper class for a recommendation objective (adds name to it)
 class ObjectiveWrapper:
@@ -1372,7 +1371,7 @@ def metric_feedback():
 
         rec_list = get_diversified_top_k_lists(k, np.array([0]), rel_scores, rel_scores_normed,
                                         alpha=alpha, items=items, diversity_function=div_f, diversity_cdf=cdf_div,
-                                        rating_matrix=user_vector,
+                                        rating_matrix=user_vector,  filter_out_items=elicitation_selected,
                                         n_items_subset=500, do_normalize=True, unit_normalize=True, rnd_mixture=True)
 
         rec_list = enrich_results(rec_list[0], loader)
