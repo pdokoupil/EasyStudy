@@ -1,4 +1,3 @@
-from abc import ABC
 import functools
 import json
 import pickle
@@ -17,23 +16,18 @@ from plugins.fastcompare.algo.wrappers.data_loadering import MLGenomeDataLoader,
 [sys.path.append(i) for i in ['.', '..']]
 [sys.path.append(i) for i in ['../.', '../..', '../../.']]
 
-from models import UserStudy
-
-from multiprocessing import Process
-from sqlalchemy import create_engine
-from sqlalchemy.orm import Session
 
 import numpy as np
 
 from common import get_tr, load_languages, multi_lang, load_user_study_config
 from flask import Blueprint, jsonify, make_response, request, redirect, render_template, url_for, session
 
-from plugins.utils.preference_elicitation import recommend_2_3, rlprop, weighted_average, get_objective_importance, prepare_tf_model, calculate_weight_estimate, load_ml_dataset, enrich_results
-from plugins.utils.interaction_logging import log_interaction, log_message
+from plugins.utils.preference_elicitation import enrich_results
+from plugins.utils.interaction_logging import log_interaction
 from plugins.fastcompare.loading import load_data_loaders
-from plugins.fastcompare import elicitation_ended, filter_params, iteration_started, iteration_ended, load_data_loader, load_data_loader_cached, search_for_item
-#from plugins.multiobjective import prepare_recommendations
-from plugins.fastcompare import prepare_recommendations, get_semi_local_cache_name, get_cache_path
+from plugins.fastcompare import elicitation_ended, filter_params, load_data_loader_cached, search_for_item
+
+from plugins.fastcompare import get_semi_local_cache_name, get_cache_path
 from plugins.journal.metrics import binomial_diversity, intra_list_diversity, item_popularity, popularity_based_novelty, exploration, exploitation
 
 #from memory_profiler import profile
@@ -42,10 +36,13 @@ from plugins.journal.algorithms import NEG_INF, evolutionary_exact, evolutionary
 
 from app import rds
 
+# Load available language mutations
 languages = load_languages(os.path.dirname(__file__))
+
+##### Global variables block #####
 N_BLOCKS = 3
 N_ITERATIONS = 6 # 6 iterations per block
-#ALGORITHMS = ["WA", "RLPROP", "MOEA-RS"]
+
 # Algorithm matrix
 # Algorithms are divided in two dimensions: [MAX, EXACT] x [ITEM-WISE, GREEDY, EVOLUTIONARY]
 # We always select one row per user, so each user gets either ITEM-WISE, GREEDY or EVOLUTIONARY (in both MAX and EXACT variants) + Relevance baseline
@@ -56,14 +53,12 @@ ALGORITHMS = [
     "RELEVANCE-BASED"
 ]
 
-# ALGORITHM_ROWS = {
-#     "ITEM-WISE": ["ITEM-WISE-MAX", "ITEM-WISE-EXACT"],
-#     "GREEDY": ["GREEDY-MAX", "GREEDY-EXACT"],
-#     "EVOLUTIONARY": ["EVOLUTIONARY-MAX", "EVOLUTIONARY-EXACT"]
-# }
-
+# What kind of optimization should the algorithm apply
+# "MAX" means that we maximize the objectives while ensuring proportionality w.r.t. given weights
+# "EXACT" means we do not care about maximization and only care about proportionality w.r.t. given weights
 OPTIMIZATION_TYPE = ["MAX", "EXACT"]
 
+# Different algorithm families
 ALGORITHM_FAMILY = [
     "ITEM-WISE",
     "GREEDY",
@@ -79,16 +74,21 @@ BACKEND_SLIDER = [
 
 # The mapping is not fixed between users
 ALGORITHM_ANON_NAMES = ["ALPHA", "BETA", "GAMMA"]
+
+# Possible alpha values to use during metric assesment
+# Since we have two steps, comparing 3 alphas in each, we sample 6 alphas randomly
+
 POSSIBLE_ALPHAS = [0.0, 0.01, 0.1, 0.25, 0.5, 0.75, 0.9, 0.99, 1.0]
 # one-way means there is single objective per slider, going from 0 to 1
 # two-way means there are two objectives, one at each side of the slider
 SLIDER_VERSIONS = ["TWO-WAY", "ONE-WAY"]
 
-
-HIDE_LAST_K = 100000
+# Number of alpha iterations
 N_ALPHA_ITERS = 2
 
+METRIC_ASSESMENT_ALPHA = 0.1
 
+# Given algorithm family, optimization type and backend slider, generate unique algorithm name
 def algo_name(family, optim_type, backend_slider):
     name = f"{family}-{optim_type}-{backend_slider}"
     assert name in ALGORITHMS, f"name={name} not in {ALGORITHMS}"
@@ -101,6 +101,7 @@ def get_lang():
         return session['lang']
     return default_lang
 
+# Global, plugin related stuff
 __plugin_name__ = "journal"
 __version__ = "0.1.0"
 __author__ = "Patrik Dokoupil"
@@ -109,18 +110,20 @@ __description__ = "Complex plugin for a very customized user study that we have 
 
 bp = Blueprint(__plugin_name__, __plugin_name__, url_prefix=f"/{__plugin_name__}")
 
-# Redis helpers
-# TODO deice if should be moved somewhere else
+##### Redis helpers #######
+# TODO decide if should be moved somewhere else
 # Return user key for a given user (by session)
+# We will key nearly all the data based on unique user session ID
+# to ensure values stored to different users are separated
 def get_uname():
     return f"user:{session['uuid']}"
 
 # Wrapper for setting values, performs serialization via pickle
 def set_val(key, val):
     name = get_uname()
-    print("Called setval with=", pickle.dumps(val))
     rds.hset(name, key, value=pickle.dumps(val))
 
+# Sets redis mapping (dict), serializing every value via pickle
 def set_mapping(name, mapping):
     rds.hset(name, mapping={x: pickle.dumps(v) for x, v in mapping.items()})
 
@@ -129,17 +132,21 @@ def get_val(key):
     name = get_uname()
     return pickle.loads(rds.hget(name, key))
 
+# Return all data we have for a given key
 def get_all(name):
     res = {str(x, encoding="utf-8") : pickle.loads(v) for x, v in rds.hgetall(name).items()}
     return res
 
+# Increment a given key
 def incr(key):
     x = get_val(key)
     set_val(key, x + 1)
 
+# Helper that checks if the user study is configured with Books dataset
 def is_books(conf):
     return "Goodbooks" in conf["selected_data_loader"]
 
+# Render journal plugin study creation page
 @bp.route("/create")
 @multi_lang
 def create():
@@ -174,24 +181,10 @@ def join():
     assert "guid" in request.args, "guid must be available in arguments"
     return redirect(url_for("utils.join", continuation_url=url_for("journal.on_joined"), **request.args))
 
-# Callback once user has joined we forward to preference elicitation
+# Callback once user has joined we forward to pre-study questionnaire
 @bp.route("/on-joined", methods=["GET", "POST"])
 def on_joined():
-    return redirect(url_for("journal.pre_study_questionnaire")
-    )
-
-displyed_name_mapping = {
-    "relevance_based": "BETA",
-    "weighted_average": "GAMMA",
-    "rlprop": "DELTA"
-}
-
-refinement_layouts = {
-    "default": "0",
-    "default_shifted": "8",
-    "buttons": "7",
-    "options": "4"
-}
+    return redirect(url_for("journal.pre_study_questionnaire"))
 
 @bp.context_processor
 def plugin_name():
@@ -199,14 +192,15 @@ def plugin_name():
         "plugin_name": __plugin_name__
     }
 
+# Endpoint used to search items
 @bp.route("/item-search", methods=["GET"])
 def item_search():
     pattern = request.args.get("pattern")
     if not pattern:
         return make_response("", 404)
-    
+
     conf = load_user_study_config(session['user_study_id'])
-    
+
     ## TODO get_loader helper
     loader_factory = load_data_loaders()[conf["selected_data_loader"]]
     loader = loader_factory(**filter_params(conf["data_loader_parameters"], loader_factory))
@@ -216,6 +210,7 @@ def item_search():
 
     return jsonify(res)
 
+# Endpoint for block questionnaire
 @bp.route("/block-questionnaire", methods=["GET", "POST"])
 def block_questionnaire():
     params = {
@@ -227,6 +222,7 @@ def block_questionnaire():
     }
     return render_template("journal_block_questionnaire.html", **params)
 
+# Endpoint that should be called once block questionnaire is done
 @bp.route("/block-questionnaire-done", methods=["GET", "POST"])
 def block_questionnaire_done():
     user_data = get_all(get_uname())
@@ -234,7 +230,7 @@ def block_questionnaire_done():
     cur_block = (int(it) - 1) // N_ITERATIONS
     cur_algorithm = user_data["selected_algorithms"][cur_block]
 
-    # TODO log interaction
+    # Log the iteration block, algorithm as well as responses to all the questions
     data = {
         "block": cur_block,
         "algorithm": cur_algorithm,
@@ -251,7 +247,7 @@ def block_questionnaire_done():
         # Otherwise continue with next block
         return redirect(url_for("journal.mors_feedback"))
 
-
+# Endpoint for pre-study questionnaire
 @bp.route("/pre-study-questionnaire", methods=["GET", "POST"])
 def pre_study_questionnaire():
     params = {
@@ -263,12 +259,14 @@ def pre_study_questionnaire():
     }
     return render_template("journal_pre_study_questionnaire.html", **params)
 
+# Endpoint that should be called once pre-study-questionnaire is done
 @bp.route("/pre-study-questionnaire-done", methods=["GET", "POST"])
 def pre_study_questionnaire_done():
 
     data = {}
     data.update(**request.form)
 
+    # We just log the question answers as there is no other useful data gathered during pre-study-questionnaire
     log_interaction(session["participation_id"], "pre-study-questionnaire", **data)
 
     return redirect(url_for("utils.preference_elicitation", continuation_url=url_for("journal.send_feedback"),
@@ -276,6 +274,7 @@ def pre_study_questionnaire_done():
             initial_data_url=url_for('fastcompare.get_initial_data'),
             search_item_url=url_for('journal.item_search')))
 
+# Endpoint for final questionnaire
 @bp.route("/final-questionnaire", methods=["GET", "POST"])
 def final_questionnaire():
     params = {
@@ -289,8 +288,7 @@ def final_questionnaire():
 
 @bp.route("/finish-user-study", methods=["GET", "POST"])
 def finish_user_study():
-    # TODO handle final questionnaire feedback
-
+    # Handle final questionnaire feedback, logging all the answers
     data = {}
     data.update(**request.form)
     log_interaction(session["participation_id"], "final-questionnaire", **data)
@@ -315,7 +313,8 @@ def send_feedback():
     selected_movies = selected_movies.split(",") if selected_movies else []
     selected_movies = [int(m) for m in selected_movies]
 
-    # Calculate weights based on selection and shown movies during preference elicitation
+    # Proceed to weights estimation, use CF-ILD, popularity novelty, MER
+    # and exploration
     diversity_f = intra_list_diversity(loader.distance_matrix)
     novelty_f = popularity_based_novelty(loader.rating_matrix)
     relevances = loader.rating_matrix.mean(axis=0)
@@ -344,53 +343,18 @@ def send_feedback():
         ObjectiveWrapper(novelty_w, "novelty"),
         ObjectiveWrapper(exploration_w, "exploration")
     ]
+
+    # Calculate weights based on selection and shown movies during preference elicitation
     weights, supports = calculate_weight_estimate_generic(loader, objectives, selected_movies, session['elicitation_movies'], return_supports=True)
-    # weights /= weights.sum()
-    #weights = weights.tolist()
-    # weights = {
-    #     algo_displayed_name: weights for algo_displayed_name in displyed_name_mapping.values()
-    # }
-    #rds.hset(f"user:weights:{session['uuid']}:", mapping=weights)
-    print(f"Weights initialized to {weights}, supports: {supports}")
+    print(f"Weights initialized to {weights}")
 
-    # Add default entries so that even the non-chosen algorithm has an empty entry
-    # to unify later access
-    # recommendations = {
-    #     x["displayed_name"]: [[]] for x in conf["algorithm_parameters"]
-    # }
-    # initial_weights_recommendation = {
-    #     x["displayed_name"]: [[]] for x in conf["algorithm_parameters"]
-    # }
-    
-    # We filter out everything the user has selected during preference elicitation.
-    # However, we allow future recommendation of SHOWN, NOT SELECTED (during elicitation, not comparison) altough these are quite rare
-    filter_out_movies = selected_movies
-
-    #prepare_recommendations(loader, conf, recommendations, selected_movies, filter_out_movies, k)
-    #prepare_recommendations(weights, recommendations, initial_weights_recommendation, selected_movies, filter_out_movies, k)
-    #print(f"Recommendations={recommendations}")
-    
     set_mapping(get_uname(), {
-        # 'movies': recommendations,
-        # 'initial_weights_recommendation': initial_weights_recommendation,
         'initial_weights': weights,
         'iteration': 0, # Start with zero, because at the very beginning, mors_feedback is called, not mors and that generates recommendations for first iteration, but at the same time, increases the iteration
         'elicitation_selected_movies': selected_movies,
         'selected_movie_indices': []
     })
 
-    # Set randomly generated refinement layout
-    if "refinement_layout" in conf and conf["refinement_layout"]:
-        print("Using configured refinement layout")
-        refinement_layout_name = conf["refinement_layout"]
-    else:
-        print(f"Using random refinement layout")
-        refinement_layout_name = np.random.choice(list(refinement_layouts.keys()))
-
-    p = [1, 0, 2]    
-    set_val("refinement_layout", refinement_layouts[refinement_layout_name])
-
-    #TODO log those into elicitation-ended
     ### Initialize stuff related to alpha comparison (after metric assesment step) ###
     # Permutation over alphas
     possible_alphas = POSSIBLE_ALPHAS[:]
@@ -418,10 +382,114 @@ def send_feedback():
     # Shuffle algorithm names
     algorithm_names = ALGORITHM_ANON_NAMES[:]
     np.random.shuffle(algorithm_names)
-    # Prepare mapping
-    algorithm_name_mapping = {
-        algorithm: algorithm_name for algorithm_name, algorithm in zip(algorithm_names, selected_algorithms)
+
+    #########################################################################
+    # Here we need to precompute data to show in the metric-assesment #
+    # since this may take a long time, we log elicitation ended right here #
+    weights_with_list = {}
+    weights_with_list["values"] = {key: val.astype(float) for key, val in weights["values"].items()}
+    weights_with_list["vec"] = weights["vec"].tolist()
+    elicitation_ended(
+        session['elicitation_movies'],
+        selected_movies,
+        supports={key: np.round(value.astype(float), 4).tolist() for key, value in supports.items()},
+        alphas_p=[selected_alphas[:3], selected_alphas[3:]],
+        algorithm_family=selected_algorithm_family,
+        selected_algorithms=selected_algorithms,
+        selected_slider_versions=selected_slider_versions,
+        initial_weights=weights_with_list
+    )
+
+    assesment_k = 8 # We use k=8 instead of k=10 so that items fit to screen easily
+    items = np.arange(loader.rating_matrix.shape[1])
+    start_time = time.perf_counter()
+    algo = EASER_pretrained(items)
+    algo = algo.load(os.path.join(get_cache_path(get_semi_local_cache_name(loader)), "item_item.npy"))
+    
+    # Movie indices of selected movies
+    elicitation_selected = np.array(selected_movies)
+    rel_scores, user_vector, ease_pred = algo.predict_with_score(elicitation_selected, elicitation_selected, assesment_k)
+    rel_scores = rel_scores[np.newaxis, :]
+    cdf_rel = load_cdf_cache(get_cache_path(get_semi_local_cache_name(loader)), "REL")
+    rel_scores_normed = cdf_rel.transform(rel_scores.reshape(-1, 1)).reshape(rel_scores.shape)
+    user_vector = user_vector[np.newaxis, :]
+
+    distance_matrix_cb = get_distance_matrix_cb(os.path.join(get_cache_path(get_semi_local_cache_name(loader)), "distance_matrix_text.npy"))
+
+    cb_ild = intra_list_diversity(distance_matrix_cb)
+    cf_ild = intra_list_diversity(loader.distance_matrix)
+    bin_div = binomial_diversity(loader.all_categories, loader.get_item_index_categories, loader.rating_matrix, 0.0, loader.name())
+
+    alpha = METRIC_ASSESMENT_ALPHA
+    # try:
+    #     alpha = float(request.args.get("alpha"))
+    # except:
+    #     alpha = 0.1
+
+    ease_baseline = enrich_results(ease_pred, loader)
+    print(f"Predicting r1 took: {time.perf_counter() - start_time}")
+    cdf_cf_div = load_cdf_cache(get_cache_path(get_semi_local_cache_name(loader)), "CF-ILD")
+    r2 = get_diversified_top_k_lists(assesment_k, np.array([0]), rel_scores, rel_scores_normed,
+                                alpha=alpha, items=items, diversity_function=cf_ild, diversity_cdf=cdf_cf_div,
+                                rating_matrix=user_vector,
+                                n_items_subset=500, do_normalize=True, unit_normalize=True, rnd_mixture=True)
+    r2 = enrich_results(r2[0], loader)
+    print(f"Predicting r2 took: {time.perf_counter() - start_time}")
+    cdf_cb_div = load_cdf_cache(get_cache_path(get_semi_local_cache_name(loader)), "CB-ILD")
+    r3 = get_diversified_top_k_lists(assesment_k, np.array([0]), rel_scores, rel_scores_normed,
+                                alpha=alpha, items=items, diversity_function=cb_ild, diversity_cdf=cdf_cb_div,
+                                rating_matrix=user_vector,
+                                n_items_subset=500, do_normalize=True, unit_normalize=True, rnd_mixture=True)
+    r3 = enrich_results(r3[0], loader)
+    print(f"Predicting r3 took: {time.perf_counter() - start_time}")
+    cdf_bin_div = load_cdf_cache(get_cache_path(get_semi_local_cache_name(loader)), "BIN-DIV")
+    r4 = get_diversified_top_k_lists(assesment_k, np.array([0]), rel_scores, rel_scores_normed,
+                                alpha=alpha, items=items, diversity_function=bin_div, diversity_cdf=cdf_bin_div,
+                                rating_matrix=user_vector,
+                                n_items_subset=500, do_normalize=True, unit_normalize=True, rnd_mixture=True)
+    r4 = enrich_results(r4[0], loader)
+    print(f"Predicting r4 took: {time.perf_counter() - start_time}")
+
+    # Mapping is implicit, position 0 means "LIST A", position 2 is "LIST C"
+    # We just shuffle the algorithms so that what is displayed below "LIST A" is random
+    lists = ["CB-ILD", "CF-ILD", "BIN-DIV"]
+    list_name_to_rec = {
+        "CF-ILD": r2,
+        "CB-ILD": r3,
+        "BIN-DIV": r4
     }
+    np.random.shuffle(lists)
+    algorithm_name_mapping = {
+        lists[0]: "LIST A",
+        lists[1]: "LIST B",
+        lists[2]: "LIST C"
+    }
+
+    params = {
+        "movies": {
+            # "EASE": {
+            #     "movies": ease_baseline,
+            #     "order": 3
+            # },
+            algorithm_name_mapping[lists[0]]: {
+                "movies": list_name_to_rec[lists[0]],
+                "order": 0
+            },
+            algorithm_name_mapping[lists[1]]: {
+                "movies": list_name_to_rec[lists[1]],
+                "order": 1
+            },
+            algorithm_name_mapping[lists[2]]: {
+                "movies": list_name_to_rec[lists[2]],
+                "order": 2
+            }
+        }
+    }
+
+    # We need to store inverse mapping
+    # in the form of "list name" : "diversity name"
+    set_val("metric_assesment_list_to_diversity", { list_name : diversity_name for diversity_name, list_name in algorithm_name_mapping.items() })
+    #########################################################################
 
     set_mapping(get_uname(), {
         "alphas_iteration": 1,
@@ -429,114 +497,33 @@ def send_feedback():
         "algorithm_family": selected_algorithm_family,
         "selected_algorithms": selected_algorithms,
         "selected_slider_versions": selected_slider_versions,
-        "algorithm_name_mapping": algorithm_name_mapping,
         "recommendations": {
-           algo: [] for algo in algorithm_name_mapping.keys() # For each algorithm and each iteration we hold the recommendation
+           algo: [] for algo in selected_algorithms # For each algorithm and each iteration we hold the recommendation
         },
         "selected_items": {
-           algo: [] for algo in algorithm_name_mapping.keys() # For each algorithm and each iteration we hold the selected items
+           algo: [] for algo in selected_algorithms # For each algorithm and each iteration we hold the selected items
         },
         "shown_items": {
-            algo: [] for algo in algorithm_name_mapping.keys() # For each algorithm and each iteration we hold the IDs of recommended items (for quick filtering)
+            algo: [] for algo in selected_algorithms # For each algorithm and each iteration we hold the IDs of recommended items (for quick filtering)
         },
         "slider_values": {
             "slider_relevance": [],
             "slider_exploitation_exploration": [],
             "slider_uniformity_diversity": [],
             "slider_popularity_novelty": []
-        }
+        },
+        "assesment_recommendations": params
     })
-
-    weights_with_list = {}
-    weights_with_list["values"] = {key: val.astype(float) for key, val in weights["values"].items()}
-    weights_with_list["vec"] = weights["vec"].tolist()
-    elicitation_ended(
-        session['elicitation_movies'],
-        selected_movies,
-        orig_permutation=p,
-        displyed_name_mapping=displyed_name_mapping,
-        refinement_layout=refinement_layout_name,
-        supports={key: np.round(value.astype(float), 4).tolist() for key, value in supports.items()},
-        alphas_p=[selected_alphas[:3], selected_alphas[3:]],
-        algorithm_family=selected_algorithm_family,
-        selected_algorithms=selected_algorithms,
-        selected_slider_versions=selected_slider_versions,
-        algorithm_name_mapping=algorithm_name_mapping,
-        initial_weights=weights_with_list
-    )  
+    
+    data = {
+        "list_permutation": lists,
+        "algorithm_name_mapping": algorithm_name_mapping,
+        "list_name_to_rec": list_name_to_rec
+    }
+    log_interaction(session["participation_id"], "metric-assesment-started", **data)
 
     #return redirect(url_for("multiobjective.compare_and_refine"))
     return redirect(url_for("journal.metric_assesment"))
-
-class RandomBoundedRecommendationGenertor:
-    
-    def __init__(self, k, lower_bound, upper_bound):
-        self.k = k
-        self.lower_bound = lower_bound
-        self.upper_bound = upper_bound
-    
-    def __iter__(self):
-        return self
-    
-    def __next__(self):
-        print("Next got called")
-        yield 0
-    
-class RandomMaximizingRecommendationGenertor:
-    
-    def __init__(self, objective, k, items, max_iters = 100000):
-        self.objective = objective
-        self.k = k
-        self.items = items
-        self.max_iters = max_iters
-    
-    def __iter__(self):
-        return self
-    
-    def __next__(self):
-        max_obj_rec = None
-        max_obj_val = None
-        obj_vals = []
-        for i in range(self.max_iters):
-            top_k = np.random.choice(self.items, self.k, replace=False)
-            obj_val = self.objective(top_k)
-            obj_vals.append(obj_val)
-            if max_obj_val is None or obj_val > max_obj_val:
-                max_obj_val = obj_val
-                max_obj_rec = top_k
-
-        obj_vals = np.array(obj_vals)
-        print(f"Min: {obj_vals.min()}, Max: {obj_vals.max()}, Mean: {obj_vals.mean()}, Percentiles: {np.percentile(obj_vals, [50, 70, 80, 90, 95, 99])}")
-        return max_obj_val, max_obj_rec
-    
-# Greedily choose highest marginal gain items
-class GreedyMaximizingRecommendationGenertor:
-    
-    def __init__(self, objective, k, items):
-        self.objective = objective
-        self.k = k
-        self.items = items
-    
-    def __iter__(self):
-        return self
-    
-    def __next__(self):
-        max_obj_rec = None
-        max_obj_val = None
-        
-        top_k = []
-        for i in range(self.k):
-            max_mgain_item = None
-            max_mgain = None
-            for item in self.items:
-                if item in top_k:
-                    continue
-                mgain = self.objective(top_k + [item]) - self.objective(top_k)
-                if max_mgain_item is None or mgain > max_mgain:
-                    max_mgain = mgain
-                    max_mgain_item = item
-            top_k.append(max_mgain_item)
-        return self.objective(top_k), top_k
 
 class EASER_pretrained:
     def __init__(self, all_items, **kwargs):
@@ -589,11 +576,6 @@ def get_diversified_top_k_lists(k, random_users, rel_scores, rel_scores_normed,
                                 alpha, items, diversity_function, diversity_cdf,
                                 rating_matrix,
                                 n_items_subset=None, do_normalize=False, unit_normalize=False, rnd_mixture=False):
-    ####TODO REMOVE SEED SETTING!!!
-    random.seed(42)
-    np.random.seed(42)
-    ### TODO
-    
     start_time = time.perf_counter()
     top_k_lists = np.zeros(shape=(random_users.size, k), dtype=np.int32)
     scores = np.zeros(shape=(items.size if n_items_subset is None else n_items_subset, ), dtype=np.float32)
@@ -783,11 +765,7 @@ def morsify(k, rel_scores,
             algo, items, objective_fs,
             rating_row, filter_out_items, n_items_subset=None,
             do_normalize=False, rnd_mixture=False):
-    ####TODO REMOVE SEED SETTING!!!
-    random.seed(42)
-    np.random.seed(42)
-    ### TODO
-    
+   
     assert rel_scores.ndim == 1
     assert rating_row.ndim == 1
     
@@ -1304,80 +1282,6 @@ def mors():
     #assert session.modified == False
     return render_template("mors.html", **params)
 
-# TODO remove, temporary endpoint
-@bp.route("/greedy", methods=["GET", "POST"])
-def gr():
-    conf = load_user_study_config(session['user_study_id'])
-    
-    # Get a loader
-    loader_factory = load_data_loaders()[conf["selected_data_loader"]]
-    loader = loader_factory(**filter_params(conf["data_loader_parameters"], loader_factory))
-    loader = load_data_loader_cached(loader, session['user_study_guid'], loader_factory.name(), get_semi_local_cache_name(loader))
-
-    potter_movies = np.array([3161, 3948, 4882, 5524, 6452, 7193, 7538])
-    items = np.arange(loader.rating_matrix.shape[1])
-    algo = EASER_pretrained(items)
-    algo = algo.load(os.path.join(get_cache_path(get_semi_local_cache_name(loader)), "item_item.npy"))
-    rel_scores, user_vector, ease_pred = algo.predict_with_score(potter_movies, potter_movies, k=10)
-    ease_baseline = enrich_results(ease_pred, loader)
-    
-    cdf_rel = load_cdf_cache(get_cache_path(get_semi_local_cache_name(loader)), "REL")
-    #rel_scores_normed = cdf_rel.transform(rel_scores.reshape(-1, 1)).reshape(rel_scores.shape)
-
-    #diversity_f = intra_list_diversity(loader.distance_matrix)
-    diversity_f = binomial_diversity(loader.all_categories, loader.get_item_index_categories, loader.rating_matrix, 0.0, loader.name())
-    #cdf_diversity = load_cdf_cache(get_cache_path(get_semi_local_cache_name(loader)), "CF-ILD")
-    
-    uniformity_f = intra_list_diversity(1.0 - loader.distance_matrix)
-    #cdf_uniformity = load_cdf_cache
-
-    popularity_f = item_popularity(loader.rating_matrix)
-    novelty_f = popularity_based_novelty(loader.rating_matrix)
-    exploration_f = exploration(user_vector, loader.distance_matrix)
-    exploitation_f = exploitation(user_vector, 1.0 - loader.distance_matrix)
-
-
-    def relevance_f(top_k_list):
-        return rel_scores[top_k_list].sum()
-
-    objectives = [
-        relevance_f,
-
-        diversity_f,
-        uniformity_f,
-
-        popularity_f,
-        novelty_f,
-
-        exploration_f,
-        exploitation_f
-    ]
-
-    start_time = time.perf_counter()
-    algo = item_wise_exact(np.array([1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.0]))
-    greedy_top_k = morsify(
-        10, rel_scores, algo,
-        items, objectives, user_vector, n_items_subset=500,
-        do_normalize=True, rnd_mixture=True
-    )
-    print(f"Greedy morsify took: {time.perf_counter() - start_time}")
-
-    print(f"@@@ Greedy top k = {greedy_top_k}")
-
-
-    params = {
-        "movies": {
-            "EASE": {
-                "movies": ease_baseline,
-                "order": 0
-            },
-            "Greedy": {
-                "movies": enrich_results(greedy_top_k, loader),
-                "order": 1
-            }
-        }
-    }
-    return render_template("metric_assesment.html", **params)
 
 # Called as continuation of compare-alphas, redirects for compare-alphas (next step)
 # This is where we generate the results, compare-alphas then just shows them
@@ -1516,129 +1420,9 @@ def compare_alphas():
 
 @bp.route("/metric-assesment", methods=["GET"])
 def metric_assesment():
-    start_time = time.perf_counter()
-    conf = load_user_study_config(session['user_study_id'])
+    conf =  load_user_study_config(session["user_study_id"])
+    params = get_val("assesment_recommendations")    
 
-    # Get a loader
-    loader_factory = load_data_loaders()[conf["selected_data_loader"]]
-    loader = loader_factory(**filter_params(conf["data_loader_parameters"], loader_factory))
-    loader = load_data_loader_cached(loader, session['user_study_guid'], loader_factory.name(), get_semi_local_cache_name(loader))
-
-    # TODO get TRUE CB
-    k = 8 # We use k=8 instead of k=10 so that items fit to screen easily
-    items = np.arange(loader.rating_matrix.shape[1])
-
-    algo = EASER_pretrained(items)
-    algo = algo.load(os.path.join(get_cache_path(get_semi_local_cache_name(loader)), "item_item.npy"))
-    print(f"Took 2+:", time.perf_counter() - start_time)
-    #print(f"@@ {loader.get_item_id(270)}, {loader.get_item_index(333)}, {loader.get_item_index_description(270)}, {loader.get_item_id_description(333)}")
-    # Movie indices of selected movies
-    elicitation_selected = np.array(get_val("elicitation_selected_movies"))
-    rel_scores, user_vector, ease_pred = algo.predict_with_score(elicitation_selected, elicitation_selected, k)
-    rel_scores = rel_scores[np.newaxis, :]
-    cdf_rel = load_cdf_cache(get_cache_path(get_semi_local_cache_name(loader)), "REL")
-    rel_scores_normed = cdf_rel.transform(rel_scores.reshape(-1, 1)).reshape(rel_scores.shape)
-    user_vector = user_vector[np.newaxis, :]
-    
-    print(f"Elicitation selected: {elicitation_selected}")
-    print(f"Ease pred: {ease_pred}")
-    print(f"Rel scores: {rel_scores[0, ease_pred]}")
-
-    # print(f"## Elicitation selected movies = {elicitation_selected}")
-    # user_row = np.zeros(shape=(1, items.size), dtype=np.int32)
-    # if elicitation_selected.size > 0:
-    #     user_row[0, elicitation_selected] = 1
-    # rel_scores = np.dot(user_row, algo.item_item)
-    # rel_scores_normed = rel_scores
-    print(f"Took 2++:", time.perf_counter() - start_time)
-    distance_matrix_cb = get_distance_matrix_cb(os.path.join(get_cache_path(get_semi_local_cache_name(loader)), "distance_matrix_text.npy"))
-    print(f"Distance matrix CB loading took: {time.perf_counter() - start_time}")
-
-    cb_ild = intra_list_diversity(distance_matrix_cb)
-    cf_ild = intra_list_diversity(loader.distance_matrix)
-    bin_div = binomial_diversity(loader.all_categories, loader.get_item_index_categories, loader.rating_matrix, 0.0, loader.name())
-
-    print(f"Took 3:", time.perf_counter() - start_time)
-
-    try:
-        alpha = float(request.args.get("alpha"))
-    except:
-        alpha = 1.0
-    # r1 = enrich_results(next(rnd_cb_ild)[1], loader)
-    # r2 = enrich_results(next(rnd_cf_ild)[1], loader)
-    # r3 = enrich_results(next(rnd_bin_div)[1], loader)
-    ease_baseline = enrich_results(ease_pred, loader)
-    print(f"Predicting r1 took: {time.perf_counter() - start_time}")
-    cdf_cf_div = load_cdf_cache(get_cache_path(get_semi_local_cache_name(loader)), "CF-ILD")
-    r2 = get_diversified_top_k_lists(k, np.array([0]), rel_scores, rel_scores_normed,
-                                alpha=alpha, items=items, diversity_function=cf_ild, diversity_cdf=cdf_cf_div,
-                                rating_matrix=user_vector,
-                                n_items_subset=500, do_normalize=True, unit_normalize=True, rnd_mixture=True)
-    r2 = enrich_results(r2[0], loader)
-    print(f"Predicting r2 took: {time.perf_counter() - start_time}")
-    cdf_cb_div = load_cdf_cache(get_cache_path(get_semi_local_cache_name(loader)), "CB-ILD")
-    r3 = get_diversified_top_k_lists(k, np.array([0]), rel_scores, rel_scores_normed,
-                                alpha=alpha, items=items, diversity_function=cb_ild, diversity_cdf=cdf_cb_div,
-                                rating_matrix=user_vector,
-                                n_items_subset=500, do_normalize=True, unit_normalize=True, rnd_mixture=True)
-    r3 = enrich_results(r3[0], loader)
-    print(f"Predicting r3 took: {time.perf_counter() - start_time}")
-    cdf_bin_div = load_cdf_cache(get_cache_path(get_semi_local_cache_name(loader)), "BIN-DIV")
-    r4 = get_diversified_top_k_lists(k, np.array([0]), rel_scores, rel_scores_normed,
-                                alpha=alpha, items=items, diversity_function=bin_div, diversity_cdf=cdf_bin_div,
-                                rating_matrix=user_vector,
-                                n_items_subset=500, do_normalize=True, unit_normalize=True, rnd_mixture=True)
-    r4 = enrich_results(r4[0], loader)
-    print(f"Predicting r4 took: {time.perf_counter() - start_time}")
-
-    # Mapping is implicit, position 0 means "LIST A", position 2 is "LIST C"
-    # We just shuffle the algorithms so that what is displayed below "LIST A" is random
-    lists = ["CB-ILD", "CF-ILD", "BIN-DIV"]
-    list_name_to_rec = {
-        "CF-ILD": r2,
-        "CB-ILD": r3,
-        "BIN-DIV": r4
-    }
-    np.random.shuffle(lists)
-    algorithm_name_mapping = {
-        lists[0]: "LIST A",
-        lists[1]: "LIST B",
-        lists[2]: "LIST C"
-    }
-
-    params = {
-        "movies": {
-            # "EASE": {
-            #     "movies": ease_baseline,
-            #     "order": 0
-            # },
-            algorithm_name_mapping[lists[0]]: {
-                "movies": list_name_to_rec[lists[0]],
-                "order": 0
-            },
-            algorithm_name_mapping[lists[1]]: {
-                "movies": list_name_to_rec[lists[1]],
-                "order": 1
-            },
-            algorithm_name_mapping[lists[2]]: {
-                "movies": list_name_to_rec[lists[2]],
-                "order": 2
-            }
-        }
-    }
-
-    data = {
-        "list_permutation": lists,
-        "algorithm_name_mapping": algorithm_name_mapping,
-        "list_name_to_rec": list_name_to_rec
-    }
-    log_interaction(session["participation_id"], "metric-assesment-started", **data)
-
-    # We need to store inverse mapping
-    # in the form of "list name" : "diversity name"
-    set_val("metric_assesment_list_to_diversity", { list_name : diversity_name for diversity_name, list_name in algorithm_name_mapping.items() })
-
-    print(f"Took 4:", time.perf_counter() - start_time)
     tr = get_tr(languages, get_lang())
     params["contacts"] = tr("footer_contacts")
     params["contact"] = tr("footer_contact")
@@ -1653,14 +1437,13 @@ def metric_assesment():
     params["finish"] = tr("metric_assesment_finish")
     params["iteration"] = 1
     params["n_iterations"] = 1 + N_ALPHA_ITERS # We have 1 iteration for actual metric assesment followed bz N_ALPHA_ITERS iterations for comparing alphas
-    print(f"Took 5:", time.perf_counter() - start_time)
+    
     # Handle overrides
     params["footer_override"] = None
     if "text_overrides" in conf:
         if "footer" in conf["text_overrides"]:
             params["footer_override"] = conf["text_overrides"]["footer"]
-    print(f"Took 6:", time.perf_counter() - start_time)
-    params["alpha"] = alpha
+    
     return render_template("metric_assesment.html", **params)
 
 # from plugins.layoutshuffling import long_initialization
@@ -1890,7 +1673,7 @@ def calculate_weight_estimate_generic(loader, objectives, selected_movies, elici
         x = {
             "vec": np.array([1.0] * n_objectives, dtype=np.float32),
             "values": {
-                obj.name(): 1.0 for obj in objectives
+                obj.name(): np.float32(1.0) for obj in objectives
             }
         }
         if return_supports:
@@ -1904,6 +1687,10 @@ def calculate_weight_estimate_generic(loader, objectives, selected_movies, elici
         movie_indices = np.unique([int(movie["movie_idx"]) for movie in elicitation_movies])
     else:
         assert False
+
+    # If movies are selected after search, they are not correctly propagated through elicitation_movies
+    # therefore we append them here
+    movie_indices = np.unique(np.concatenate([movie_indices, selected_movies]))
 
     # We treat movie_indices as one long recommendation list and try to reconstruct it, calculating
     # intermediate marginal gains for all the items
@@ -1935,7 +1722,7 @@ def calculate_weight_estimate_generic(loader, objectives, selected_movies, elici
         x = {
             "vec": np.array([1.0] * n_objectives, dtype=np.float32),
             "values": {
-                obj.name(): 1.0 for obj in objectives
+                obj.name(): np.float32(1.0) for obj in objectives
             }
         }
         if return_supports:

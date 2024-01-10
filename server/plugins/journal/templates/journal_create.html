@@ -277,7 +277,6 @@
         },
 
         async mounted() {
-            console.log("Is it ever called");
             // TODO reuse above steps
             this.dataLoaderData = await fetch("{{ url_for('fastcompare.available_data_loaders') }}").then(resp => resp.json());
             this.dataLoaders = this.dataLoaders.concat(this.dataLoaderData.map(x => {
