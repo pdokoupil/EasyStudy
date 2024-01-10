@@ -4,3 +4,6 @@ is-safe-url
 tensorflow
 tensorflow-recommenders
 recommenders
+redis
+BeautifulSoup4
+jmetalpy
