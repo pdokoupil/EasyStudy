@@ -119,7 +119,7 @@
         <b-collapse id="collapse-1" v-model="showRefinement" class="mt-2">
             <b-card>
                 <b-row v-if="canFineTune" class="mb-3">
-                    <b-col class="text-center">You can tweak the recommendation algorithm by fine-tuning the amount of attention it pays to different objectives. This will affect recommendations in the next step. Description of individual objectives is hidden under the questionmark icon. <strong>How much of the specified quality should be present in the next recommendation iteration?</strong></b-col>
+                    <b-col class="text-center">You can tweak the recommendation algorithm by fine-tuning the amount of attention it pays to different objectives. This will affect recommendations in the next step. Descriptions of individual objectives are shown if you hover the mouse over the questionmark icons. <strong>How much of the specified quality should be present in the next recommendation iteration?</strong></b-col>
                 </b-row>
                 <b-row v-else class="mb-3">
                     <b-col class="text-center">This algorithm cannot be fine-tuned.</strong></b-col>
