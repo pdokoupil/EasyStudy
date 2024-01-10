@@ -37,7 +37,7 @@
                         <b-col>
                             <b-form-group>
                                 <b-label for="q1">
-                                    <strong>1. Do you have some knowledge of what recommender systems are and how they function?</strong>
+                                    <strong>1. Do you know what recommender systems are and how they work?</strong>
                                 </b-label>
                                 <b-form-select name="q1" id="q1" :state="q1Validated" v-model="selectedQ1" :options="optionsQ1"></b-form-select>
                             </b-form-group>
@@ -68,7 +68,7 @@
                         <b-col>
                             <b-form-group>
                                 <b-label for="q2">
-                                    <strong>2. Did you previously hear about the term <u>relevance</u> in the context of recommendations?</strong>
+                                    <strong>2. Have you heard of the term <u>"relevance"</u> in the context of recommendations before?</strong>
                                 </b-label>
                                 <b-form-select name="q2" id="q2" :state="q2Validated" v-model="selectedQ2" :options="optionsYesNo"></b-form-select>
                             </b-form-group>
@@ -96,7 +96,7 @@
                         <b-col>
                             <b-form-group>
                                 <b-label for="q3">
-                                    <strong>3. Did you previously hear about the term <u>diversity</u> in the context of recommendations?</strong>
+                                    <strong>3. Have you heard of the term <u>"diversity"</u> in relation to recommendations previously?</strong>
                                 </b-label>
                                 <b-form-select name="q3" id="q3" :state="q3Validated" v-model="selectedQ3" :options="optionsYesNo"></b-form-select>
                             </b-form-group>
@@ -123,7 +123,7 @@
                         <b-col>
                             <b-form-group>
                                 <b-label for="q4">
-                                    <strong>4. Did you previously hear about the term <u>novelty</u> in the context of recommendations?</strong>
+                                    <strong>4. Have you heard of the term <u>"novelty"</u> when discussing recommendations before?</strong>
                                 </b-label>
                                 <b-form-select name="q4" id="q4" :state="q4Validated" v-model="selectedQ4" :options="optionsYesNo"></b-form-select>
                             </b-form-group>
@@ -150,7 +150,7 @@
                         <b-col>
                             <b-form-group>
                                 <b-label for="q5">
-                                    <strong>5. Did you previously hear about the term <u>exploration</u> in the context of recommendations?</strong>
+                                    <strong>5. Have you heard of the term <u>"exploration"</u> in the context of recommendations before?</strong>
                                 </b-label>
                                 <b-form-select name="q5" id="q5" :state="q5Validated" v-model="selectedQ5" :options="optionsYesNo"></b-form-select>
                             </b-form-group>
@@ -177,7 +177,7 @@
                         <b-col>
                             <b-form-group>
                                 <b-label for="q6">
-                                    <strong>6. Did you previously hear about the term <u>exploitation (familiarity)</u> in the context of recommendations?</strong>
+                                    <strong>6. Have you heard of the term <u>"exploitation"</u> (<u>familiarity</u>) in relation to recommendations before?</strong>
                                 </b-label>
                                 <b-form-select name="q6" id="q6" :state="q6Validated" v-model="selectedQ6" :options="optionsYesNo"></b-form-select>
                             </b-form-group>
@@ -204,7 +204,7 @@
                         <b-col>
                             <b-form-group>
                                 <b-label for="q7">
-                                    <strong>7. Select the statement that best corresponds to what <u>relevant</u> recommendations mean to you</strong>
+                                    <strong>7. Please choose the statement that best describes what <u>relevant</u> recommendations mean to you</strong>
                                 </b-label>
                                 <b-form-select name="q7" id="q7" :state="q7Validated" v-model="selectedQ7" :options="optionsRelevance"></b-form-select>
                                 <b-input name="q7Other" id="q7Other" :state="otherTextQ7 != ''" v-if="selectedQ7 === 'other'" v-model="otherTextQ7" type="text" placeholder="Please specify"/>
@@ -233,7 +233,7 @@
                         <b-col>
                             <b-form-group>
                                 <b-label for="q8">
-                                    <strong>8. Select the statement that best corresponds to what <u>diverse</u> recommendations mean to you</strong>
+                                    <strong>8. Please select the statement that best describes what <u>diverse</u> recommendations mean to you</strong>
                                 </b-label>
                                 <b-form-select name="q8" id="q8" :state="q8Validated" v-model="selectedQ8" :options="optionsCorrespondence"></b-form-select>
                                 <b-input name="q8Other" id="q8Other" :state="otherTextQ8 != ''" v-if="selectedQ8 === 'other'" v-model="otherTextQ8" type="text" placeholder="Please specify"/>
@@ -261,7 +261,7 @@
                         <b-col>
                             <b-form-group>
                                 <b-label for="q9">
-                                    <strong>9. Select the statement that best corresponds to what <u>novel</u> recommendations mean to you</strong>
+                                    <strong>9. Please choose the statement that best describes what <u>novel</u> recommendations mean to you</strong>
                                 </b-label>
                                 <b-form-select name="q9" id="q9" :state="q9Validated" v-model="selectedQ9" :options="optionsCorrespondence"></b-form-select>
                                 <b-input name="q9Other" id="q9Other" :state="otherTextQ9 != ''" v-if="selectedQ9 === 'other'" v-model="otherTextQ9" type="text" placeholder="Please specify"/>
@@ -289,7 +289,7 @@
                         <b-col>
                             <b-form-group>
                                 <b-label for="q10">
-                                    <strong>10. Select the statement that best corresponds to what <u>exploratory</u> recommendations mean to you</strong>
+                                    <strong>10. Please choose the statement that best describes what <u>exploratory</u> recommendations mean to you</strong>
                                 </b-label>
                                 <b-form-select name="q10" id="q10" :state="q10Validated" v-model="selectedQ10" :options="optionsCorrespondence"></b-form-select>
                                 <b-input name="q10Other" id="q10Other" :state="otherTextQ10 != ''" v-if="selectedQ10 === 'other'" v-model="otherTextQ10" type="text" placeholder="Please specify"/>
@@ -317,7 +317,7 @@
                         <b-col>
                             <b-form-group>
                                 <b-label for="q11">
-                                    <strong>11. Select the statement that best corresponds to what <u>exploitational (familiar)</u> recommendations mean to you</strong>
+                                    <strong>11. Please select the statement that best describes what <u>exploitational</u> (<u>familiar</u>) recommendations mean to you</strong>
                                 </b-label>
                                 <b-form-select name="q11" id="q11" :state="q11Validated" v-model="selectedQ11" :options="optionsCorrespondence"></b-form-select>
                                 <b-input name="q11Other" id="q11Other" :state="otherTextQ11 != ''" v-if="selectedQ11 === 'other'" v-model="otherTextQ11" type="text" placeholder="Please specify"/>
