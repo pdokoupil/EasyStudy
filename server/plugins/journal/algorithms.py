@@ -429,19 +429,20 @@ class greedy_max:
         _, n_items = mgains.shape
         assert np.all(mgains >= 0.0), "We expect all mgains to be normalized to be greater than 0"
         tots = np.zeros(shape=(n_items, ), dtype=np.float32)
-        remainder = np.zeros_like(self.gm)
-        scores = np.zeros_like(tots)
+        # Added second dimension to enable broadcasting
+        remainder = np.zeros_like(self.gm)[:, np.newaxis]
+        gain_items = np.zeros_like(mgains)
         for item_idx in np.arange(n_items):
             tots[item_idx] = max(self.TOT, self.TOT + mgains[:, item_idx].sum())
-            remainder = tots[item_idx] * self.weights - self.gm
-            assert remainder.shape == (self.n_objectives,)
+            remainder[:, 0] = tots[item_idx] * self.weights - self.gm
+            assert remainder.shape == (self.n_objectives, 1)
             
             positive_gain_mask = mgains >= 0.0
             negative_gain_mask = mgains < 0.0
-            scores[positive_gain_mask] = np.maximum(0, np.minimum(mgains[positive_gain_mask], remainder[positive_gain_mask]))
-            scores[negative_gain_mask] = np.minimum(0, mgains[negative_gain_mask] - remainder[negative_gain_mask])
+            gain_items[positive_gain_mask] = np.maximum(0, np.minimum(mgains, remainder)[positive_gain_mask])
+            gain_items[negative_gain_mask] = np.minimum(0, (mgains - remainder)[negative_gain_mask])
             
-        scores = mask_scores(scores, seen_items_mask)
+        scores = mask_scores(gain_items.sum(axis=0), seen_items_mask)
         i_best = scores.argmax()
 
         self.gm = self.gm + mgains[:, i_best]
