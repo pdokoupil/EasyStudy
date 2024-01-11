@@ -307,10 +307,10 @@ def get_diversified_top_k_lists(k, random_users, rel_scores, rel_scores_normed,
                 assert n_items_subset % 2 == 0, f"When using random mixture we expect n_items_subset ({n_items_subset}) to be divisible by 2"
                 #source_items = np.concatenate([sorted_relevances[user_idx, :n_items_subset//2], np.random.choice(sorted_relevances[user_idx, n_items_subset:], n_items_subset//2, replace=False)])
 
-                relevance_half = sorted_relevances[:n_items_subset//2]
+                relevance_half = sorted_relevances[user_idx, :n_items_subset//2]
                 # However, for the random half, we have to ensure we do not sample movies from filter_out_movies because this can lead to issues
                 # especially when n_items_subset is small and filter_out_items is large (worst case is that we will sample exactly those items that should have been filtered out)
-                random_candidates = np.setdiff1d(sorted_relevances[n_items_subset//2:], filter_out_items)
+                random_candidates = np.setdiff1d(sorted_relevances[user_idx, n_items_subset//2:], filter_out_items)
                 random_half = np.random.choice(random_candidates, n_items_subset//2, replace=False)
                 source_items = np.concatenate([
                     relevance_half, 
@@ -1064,7 +1064,7 @@ def mors_feedback():
     # Generate recommendation for relevance only EASE
     ease = EASER_pretrained(items)
     ease = ease.load(os.path.join(get_cache_path(get_semi_local_cache_name(loader)), "item_item.npy"))
-    elicitation_selected = np.array(user_data['elicitation_selected_movies'])
+    elicitation_selected = np.array(user_data['elicitation_selected_movies'],  dtype=np.int32)
     # Train the algorithm on all movies selected during preference elicitation
     # and all movies previously selected during recommendations made by current algorithm
     training_selections = np.concatenate([elicitation_selected] + [np.array(x, dtype=np.int32) for x in selected_items_history[cur_algorithm]], dtype=np.int32)
@@ -1073,7 +1073,7 @@ def mors_feedback():
     print(f"Shown items from current algorithm so far: {user_data['shown_items'][cur_algorithm]}")
     all_recommendations = sum(user_data["shown_items"][cur_algorithm], [])
     # Note that "all_recommendations" already includes items selected during the study (except those selected during elicitattion which we are thus adding)
-    filter_out_items = np.concatenate([all_recommendations, elicitation_selected])
+    filter_out_items = np.concatenate([all_recommendations, elicitation_selected]).astype(np.int32)
     rel_scores, user_vector, relevance_top_k = ease.predict_with_score(training_selections, filter_out_items, k)
     cdf_rel = load_cdf_cache(get_cache_path(get_semi_local_cache_name(loader)), "REL")
     rel_scores_normed = cdf_rel.transform(rel_scores.reshape(-1, 1)).reshape(rel_scores.shape)
