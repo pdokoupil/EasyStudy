@@ -6,13 +6,38 @@
             {{hint}}
         </b-jumbotron> -->
         <b-jumbotron style="max-height: 7vh;" class="smallJumbotron" header-level="8">
-            <template #header>
+            <!-- <template #header>
                 <h1 style="font-size: 1.0rem; margin-bottom: -0.5em; padding: 0;">{{header}}</h1>
-            </template>
-            <p style="margin-top: 0px;">
-                {{hint}}
-            </p>
+            </template> -->
+            <b-row>
+                <b-col style="text-align: left;">
+                    <h1 style="font-size: 1.0rem; margin-bottom: -0.1em; padding: 0;">{{header}}</h1>
+                    <p style="margin-top: 0px;">
+                        {{hint}}
+                    </p>
+                </b-col>
+                <b-col style="text-align: right;">
+                    <b-button variant="info" class="mb-2" v-b-toggle.sidebar-1>
+                        Instructions <b-icon icon="question-square-fill" aria-hidden="true"></b-icon>
+                      </b-button>
+                </b-col>
+            </b-row>
+            
         </b-jumbotron>
+
+        <template>
+            <div>
+              <b-sidebar id="sidebar-1" title="Sidebar" shadow>
+                <div class="px-3 py-2">
+                  <p>
+                    Cras mattis consectetur purus sit amet fermentum. Cras justo odio, dapibus ac facilisis
+                    in, egestas eget quam. Morbi leo risus, porta ac consectetur ac, vestibulum at eros.
+                  </p>
+                  <b-img src="https://picsum.photos/500/500/?image=54" fluid thumbnail></b-img>
+                </div>
+              </b-sidebar>
+            </div>
+          </template>
     
         <b-form method="POST" action="{{ continuation_url }}">
             <b-row class="mb-3" align-h="center">
