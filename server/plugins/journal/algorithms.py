@@ -38,52 +38,68 @@ from jmetal.util.termination_criterion import StoppingByEvaluations, StoppingByT
 from jmetal.core.problem import IntegerProblem
 from jmetal.core.solution import IntegerSolution
 
+# For exact, we treat recommendation problem as single-objective optimization, where the single objective
+# corresponds to distance between weights and objectives evaluated on top of each solution
 class RecommendationProblemExact(IntegerProblem):
     def __init__(self, k, objs, user_idx, relevance_scores, user_vector, relevance_top_k, filter_out_items, target_weights):
         super(RecommendationProblemExact, self).__init__()
         
+        # Single objective that corresponds to distance between weights and actual objectives
         self.number_of_objectives = 1
+        # No constraints
         self.number_of_constraints = 0
+        # Number of variables corresponds to length of recommendation list
         self.number_of_variables = k
 
+        # We minimize the objective (distance)
         self.obj_directions = [self.MINIMIZE]
         self.obj_labels = ["dist"]
 
-        # Total number of items (before filtering seen items)
         assert relevance_scores.ndim == 1
+        
+        # Total number of items (before filtering seen items)
         n_all_items = relevance_scores.size
+        # Filter out the items
         self.items = np.setdiff1d(np.arange(n_all_items), filter_out_items)
-        # Number of items after filtering!
+        # Number of items after filtering! This is the number we choose from in individuals
         self.n_items = self.items.size
 
         assert self.n_items <= n_all_items, f"{self.n_items} <= {n_all_items}"
+        # We need consecutive numbers for the items (we are sampling from [lower_bound, upper_bound))
         self.item_indices = np.arange(self.n_items)
 
+        # Lower bound is 0
         self.lower_bound = [0] * self.number_of_variables
         # Upper bound equals new number of items (i.e. after filtering)
         self.upper_bound = [self.n_items - 1] * self.number_of_variables
 
+        # Index of the user for which we generate the recommendation
         self.user_idx = user_idx
+
+        # The actual objectives that WE want to optimize (not the objective that is optimized by MO-EA algorithm as that is only proxy to our objectives)
         self.objs = objs
+        # Relevance based recommendation
         self.relevance_top_k = relevance_top_k
-    
+        # User vector (binary feedback from the user)
         self.user_vector = user_vector
         assert user_vector.ndim == 1 and user_vector.size == n_all_items
-
+        # Target weights we are interested in achieving in our recommendation
         self.target_weights = target_weights
 
     # Evaluate solution w.r.t. the objectives
     def evaluate(self, solution: IntegerSolution) -> IntegerSolution:
+        # The variables of solution ecode the recommendation
         top_k_list = solution.variables
         
         # During evaluation we need to map items, note that item 0 corresponds to actual item being self.items[0] (due to filtering)
         # We need to perform evaluation on original items instead of just their indices
+        # Evaluate all the objectives on the given recommendation list
         top_k_mapped = self.items[top_k_list]
         obj_vals = np.zeros(shape=(len(self.objs),), dtype=np.float32)
         for i, obj in enumerate(self.objs):
             obj_vals[i] = obj(top_k_mapped)
         
-        # Our objective is distance between actual and target weights
+        # MO-EA's objective is distance between actual and target weights
         solution.objectives = [((obj_vals - self.target_weights) ** 2).sum()]
 
         assert solution is not None
@@ -92,17 +108,18 @@ class RecommendationProblemExact(IntegerProblem):
     # We should constraint the new solution to never contain duplicates
     # and also update mutation and crossover accordingly (to not introduce them later on in the optimization process)
     def create_solution(self) -> IntegerSolution:
+        # Create new solution (integer solution with given bounds)
         new_solution = IntegerSolution(
             self.lower_bound, self.upper_bound, self.number_of_objectives, self.number_of_constraints
         )
  
-        #new_solution.variables = np.random.choice(self.items, size=self.number_of_variables, replace=False).tolist()
-        #### NEW ####
         # Instead of generating new solution from random variables, we start with relevance only recommendation
         new_solution.variables = self.relevance_top_k.copy()
+        # And replace position at random index with a random item
         rnd_idx = np.random.randint(low=0, high=self.relevance_top_k.size)
         rnd_item = np.random.choice(self.item_indices)
         new_solution.variables[rnd_idx] = rnd_item
+        # Finally we repair duplicates (no duplicates are allowed)
         return repair_duplicates(self.item_indices, new_solution)
     
     def number_of_variables(self):
@@ -123,32 +140,44 @@ class RecommendationProblemMax(IntegerProblem):
     def __init__(self, k, objs, user_idx, relevance_scores, user_vector, relevance_top_k, filter_out_items):
         super(RecommendationProblemMax, self).__init__()
 
+        # Number of MO-EA's objective is same as our objectives
         self.number_of_objectives = len(objs)
+        # We do not have any constraints
         self.number_of_constraints = 0
+        # Number of variables corresponds to the length of the recommendation list
         self.number_of_variables = k
-        
-        # Total number of items (before filtering seen items)
-        assert relevance_scores.ndim == 1
-        n_all_items = relevance_scores.size
 
+        assert relevance_scores.ndim == 1
+
+        # Total number of items (before filtering seen items)
+        n_all_items = relevance_scores.size
+        # Filter out the items
         self.items = np.setdiff1d(np.arange(n_all_items), filter_out_items)
         # Number of items after filtering!
         self.n_items = self.items.size
+        # Relevances (normalized so they are >= 0) predicted by relevance baseline for each of the items
         self.relevance_scores = relevance_scores
 
         assert self.n_items <= n_all_items, f"{self.n_items} <= {n_all_items}"
+        # We need consecutive numbers for the items (we are sampling from [lower_bound, upper_bound))
         self.item_indices = np.arange(self.n_items)
         
+        # Index of the user for which we generate the recommendation
         self.user_idx = user_idx
+        # Save the objectives
         self.objs = objs
+        # Relevance-only recommendation list
         self.relevance_top_k = relevance_top_k
     
+        # User vector with implicit feedback
         self.user_vector = user_vector
         assert user_vector.ndim == 1 and user_vector.size == n_all_items
+
         # By default we maximize all the objectives in recommendation
         self.obj_directions = [self.MAXIMIZE] * len(objs)
         self.obj_labels = [o.name() for o in objs]
         
+        # Lower bound is 0
         self.lower_bound = [0] * self.number_of_variables
         # Upper bound equals new number of items (i.e. after filtering)
         self.upper_bound = [self.n_items - 1] * self.number_of_variables
@@ -173,20 +202,14 @@ class RecommendationProblemMax(IntegerProblem):
             self.lower_bound, self.upper_bound, self.number_of_objectives, self.number_of_constraints
         )
  
-        #new_solution.variables = np.random.choice(self.items, size=self.number_of_variables, replace=False).tolist()
-        #### NEW ####
         # Instead of generating new solution from random variables, we start with relevance only recommendation
         new_solution.variables = self.relevance_top_k.copy()
+        # And we replace item at random position with a random item
         rnd_idx = np.random.randint(low=0, high=self.relevance_top_k.size)
         rnd_item = np.random.choice(self.item_indices)
         new_solution.variables[rnd_idx] = rnd_item
+        # Finaly we get rid of all duplicates as these are prohibited
         return repair_duplicates(self.item_indices, new_solution)
-        
-        
-        #return new_solution
-    #def create_solution(self) -> IntegerSolution:
-    #    new_solution = IntegerSolution(lower_bounds, upper_bounds, number_of_constraints=self.number_of_constraints,
-    #                              number_of_objectives=self.number_of_objectives)
 
     def number_of_variables(self):
         return self.number_of_variables
@@ -201,6 +224,8 @@ class RecommendationProblemMax(IntegerProblem):
         return self.__name__
 
 # Function for repairing integer solution by getting rid of duplicated entries
+# Whenever we see an item that is present multiple times, we start getting rid of its occurrences (while we have > 1 of them)
+# by replacing these items by randomly sampled items
 def repair_duplicates(all_items, res: IntegerSolution):
     # Those are items not in the recommendation yet
     candidate_items = np.setdiff1d(all_items, res.variables)
@@ -240,6 +265,7 @@ class FixingCrossover(IntegerSBXCrossover):
 
 ##### End of evolutionary helpers ######
 
+# Actual evolutionary algorithm that wraps the underlying helpers passed to MO-EA jmetalpy framework
 class evolutionary_max:
     def __init__(self, weights, relevance_estimates, user_vector, objectives, relevance_top_k, filter_out_items, k=10, time_limit_seconds=4):
         self.weights = weights
