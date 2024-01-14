@@ -80,6 +80,13 @@
           </b-row>
 
           <b-row align-h="center" class="mb-3">
+            <b-col cols="8">
+              <label for="diversity-metric">Please select a diversity metric</label>
+              <b-form-select :state="diversityMetric != null" name="diversity-metric" v-model="diversityMetric" :options="diversityMetricOptions" required="True" type=""/>
+            </b-col>
+          </b-row>
+
+          <b-row align-h="center" class="mb-3">
             <b-col class="text-center" cols="8">
               <b-form-checkbox v-model="disableRelativeComparison">{{disable_relative_comparison}}</b-form-checkbox>
             </b-col>
@@ -139,7 +146,7 @@
           <b-row align-h="center">
             <b-col cols="8" class="text-right" align-h="end">
               <b-btn variant="warning" v-on:click="cancelCreateUserStudy">Cancel</b-btn>
-              <b-btn variant="primary" v-on:click="onCreateUserStudy">Create</b-btn>
+              <b-btn variant="primary" :disabled="!allValidated" v-on:click="onCreateUserStudy">Create</b-btn>
             </b-col>
           </b-row>
       </b-container>
@@ -186,6 +193,12 @@
                 { value: "options", text: "Options" },
               ],
               refinementLayout: "",
+              diversityMetricOptions: [
+                { value: null, text: "Please select diversity metric" },
+                { value: "CF-ILD", text: "CF-ILD" },
+                { value: "CB-ILD", text: "CB-ILD" }
+              ],
+              diversityMetric: null,
               dataLoader: null,
               dataLoaders: [
                 { value: null, text: '{{select_loader}}' }
@@ -194,6 +207,11 @@
               dataLoaderNames: null,
               dataLoadersParameters: []
             }
+        },
+        computed: {
+          allValidated() {
+            return this.dataLoader != null && this.diversityMetric != null;
+          }
         },
         methods: {
           prepareOverrides() {
@@ -240,7 +258,8 @@
                     "data_loader_parameters": dataLoaderParameters,
                     "selected_algorithms": ["Most Popular Items Baseline", "Random Items Baseline"],
                     "algorithm_parameters": [{"displayed_name": "BETA", "name": "Most Popular Items Baseline"}, {"displayed_name": "GAMMA", "name": "Random Items Baseline"}],
-                    "shuffle_recommendations": true
+                    "shuffle_recommendations": true,
+                    "mors_diversity_metric": this.diversityMetric
                 };
 
                 let userStudyData = {
