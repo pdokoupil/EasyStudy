@@ -213,6 +213,10 @@ window.app = new Vue({
             }
         },
         onElicitationFinish(form) {
+            if (this.selected.length < 5) {
+                this.$bvModal.show('bv-modal-example');
+                return;
+            }
             this.busy = true;
             let selectedMoviesTag = document.createElement("input");
             selectedMoviesTag.setAttribute("type","hidden");
