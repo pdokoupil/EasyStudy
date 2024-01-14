@@ -20,13 +20,53 @@
 <div id="app">
     <b-container fluid>
         <b-jumbotron  class="smallJumbotron" header-level="8">
-            <template #header>
-                <h1 style="font-size: 1.0rem; margin-bottom: -0.5em; padding: 0;">{{header}} ({{iteration}}/{{n_iterations}})</h1>
+            <!-- <template #header>
+                <h1 style="font-size: 1.0rem; margin-bottom: -0.5em; padding: 0;">{{header}} (block: {{block}}/{{n_blocks}}, iteration: {{iteration}}/{{n_iterations}})</h1>
             </template>
             <p style="margin-top: 0px;">
                 {{hint}}
-            </p>
+            </p> -->
+            <b-row>
+                <b-col cols="auto" style="text-align: left;">
+                    <h1 style="font-size: 1.0rem; margin-bottom: -0.1em; padding: 0;">{{header}} (block: {{block}}/{{n_blocks}}, iteration: {{iteration}}/{{n_iterations}})</h1>
+                    <p style="margin-top: 0px;">
+                        {{hint}}
+                    </p>
+                </b-col>
+                <b-col style="text-align: right;">
+                    <b-button size="lg" name="instructionsBtn" variant="info" class="mb-2" v-b-toggle.sidebar-1>
+                        Instructions <b-icon icon="question-square-fill" aria-hidden="true"></b-icon>
+                      </b-button>
+                </b-col>
+            </b-row>
         </b-jumbotron>
+
+        <template>
+            <div>
+              <b-sidebar id="sidebar-1" title="Instructions" shadow>
+                <div class="px-3 py-2">
+                  <ol>
+                    <li v-for="bulletText in instructionBullets">
+                        [[bulletText]]
+                    </li>
+                  </ol>
+                  <!-- <b-img src="https://picsum.photos/500/500/?image=54" fluid thumbnail></b-img> -->
+                </div>
+              </b-sidebar>
+            </div>
+        </template>
+
+        <div>
+            <b-modal id="bv-modal-block-start" hide-footer>
+              <template #modal-title>
+                {{block_start_header}}
+              </template>
+              <div class="d-block text-center">
+                <p>{{block_start_detail}}</p>
+              </div>
+              <b-button variant="primary" name="modalOkBtn" class="mt-3" block @click="$bvModal.hide('bv-modal-block-start')">OK</b-button>
+            </b-modal>
+        </div>
     
         <b-col align-h="center">
             <b-row align-h="center" v-for="variantResults in variantsResults" :set="algoIdx = variantsResults.indexOf(variantResults)">
@@ -108,6 +148,7 @@
                     @click="showAndScroll"
                     :disabled="showRefinement || !allValidated"
                     block
+                    name="continue1Btn"
                     variant="primary"
                     :class="showRefinement ? null : 'collapsed'"
                     :aria-expanded="showRefinement ? 'true' : 'false'"
@@ -473,7 +514,7 @@
                     </b-col>
                     <b-col>
                         <b-col class="text-center">
-                            <b-form method="POST" action="{{continuation_url}}">
+                            <b-form method="POST" ref="myForm" @submit.prevent="onSubmit" action="{{continuation_url}}">
                                 <input type="hidden" name="csrf_token" value="{{csrf_token()}}"/>
                                 <input type="hidden" name="selected_items" :value="selectedMovieIndices"/>
                                 <input type="hidden" name="slider_relevance" :value="sliderRelevance"/>
@@ -484,7 +525,16 @@
                                 <input type="hidden" name="ignore_popularity_novelty" :value="ignorePopularityNovelty"/>
                                 <input type="hidden" name="ignore_uniformity_diversity" :value="ignoreUniformityDiversity"/>
                                 <input type="hidden" name="ignore_exploitation_exploration" :value="ignoreExploitationExploration"/>
-                                <b-button variant="success" block type="submit">Continue</b-button>
+                                <b-overlay
+                                    :show="busy"
+                                    rounded
+                                    opacity="0.6"
+                                    spinner-small
+                                    spinner-variant="primary"
+                                    class="d-inline-block"
+                                >
+                                    <b-button :disabled="!allValidated" variant="success" name="continue2Btn" block type="submit">Continue</b-button>
+                                </b-overlay>
                             </b-form>
                         </b-col>
                     </b-col>
@@ -511,6 +561,7 @@
     var csrfToken = "{{csrf_token()}}";
     var canFineTune = "{{can_fine_tune}}" == "True" ? true : false;
     var sliderVersion = "{{slider_version}}";
+    var showModal = "{{show_modal}}" == "True" ? true : false;
 
     var defaultComparisonValue = "{{disable_relative_comparison}}";
     var defaultComparisonValidation = defaultComparisonValue == "True" ? true : false;
@@ -604,7 +655,9 @@
             ignoreUniformityDiversity: false,
             ignoreExploitationExploration: false,
             canFineTune: canFineTune,
-            sliderVersion: sliderVersion
+            sliderVersion: sliderVersion,
+            busy: false,
+            instructionBullets: []
         };
     },
     computed: {
@@ -807,6 +860,10 @@
                 }
             });
         },
+        onSubmit() {
+            this.busy = true;
+            this.$refs.myForm.submit();
+        }
     },
     async mounted() {
         const btns = document.querySelectorAll("button");
@@ -814,6 +871,14 @@
         const checkboxes = document.querySelectorAll("input[type=checkbox]");
         const textboxes = document.querySelectorAll("input[type=text]");
         const selects = document.querySelectorAll("select");
+
+        this.instructionBullets = await fetch("{{url_for('journal.get_instruction_bullets', page='mors')}}")
+                            .then(response => {
+                                if (!response.ok) {
+                                    console.log("Erorr");
+                                }
+                                return response.json();
+                            });
         
         // Register the handlers for event reporting
         startViewportChangeReportingWithLimit(`/utils/changed-viewport`, csrfToken, 1.0, true);
@@ -835,6 +900,12 @@
                 return {"type": "Navigate back", "iteration": iteration};
             });
         });
+
+        if (showModal) {
+            this.$nextTick(() => {
+                this.$bvModal.show('bv-modal-block-start');
+            })
+        }
     },
     beforeDestroy() {
         window.removeEventListener('resize', this.setRowHeights); // Remove event listener on component destroy

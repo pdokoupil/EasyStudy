@@ -209,6 +209,8 @@ def preference_elicitation():
     params["continuation_url"] = request.args.get("continuation_url") # Continuation url must be specified
     params["initial_data_url"] = request.args.get("initial_data_url")
     params["search_item_url"] = request.args.get("search_item_url")
+    params["not_enough_movies_detail"] = tr("elicitation_not_enough_movies_detail")
+    params["not_enough_movies_header"] = tr("elicitation_not_enough_movies_header")
 
     # Handle textual overrides
     params["elicitation_hint_override"] = None

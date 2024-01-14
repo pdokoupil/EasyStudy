@@ -232,14 +232,41 @@ window.dragMoveListener = dragMoveListener;
 <div id="app">
     <b-container fluid>
         <b-jumbotron style="max-height: 7vh;" class="smallJumbotron" header-level="8">
-            <template #header>
+            <!-- <template #header>
                 <h1 style="font-size: 1.0rem; margin-bottom: -0.5em; padding: 0;">{{header}} ({{iteration}}/{{n_iterations}})</h1>
             </template>
             <p style="margin-top: 0px;">
                 {{hint}}
-            </p>
+            </p> -->
+            <b-row>
+                <b-col cols="auto" style="text-align: left;">
+                    <h1 style="font-size: 1.0rem; margin-bottom: -0.1em; padding: 0;">{{header}} ({{iteration}}/{{n_iterations}})</h1>
+                    <p style="margin-top: 0px;">
+                        {{hint}}
+                    </p>
+                </b-col>
+                <b-col style="text-align: right;">
+                    <b-button size="lg" name="instructionsBtn" variant="info" class="mb-2" v-b-toggle.sidebar-1>
+                        Instructions <b-icon icon="question-square-fill" aria-hidden="true"></b-icon>
+                      </b-button>
+                </b-col>
+            </b-row>
         </b-jumbotron>
     
+        <template>
+            <div>
+              <b-sidebar id="sidebar-1" title="Instructions" shadow>
+                <div class="px-3 py-2">
+                  <ol>
+                    <li v-for="bulletText in instructionBullets">
+                        [[bulletText]]
+                    </li>
+                  </ol>
+                </div>
+              </b-sidebar>
+            </div>
+        </template>
+
         <!-- <b-row align-h="center">
             <b-col class="text-center">
                 <b-form method="POST" action="{{continuation_url}}">
@@ -293,7 +320,7 @@ window.dragMoveListener = dragMoveListener;
                 </b-row>
             </b-col>
         </b-row>
-        <b-form method="POST" action="{{continuation_url}}">
+        <b-form method="POST" ref="myForm" @submit.prevent="onSubmit" action="{{continuation_url}}">
             <b-row class="horizontalSeparator mt-1" style="height: 15vh;" align-h="center" align-v="center">
                 <b-col cols="4" class="text-center" style="height: auto;">
                     {{drag}}
@@ -349,7 +376,16 @@ window.dragMoveListener = dragMoveListener;
                     <input type="hidden" name="csrf_token" value="{{csrf_token()}}"/>
                     <input type="hidden" name="drag_and_drop_positions" :value="JSON.stringify(dragAndDropPositions)"/>
                     <input type="hidden" name="dropzone_position" :value="JSON.stringify(dropzonePosition)"/>
-                    <b-button :disabled="!Object.values(dragAndDropValidated).every(value => value === true)" class="mb-1" variant="success" type="submit">Continue</b-button>
+                    <b-overlay
+                        :show="busy"
+                        rounded
+                        opacity="0.6"
+                        spinner-small
+                        spinner-variant="primary"
+                        class="d-inline-block"
+                        >
+                        <b-button :disabled="!Object.values(dragAndDropValidated).every(value => value === true)" class="mb-1" variant="success" type="submit" name="continueBtn">Continue</b-button>
+                    </b-overlay>
                 </b-col>
             </b-row>
         </b-form>
@@ -363,6 +399,7 @@ window.dragMoveListener = dragMoveListener;
     var resultLayout = "{{result_layout}}";
     var iteration = "{{iteration}}";
     var csrfToken = "{{csrf_token()}}";
+    var algorithmOffset = parseInt("{{algorithm_offset}}", 10);
 
     var defaultComparisonValue = "{{disable_relative_comparison}}";
     var defaultComparisonValidation = defaultComparisonValue == "True" ? true : false;
@@ -418,6 +455,10 @@ window.dragMoveListener = dragMoveListener;
             "#f8f398",
             "#f1b963",
             "#68b6ef",
+            "#d2f7e3",
+            "#c8a8ff",
+            "#e0c5bd",
+            "#ffc5d9",
             "#cbf078",
             "#e46161",
             "#f5c7f7",
@@ -426,7 +467,7 @@ window.dragMoveListener = dragMoveListener;
             "#27296d"
         ];
 
-        let variantColors = availColors.slice(0, numAlgorithms);
+        let variantColors = availColors.slice(algorithmOffset, algorithmOffset+numAlgorithms);
         let dragAndDropValidated = {};
         let dragAndDropPositions = {};
 
@@ -471,7 +512,9 @@ window.dragMoveListener = dragMoveListener;
             dragAndDropValidated: dragAndDropValidated,
             dragAndDropPositions: dragAndDropPositions,
             bgColor: "red",
-            dropzonePosition: null
+            dropzonePosition: null,
+            busy: false,
+            instructionBullets: []
         };
     },
     computed: {
@@ -647,6 +690,10 @@ window.dragMoveListener = dragMoveListener;
                 }
             });
         },
+        onSubmit() {
+            this.busy = true;
+            this.$refs.myForm.submit();
+        }
     },
     async mounted() {
         const btns = document.querySelectorAll("button");
@@ -656,6 +703,14 @@ window.dragMoveListener = dragMoveListener;
         const selects = document.querySelectorAll("select");
         
         this.dropzonePosition = getElementBoundingBox(document.getElementById("dropzone"));
+
+        this.instructionBullets = await fetch("{{url_for('journal.get_instruction_bullets', page='compare-alphas')}}")
+                            .then(response => {
+                                if (!response.ok) {
+                                    console.log("Erorr");
+                                }
+                                return response.json();
+                            });
         
         // Register the handlers for event reporting
         startViewportChangeReportingWithLimit(`/utils/changed-viewport`, csrfToken, 1.0, true);

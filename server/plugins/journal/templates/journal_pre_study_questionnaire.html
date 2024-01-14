@@ -6,13 +6,40 @@
             {{hint}}
         </b-jumbotron> -->
         <b-jumbotron style="max-height: 7vh;" class="smallJumbotron" header-level="8">
-            <template #header>
+            <!-- <template #header>
                 <h1 style="font-size: 1.0rem; margin-bottom: -0.5em; padding: 0;">{{header}}</h1>
             </template>
             <p style="margin-top: 0px;">
                 {{hint}}
-            </p>
+            </p> -->
+            <b-row>
+                <b-col cols="auto" style="text-align: left;">
+                    <h1 style="font-size: 1.0rem; margin-bottom: -0.1em; padding: 0;">{{header}}</h1>
+                    <p style="margin-top: 0px;">
+                        {{hint}}
+                    </p>
+                </b-col>
+                <b-col style="text-align: right;">
+                    <b-button size="lg" name="instructionsBtn" variant="info" class="mb-2" v-b-toggle.sidebar-1>
+                        Instructions <b-icon icon="question-square-fill" aria-hidden="true"></b-icon>
+                      </b-button>
+                </b-col>
+            </b-row>
         </b-jumbotron>
+
+        <template>
+            <div>
+              <b-sidebar id="sidebar-1" title="Instructions" shadow>
+                <div class="px-3 py-2">
+                  <ol>
+                    <li v-for="bulletText in instructionBullets">
+                        [[bulletText]]
+                    </li>
+                  </ol>
+                </div>
+              </b-sidebar>
+            </div>
+        </template>
 
         <b-form method="POST" action="{{ continuation_url }}">
     
@@ -327,6 +354,33 @@
                 </b-col>
             </b-row>
 
+            <b-row class="mb-3" align-h="center">
+                <b-col cols="8" >
+                    <b-row align-v="center">
+                        <!-- <b-col class="mt-2" cols="auto">
+                            <b-row>
+                                <b-col>
+                                    <b-icon class="h1" icon="grid"></b-icon>
+                                </b-col>
+                            </b-row>
+                            <b-row>
+                                <b-col>
+                                    <b-icon class="h1" icon="grid"></b-icon>
+                                </b-col>
+                            </b-row>
+                        </b-col> -->
+                        <b-col>
+                            <b-form-group>
+                                <b-label for="q12">
+                                    <strong>12. [[engagementText]]</strong>
+                                </b-label>
+                                <b-form-select name="q12" id="q12" :state="q12Validated" v-model="selectedQ12" :options="optionsEngagement"></b-form-select>
+                            </b-form-group>
+                        </b-col>
+                    </b-row>
+                </b-col>
+            </b-row>
+
             <!-- <b-row>
                 <b-col>
                 </b-col>
@@ -360,7 +414,7 @@
                 <b-col class="text-center">
                     <input type="hidden" name="csrf_token" value="{{csrf_token()}}"/>
                     <!-- <input type="hidden" name="final_questionnaire_data" value="final_questionnaire_data"/> -->
-                    <b-button :disabled="!allValidated" variant="success" type="submit">{{finish}}</b-button>
+                    <b-button :disabled="!allValidated" name="finishBtn" variant="success" type="submit">{{finish}}</b-button>
                 </b-col>
             </b-row>
         </b-form>
@@ -383,6 +437,7 @@
     data: function() {
         
         return {
+            instructionBullets: [],
             selectedQ1: null,
             selectedQ2: null,
             selectedQ3: null,
@@ -394,6 +449,8 @@
             selectedQ9: null,
             selectedQ10: null,
             selectedQ11: null,
+            selectedQ12: null,
+            engagementText: "",
             otherTextQ7: '',
             otherTextQ8: '',
             otherTextQ9: '',
@@ -428,6 +485,9 @@
                 { value: '3', text: 'Providing items that are very similar to the ones you consumed so far (e.g., genres you are used to watch).' },
                 { value: 'other', text: 'Other' },
             ],
+            optionsEngagement: [
+                { value: null, text: 'Please select an option' }, // Rest to be populated once fetched from the server
+            ]
         };
     },
     methods: {
@@ -466,6 +526,9 @@
         q11Validated() {
             return this.selectedQ11 != null && ((this.selectedQ11 === 'other' && this.otherTextQ11 != '') || this.selectedQ11 != 'other');
         },
+        q12Validated() {
+            return this.selectedQ12 != null;
+        },
         allValidated() {
             return this.q1Validated
                 && this.q2Validated
@@ -477,7 +540,8 @@
                 && this.q8Validated
                 && this.q9Validated
                 && this.q10Validated
-                && this.q11Validated;
+                && this.q11Validated
+                && this.q12Validated;
         }
     },
     async mounted() {
@@ -485,16 +549,42 @@
         const radios = document.querySelectorAll("input[type=radio]");
         const checkboxes = document.querySelectorAll("input[type=checkbox]");
         const textboxes = document.querySelectorAll("input[type=text]");
-        const selects = document.querySelectorAll("select");
+
+        let q = await fetch("{{url_for('journal.get_engagement_question')}}")
+                            .then(response => {
+                                if (!response.ok) {
+                                    console.log("Erorr");
+                                }
+                                return response.json();
+                            });
+        this.engagementText = q.text;
+
+        this.instructionBullets = await fetch("{{url_for('journal.get_instruction_bullets', page='pre-study-questionnaire')}}")
+                            .then(response => {
+                                if (!response.ok) {
+                                    console.log("Erorr");
+                                }
+                                return response.json();
+                            });
+
+        for (const optIdx in q.options) {
+            this.optionsEngagement.push({
+                "value": String(optIdx),
+                "text": q.options[optIdx]
+            })
+        }
         
-        // Register the handlers for event reporting
-        startViewportChangeReportingWithLimit(`/utils/changed-viewport`, csrfToken, 1.0, true);
-        startScrollReportingWithLimit(`/utils/changed-viewport`, csrfToken, 1.0, document.getElementsByName("scrollableDiv"));
-        registerClickedButtonReporting(`/utils/on-input`, csrfToken, btns);
-        registerClickedRadioReporting("/utils/on-input", csrfToken, radios);
-        registerClickedCheckboxReporting("/utils/on-input", csrfToken, checkboxes);
-        registerChangedSelectionReporting("/utils/on-input", csrfToken, selects);
-        reportLoadedPage(`/utils/loaded-page`, csrfToken, "pre_study_questionnaire");
+        this.$nextTick(() => {
+            const selects = document.querySelectorAll("select");
+            // Register the handlers for event reporting
+            startViewportChangeReportingWithLimit(`/utils/changed-viewport`, csrfToken, 1.0, true);
+            startScrollReportingWithLimit(`/utils/changed-viewport`, csrfToken, 1.0, document.getElementsByName("scrollableDiv"));
+            registerClickedButtonReporting(`/utils/on-input`, csrfToken, btns);
+            registerClickedRadioReporting("/utils/on-input", csrfToken, radios);
+            registerClickedCheckboxReporting("/utils/on-input", csrfToken, checkboxes);
+            registerChangedSelectionReporting("/utils/on-input", csrfToken, selects);
+            reportLoadedPage(`/utils/loaded-page`, csrfToken, "pre_study_questionnaire");
+        });
     }
 })
 </script>

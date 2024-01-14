@@ -60,5 +60,7 @@
     "error_not_active": "Studie byla deaktivována, zkuste prosím znovu později",
     "error_hint": "",
     "error_header": "Chyba",
-    "error_hint_lead": "Někde nastala chyba"
+    "error_hint_lead": "Někde nastala chyba",
+    "elicitation_not_enough_movies_detail": "Pro správné fungování algoritmu je nutné vybrat alespoň 5 - 10 filmů",
+    "elicitation_not_enough_movies_header": "Nedostatek vybraných filmů"
 }

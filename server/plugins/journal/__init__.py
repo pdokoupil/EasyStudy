@@ -32,7 +32,7 @@ from plugins.journal.metrics import binomial_diversity, intra_list_diversity, it
 
 #from memory_profiler import profile
 
-from plugins.journal.algorithms import NEG_INF, evolutionary_exact, evolutionary_max, greedy_exact, greedy_max, item_wise_exact, item_wise_max
+from plugins.journal.algorithms import NEG_INF, evolutionary_exact, evolutionary_max, greedy_exact, greedy_max, item_wise_exact, item_wise_max, unit_normalized_diversification
 
 from app import rds
 
@@ -270,118 +270,6 @@ class EASER_pretrained:
         return self.predict_with_score(selected_items, filter_out_items, k)[2]
 
 
-# If all_items is false, we only look into n_items_subset items with highest relevance score
-# If also rnd_mixture is true than we only look into n_items_subset // 2 items with highest relevance
-# score and mix them with n_items_subset // 2 items randomly sampled from the rest of items
-# do_normalize -> whether we normalize the diversity support
-def get_diversified_top_k_lists(k, random_users, rel_scores, rel_scores_normed,
-                                alpha, items, diversity_function, diversity_cdf,
-                                rating_matrix, filter_out_items,
-                                n_items_subset=None, do_normalize=False, unit_normalize=False, rnd_mixture=False):
-    start_time = time.perf_counter()
-    top_k_lists = np.zeros(shape=(random_users.size, k), dtype=np.int32)
-    scores = np.zeros(shape=(items.size if n_items_subset is None else n_items_subset, ), dtype=np.float32)
-    mgains = np.zeros(shape=(items.size if n_items_subset is None else n_items_subset, ), dtype=np.float32)
-
-    assert rel_scores.shape == rel_scores_normed.shape
-    
-    # User normalized relevance scores
-    if do_normalize:
-        rel_scores = rel_scores_normed
-    
-    # Sort relevances
-    sorted_relevances = np.argsort(-rel_scores, axis=-1)
-   
-    divs = []
-   
-    # Iterate over the random users sample
-    for user_idx, random_user in enumerate(random_users):
-        
-        #print(f"User_idx = {user_idx}, user={random_user}")
-        
-        # If n_items_subset is specified, we take subset of items
-        if n_items_subset is None:
-            source_items = items
-        else:
-            if rnd_mixture:
-                assert n_items_subset % 2 == 0, f"When using random mixture we expect n_items_subset ({n_items_subset}) to be divisible by 2"
-                #source_items = np.concatenate([sorted_relevances[user_idx, :n_items_subset//2], np.random.choice(sorted_relevances[user_idx, n_items_subset:], n_items_subset//2, replace=False)])
-
-                relevance_half = sorted_relevances[user_idx, :n_items_subset//2]
-                # However, for the random half, we have to ensure we do not sample movies from filter_out_movies because this can lead to issues
-                # especially when n_items_subset is small and filter_out_items is large (worst case is that we will sample exactly those items that should have been filtered out)
-                random_candidates = np.setdiff1d(sorted_relevances[user_idx, n_items_subset//2:], filter_out_items)
-                random_half = np.random.choice(random_candidates, n_items_subset//2, replace=False)
-                source_items = np.concatenate([
-                    relevance_half, 
-                    random_half
-                ])
-            else:
-                source_items = sorted_relevances[user_idx, :n_items_subset]
-            
-        #print(f"Source items are: {source_items}")
-        
-        # Mask-out seen items by multiplying with zero
-        # i.e. 1 is unseen
-        # 0 is seen
-        seen_items_mask = np.ones(shape=(random_users.size, source_items.size), dtype=np.int8)
-        seen_items_mask[rating_matrix[np.ix_(random_users, source_items)] > 0.0] = 0
-        
-        #print(f"Seen items mask: {seen_items_mask}")
-        
-        # Build the recommendation incrementally
-        for i in range(k):
-            # Cache f_prev
-            st = time.perf_counter()
-            f_prev = diversity_function(top_k_lists[user_idx, :i])
-            #print(f"\ti={i}, f_prev={f_prev}")
-           
-            # For every source item, try to add it and calculate its marginal gain
-            st = time.perf_counter()
-            for j, item in enumerate(source_items):
-                top_k_lists[user_idx, i] = item # try extending the list
-                mgains[j] = (diversity_function(top_k_lists[user_idx, :i+1]) - f_prev)
-                
-            # If we should normalize, use cdf_div to normalize marginal gains
-            if do_normalize:
-                # Reshape to N examples with single feature
-                mgains = diversity_cdf.transform(mgains.reshape(-1, 1)).reshape(mgains.shape)
-    
-            # Calculate scores
-            if unit_normalize:
-                # If we do unit normalization, we multiply with coefficients that sum to 1
-                scores = (1.0 - alpha) * rel_scores[user_idx, source_items] + alpha * mgains
-            else:
-                # Otherwise we just take relevance + diversity
-                scores = rel_scores[user_idx, source_items] + alpha * mgains
-            # assert np.all(scores >= 0.0) and np.all(scores <= 1.0)
-            # Ensure seen items get lowest score of 0
-            # Just multiplying by zero does not work when scores are not normalized to be always positive
-            # because masked-out items will not have smallest score (some valid, non-masked ones can be negative)
-            # scores = scores * seen_items_mask[user_idx]
-            # So instead we do scores = scores * seen_items_mask[user_idx] + NEG_INF * (1 - seen_items_mask[user_idx])
-            min_score = scores.min()
-            # Unlike in predict_with_score, here we do not mandate NEG_INF to be strictly smaller
-            # because rel_scores may already contain some NEG_INF that was set by predict_with_score
-            # called previously -> so we allow <=.
-            assert NEG_INF <= min_score, f"min_score ({min_score}) is not smaller than NEG_INF ({NEG_INF})"
-            scores = scores * seen_items_mask[user_idx] + NEG_INF * (1 - seen_items_mask[user_idx])
-
-            # Get item with highest score
-            # But beware that this is index inside "scores"
-            # which has same size as subset of rnd_items
-            # so we need to map item index to actual item later on
-            best_item_idx = scores.argmax()
-            best_item = source_items[best_item_idx]
-            #print(f"Best item idx = {best_item_idx}, best item: {best_item}, best item score={scores[best_item_idx]}, mgain: {mgains[best_item_idx]}, rel: {rel_scores[user_idx, best_item_idx]}")
-
-            # Select the best item and append it to the recommendation list
-            top_k_lists[user_idx, i] = best_item
-            # Mask out the item so that we do not recommend it again
-            seen_items_mask[user_idx, best_item_idx] = 0
-
-    print(f"Diversification took: {time.perf_counter() - start_time}")
-    return top_k_lists
 
 # Some common abstraction about "morsification" (like diversification, but with multiple objectives)
 # Runs diversification on a relevance based recommendation
@@ -432,6 +320,9 @@ def morsify(k, rel_scores,
         else:
             source_items = sorted_relevances[:n_items_subset]
 
+    # Default number of quantiles is 1000, however, if n_samples is smaller than n_quantiles, then n_samples is used and warning is raised
+    # to get rid of the warning, we calculates quantiles straight away
+    n_quantiles = min(1000, mgains.shape[1])
 
     # Mask-out seen items by multiplying with zero
     # i.e. 1 is unseen
@@ -440,7 +331,7 @@ def morsify(k, rel_scores,
     seen_items_mask = np.zeros(shape=(source_items.size, ), dtype=np.int8)
     # And only put 1 to UNSEEN items in CANDIDATE (source_items) list
     seen_items_mask[rating_row[source_items] <= 0.0] = 1
-    print(f"### Unseen: {seen_items_mask.sum()} out of: {seen_items_mask.size}")
+    # print(f"### Unseen: {seen_items_mask.sum()} out of: {seen_items_mask.size}")
     
     # Build the recommendation incrementally
     for i in range(k):
@@ -458,10 +349,10 @@ def morsify(k, rel_scores,
             # If we should normalize, use cdf_div to normalize marginal gains
             if do_normalize:
                 # Reshape to N examples with single feature
-                mgains[objective_index] = QuantileTransformer().fit_transform(mgains[objective_index].reshape(-1, 1)).reshape(mgains[objective_index].shape)
+                mgains[objective_index] = QuantileTransformer(n_quantiles=n_quantiles).fit_transform(mgains[objective_index].reshape(-1, 1)).reshape(mgains[objective_index].shape)
     
         # Calculate scores
-        print(f"@@ Mgains shape: {mgains.shape}, seen_items_mask shape: {seen_items_mask}")
+        #print(f"@@ Mgains shape: {mgains.shape}, seen_items_mask shape: {seen_items_mask}")
         best_item_idx = algo(mgains, seen_items_mask)
         best_item = source_items[best_item_idx]
             
@@ -470,11 +361,11 @@ def morsify(k, rel_scores,
         # Mask out the item so that we do not recommend it again
         seen_items_mask[best_item_idx] = 0
 
-        if i == 9:
-            print(f"Rel scores shape: {rel_scores.shape}")
-            print(f"### best item = {best_item}, mgains: {mgains[:, best_item_idx]}, rel: {rel_scores[best_item]}")
+        # if i == 9:
+        #     print(f"Rel scores shape: {rel_scores.shape}")
+        #     print(f"### best item = {best_item}, mgains: {mgains[:, best_item_idx]}, rel: {rel_scores[best_item]}")
 
-    print(f"Diversification took: {time.perf_counter() - start_time}")
+    # print(f"Diversification took: {time.perf_counter() - start_time}")
     return top_k_list
 
 # A simple wrapper class for a recommendation objective (adds name to it)
@@ -580,17 +471,25 @@ def send_feedback():
     selected_movies = selected_movies.split(",") if selected_movies else []
     selected_movies = [int(m) for m in selected_movies]
 
+    # Indices of items shown during preference elicitation
+    elicitation_shown_items = stable_unique([int(movie["movie_idx"]) for movie in session['elicitation_movies']])
+
+
     # Proceed to weights estimation, use CF-ILD, popularity novelty, MER
     # and exploration
     diversity_f = intra_list_diversity(loader.distance_matrix)
     novelty_f = popularity_based_novelty(loader.rating_matrix)
-    relevances = loader.rating_matrix.mean(axis=0)
+    #relevances = loader.rating_matrix.mean(axis=0)
 
-    def relevance_f(top_k_list):
+    items = np.arange(loader.rating_matrix.shape[1])
+    algo = EASER_pretrained(items)
+    algo = algo.load(os.path.join(get_cache_path(get_semi_local_cache_name(loader)), "item_item.npy"))
+
+    def relevance_f(top_k_list, relevances):
         return relevances[top_k_list].sum()
-    
-    def relevance_w(top_k_list, *args, **kwargs):
-        return relevance_f(top_k_list)
+
+    def relevance_w(top_k_list, relevances, **kwargs):
+        return relevance_f(top_k_list, relevances)
     
     # Wrapped diversity
     def diversity_w(top_k_list, *args, **kwargs):
@@ -612,14 +511,16 @@ def send_feedback():
     ]
 
     # Calculate weights based on selection and shown movies during preference elicitation
-    weights, supports = calculate_weight_estimate_generic(loader, objectives, selected_movies, session['elicitation_movies'], return_supports=True)
-    print(f"Weights initialized to {weights}")
+    start_time = time.perf_counter()
+    weights, supports = calculate_weight_estimate_generic(algo, objectives, selected_movies, elicitation_shown_items, return_supports=True)
+    print(f"Weights initialized to {weights}, took: {time.perf_counter() - start_time}")
 
     set_mapping(get_uname(), {
         'initial_weights': weights,
         'iteration': 0, # Start with zero, because at the very beginning, mors_feedback is called, not mors and that generates recommendations for first iteration, but at the same time, increases the iteration
         'elicitation_selected_movies': selected_movies,
-        'selected_movie_indices': []
+        'selected_movie_indices': [],
+        'elicitation_shown_movies': elicitation_shown_items
     })
 
     ### Initialize stuff related to alpha comparison (after metric assessment step) ###
@@ -664,22 +565,18 @@ def send_feedback():
         algorithm_family=selected_algorithm_family,
         selected_algorithms=selected_algorithms,
         selected_slider_versions=selected_slider_versions,
-        initial_weights=weights_with_list
+        initial_weights=weights_with_list,
+        ease_selections=selected_movies,
+        ease_filter_out=selected_movies,
+        elicitation_shown_items=elicitation_shown_items.tolist()
     )
 
     assessment_k = 8 # We use k=8 instead of k=10 so that items fit to screen easily
-    items = np.arange(loader.rating_matrix.shape[1])
     start_time = time.perf_counter()
-    algo = EASER_pretrained(items)
-    algo = algo.load(os.path.join(get_cache_path(get_semi_local_cache_name(loader)), "item_item.npy"))
     
     # Movie indices of selected movies
     elicitation_selected = np.array(selected_movies)
     rel_scores, user_vector, ease_pred = algo.predict_with_score(elicitation_selected, elicitation_selected, assessment_k)
-    rel_scores = rel_scores[np.newaxis, :]
-    cdf_rel = load_cdf_cache(get_cache_path(get_semi_local_cache_name(loader)), "REL")
-    rel_scores_normed = cdf_rel.transform(rel_scores.reshape(-1, 1)).reshape(rel_scores.shape)
-    user_vector = user_vector[np.newaxis, :]
 
     distance_matrix_cb = get_distance_matrix_cb(os.path.join(get_cache_path(get_semi_local_cache_name(loader)), "distance_matrix_text.npy"))
 
@@ -688,33 +585,36 @@ def send_feedback():
     bin_div = binomial_diversity(loader.all_categories, loader.get_item_index_categories, loader.rating_matrix, 0.0, loader.name())
 
     alpha = METRIC_ASSESSMENT_ALPHA
-    # try:
-    #     alpha = float(request.args.get("alpha"))
-    # except:
-    #     alpha = 0.1
+    # relevance wrapper for morsify function below
+    relevance_wrapper = ObjectiveWrapper(functools.partial(relevance_f, relevances=rel_scores), "relevance")
+    # basic diversification algorithm (1 - alpha) * relevance + alpha * diversity
+    diversification_algo = unit_normalized_diversification(alpha)
 
-    ease_baseline = enrich_results(ease_pred, loader)
+    # ease_baseline = enrich_results(ease_pred, loader)
     print(f"Predicting r1 took: {time.perf_counter() - start_time}")
-    cdf_cf_div = load_cdf_cache(get_cache_path(get_semi_local_cache_name(loader)), "CF-ILD")
-    r2 = get_diversified_top_k_lists(assessment_k, np.array([0]), rel_scores, rel_scores_normed,
-                                alpha=alpha, items=items, diversity_function=cf_ild, diversity_cdf=cdf_cf_div,
-                                rating_matrix=user_vector, filter_out_items=elicitation_selected,
-                                n_items_subset=N_ITEMS_SUBSET, do_normalize=True, unit_normalize=True, rnd_mixture=True)
-    r2 = enrich_results(r2[0], loader)
+
+    r2 = morsify(assessment_k, rel_scores, diversification_algo,
+                 items, [relevance_wrapper, ObjectiveWrapper(cf_ild, "cf-ild")],
+                 rating_row=user_vector, filter_out_items=elicitation_selected,
+                 n_items_subset=N_ITEMS_SUBSET, do_normalize=True, rnd_mixture=True)
+    r2_indices = r2
+    r2 = enrich_results(r2_indices, loader)
     print(f"Predicting r2 took: {time.perf_counter() - start_time}")
-    cdf_cb_div = load_cdf_cache(get_cache_path(get_semi_local_cache_name(loader)), "CB-ILD")
-    r3 = get_diversified_top_k_lists(assessment_k, np.array([0]), rel_scores, rel_scores_normed,
-                                alpha=alpha, items=items, diversity_function=cb_ild, diversity_cdf=cdf_cb_div,
-                                rating_matrix=user_vector, filter_out_items=elicitation_selected,
-                                n_items_subset=N_ITEMS_SUBSET, do_normalize=True, unit_normalize=True, rnd_mixture=True)
-    r3 = enrich_results(r3[0], loader)
+    
+    r3 = morsify(assessment_k, rel_scores, diversification_algo,
+                 items, [relevance_wrapper, ObjectiveWrapper(cb_ild, "cb-ild")],
+                 rating_row=user_vector, filter_out_items=elicitation_selected,
+                 n_items_subset=N_ITEMS_SUBSET, do_normalize=True, rnd_mixture=True)
+    r3_indices = r3
+    r3 = enrich_results(r3_indices, loader)
     print(f"Predicting r3 took: {time.perf_counter() - start_time}")
-    cdf_bin_div = load_cdf_cache(get_cache_path(get_semi_local_cache_name(loader)), "BIN-DIV")
-    r4 = get_diversified_top_k_lists(assessment_k, np.array([0]), rel_scores, rel_scores_normed,
-                                alpha=alpha, items=items, diversity_function=bin_div, diversity_cdf=cdf_bin_div,
-                                rating_matrix=user_vector, filter_out_items=elicitation_selected,
-                                n_items_subset=N_ITEMS_SUBSET, do_normalize=True, unit_normalize=True, rnd_mixture=True)
-    r4 = enrich_results(r4[0], loader)
+
+    r4 = morsify(assessment_k, rel_scores, diversification_algo,
+                 items, [relevance_wrapper, ObjectiveWrapper(bin_div, "bin-div")],
+                 rating_row=user_vector, filter_out_items=elicitation_selected,
+                 n_items_subset=N_ITEMS_SUBSET, do_normalize=True, rnd_mixture=True)
+    r4_indices = r4
+    r4 = enrich_results(r4_indices, loader)
     print(f"Predicting r4 took: {time.perf_counter() - start_time}")
 
     # Mapping is implicit, position 0 means "LIST A", position 2 is "LIST C"
@@ -781,10 +681,35 @@ def send_feedback():
         },
         "assessment_recommendations": params
     })
+
+    objectives = {
+        "CF-ILD": {
+            "indices": r2_indices.tolist(),
+            "cf_ild": cf_ild(r2_indices),
+            "cb_ild": cb_ild(r2_indices),
+            "bin_div": bin_div(r2_indices),
+            "relevance": relevance_f(r2_indices, rel_scores).item()
+        },
+        "CB-ILD": {
+            "indices": r3_indices.tolist(),
+            "cf_ild": cf_ild(r3_indices),
+            "cb_ild": cb_ild(r3_indices),
+            "bin_div": bin_div(r3_indices),
+            "relevance": relevance_f(r3_indices, rel_scores).item()
+        },
+        "BIN-DIV": {
+            "indices": r4_indices.tolist(),
+            "cf_ild": cf_ild(r4_indices),
+            "cb_ild": cb_ild(r4_indices),
+            "bin_div": bin_div(r4_indices),
+            "relevance": relevance_f(r4_indices, rel_scores).item()
+        }
+    }
     
     data = {
         "list_permutation": lists,
         "algorithm_name_mapping": algorithm_name_mapping,
+        "objectives": objectives,
         "list_name_to_rec": list_name_to_rec
     }
     log_interaction(session["participation_id"], "metric-assessment-started", **data)
@@ -875,18 +800,28 @@ def metric_feedback():
     # as the alphas are already shuffled
     # We just shuffle the algorithms so that what is displayed below "LIST A" is random
     algorithm_name_mapping = {
-        current_alphas[0]: "LIST 1",
-        current_alphas[1]: "LIST 2",
-        current_alphas[2]: "LIST 3"
+        current_alphas[0]: f"LIST {(cur_iter - 1) * 3 + 1}", # Either 1, 4, ..
+        current_alphas[1]: f"LIST {(cur_iter - 1) * 3 + 2}", # Either 2, 5, ..
+        current_alphas[2]: f"LIST {(cur_iter - 1) * 3 + 3}" # # Either 3, 6, ..
     }
 
+    # We prepare relevance for logging
+    def relevance_f(top_k_list, relevances):
+        return relevances[top_k_list].sum()
+
+    # We construct all objectives as we want to use them for logging
+    cf_ild = intra_list_diversity(loader.distance_matrix)
+    distance_matrix_cb = get_distance_matrix_cb(os.path.join(get_cache_path(get_semi_local_cache_name(loader)), "distance_matrix_text.npy"))
+    cb_ild = intra_list_diversity(distance_matrix_cb)
+    bin_div = binomial_diversity(loader.all_categories, loader.get_item_index_categories, loader.rating_matrix, 0.0, loader.name())
+
+    # Eventually we select just a single objective for diversification
     if selected_metric_name == "CF-ILD":
-        div_f = intra_list_diversity(loader.distance_matrix)
+        div_f = cf_ild
     elif selected_metric_name == "CB-ILD":
-        distance_matrix_cb = get_distance_matrix_cb(os.path.join(get_cache_path(get_semi_local_cache_name(loader)), "distance_matrix_text.npy"))
-        div_f = intra_list_diversity(distance_matrix_cb)
+        div_f = cb_ild
     elif selected_metric_name == "BIN-DIV":
-        div_f = binomial_diversity(loader.all_categories, loader.get_item_index_categories, loader.rating_matrix, 0.0, loader.name())
+        div_f = bin_div
     else:
         assert False
 
@@ -898,27 +833,34 @@ def metric_feedback():
     algo = algo.load(os.path.join(get_cache_path(get_semi_local_cache_name(loader)), "item_item.npy"))
     elicitation_selected = np.array(user_data['elicitation_selected_movies'])
     rel_scores, user_vector, _ = algo.predict_with_score(elicitation_selected, elicitation_selected, k)
-    rel_scores = rel_scores[np.newaxis, :]
-    cdf_rel = load_cdf_cache(get_cache_path(get_semi_local_cache_name(loader)), "REL")
-    rel_scores_normed = cdf_rel.transform(rel_scores.reshape(-1, 1)).reshape(rel_scores.shape)
-    user_vector = user_vector[np.newaxis, :]
-
-
-    cdf_div = load_cdf_cache(get_cache_path(get_semi_local_cache_name(loader)), selected_metric_name)
+    # relevance wrapper for morsify function below
+    objective_fs = [
+        ObjectiveWrapper(functools.partial(relevance_f, relevances=rel_scores), "relevance"),
+        ObjectiveWrapper(div_f, selected_metric_name)
+    ]
     rec_lists = dict()
+    objectives = dict()
     for alpha_order, alpha in enumerate(current_alphas):
 
-        rec_list = get_diversified_top_k_lists(k, np.array([0]), rel_scores, rel_scores_normed,
-                                        alpha=alpha, items=items, diversity_function=div_f, diversity_cdf=cdf_div,
-                                        rating_matrix=user_vector,  filter_out_items=elicitation_selected,
-                                        n_items_subset=N_ITEMS_SUBSET, do_normalize=True, unit_normalize=True, rnd_mixture=True)
+        diversification_algo = unit_normalized_diversification(alpha)
+        rec_list = morsify(k, rel_scores, diversification_algo, items,
+                           objective_fs, user_vector, filter_out_items=elicitation_selected,
+                           n_items_subset=N_ITEMS_SUBSET, do_normalize=True, rnd_mixture=True)
 
-        rec_list = enrich_results(rec_list[0], loader)
-        rec_lists[algorithm_name_mapping[alpha]] = rec_list[0]
+        rec_lists[algorithm_name_mapping[alpha]] = rec_list
+        rec_list = enrich_results(rec_list, loader)
 
         params["movies"][algorithm_name_mapping[alpha]] = {
             "movies": rec_list,
             "order": str(alpha_order)
+        }
+
+        objectives[algorithm_name_mapping[alpha]] = {
+            "indices": rec_lists[algorithm_name_mapping[alpha]].tolist(),
+            "cf_ild": cf_ild(rec_lists[algorithm_name_mapping[alpha]]),
+            "cb_ild": cb_ild(rec_lists[algorithm_name_mapping[alpha]]),
+            "bin_div": bin_div(rec_lists[algorithm_name_mapping[alpha]]),
+            "relevance": relevance_f(rec_lists[algorithm_name_mapping[alpha]], rel_scores).item()
         }
 
     #session['alpha_movies'] = params
@@ -930,9 +872,12 @@ def metric_feedback():
     log_interaction(session["participation_id"], "compare-alphas-started",
                     alphas=current_alphas,
                     iteration=cur_iter,
+                    objectives=objectives,
                     algorithm_name_mapping=algorithm_name_mapping,
                     selected_metric_name=selected_metric_name,
-                    elicitation_selected=user_data['elicitation_selected_movies'])
+                    elicitation_selected=user_data['elicitation_selected_movies'],
+                    ease_selections=user_data['elicitation_selected_movies'],
+                    ease_filter_out=user_data['elicitation_selected_movies'])
 
     cur_iter += 1
     #session['alphas_iteration'] = cur_iter
@@ -955,6 +900,8 @@ def compare_alphas():
     params["drag"] = tr("journal_compare_alphas_drag")
     params["n_iterations"] = 1 + N_ALPHA_ITERS # We have 1 iteration for actual metric assessment followed bz N_ALPHA_ITERS iterations for comparing alphas
     params["iteration"] = get_val("alphas_iteration")
+    # -1 to make it zero based, another -1 because we count 2 N_ALPHA_ITERS and one for metric-assessment, together we have -2
+    params["algorithm_offset"] = (get_val("alphas_iteration") - 2) * 3
     return render_template("compare_alphas.html", **params)
 
 
@@ -1075,10 +1022,11 @@ def mors_feedback():
     # Note that "all_recommendations" already includes items selected during the study (except those selected during elicitattion which we are thus adding)
     filter_out_items = np.concatenate([all_recommendations, elicitation_selected]).astype(np.int32)
     rel_scores, user_vector, relevance_top_k = ease.predict_with_score(training_selections, filter_out_items, k)
-    cdf_rel = load_cdf_cache(get_cache_path(get_semi_local_cache_name(loader)), "REL")
-    rel_scores_normed = cdf_rel.transform(rel_scores.reshape(-1, 1)).reshape(rel_scores.shape)
-    print(f"Rel scores normed: {rel_scores_normed}")
-    print(f"@@ Items shape={items.shape}, size={items.size}")
+    relevance_top_k = np.array(relevance_top_k)
+
+    # Needed for proper working of evolutionary algorithms
+    # as here we need the objective values to be non-negative
+    rel_scores_normed = (rel_scores - rel_scores.min()) / (rel_scores.max() - rel_scores.min())
 
     def relevance_f(top_k_list):
         return rel_scores[top_k_list].sum()
@@ -1136,6 +1084,65 @@ def mors_feedback():
     objectives = [obj for obj in objectives if obj is not None]
     target_weights = np.array([w for w in target_weights if w is not None])
 
+    if "EVOLUTIONARY" in cur_algorithm:
+        # We need to prepare mgain_cdf
+        # Unfortunately calculate_normalization requires special wrappers over the objective
+        # that support incrementally built user history
+
+        def relevance_w(top_k_list, relevances, **kwargs):
+            return relevances[top_k_list].sum()
+            
+        def diversity_w(top_k_list, *args, **kwargs):
+            return div_f(top_k_list)
+        
+        def novelty_w(top_k_list, *args, **kwargs):
+            return novelty_f(top_k_list)
+
+        def exploration_w(top_k_list, user_vector_list, *args, **kwargs):
+            f = exploration(np.array([]), loader.distance_matrix)
+            f.user_vector = np.array(user_vector_list, dtype=np.int32) # fixup
+            return f(top_k_list)
+        
+        def exploitation_w(top_k_list, user_vector_list, *args, **kwargs):
+            f = exploitation(np.array([]), 1.0 - loader.distance_matrix)
+            f.user_vector = np.array(user_vector_list, dtype=np.int32) # fixup
+            return f(top_k_list)
+        
+        def popularity_w(top_k_list, *args, **kwargs):
+            return popularity_f(top_k_list)
+        
+        def uniformity_w(top_k_list, *args, **kwargs):
+            return uniformity_f(top_k_list)
+
+        start_time = time.perf_counter()
+        elicitation_shown = stable_unique(np.concatenate([get_val('elicitation_shown_movies'), elicitation_selected]))
+        if "EXACT" in cur_algorithm or "1W" in cur_algorithm:
+            # Only care about relevance, diversity, novelty and exploration. Minus everything that user wants to ignore
+            wrapped_objectives = [
+                ObjectiveWrapper(relevance_w, "relevance") if not ignore_relevance else None,
+                ObjectiveWrapper(diversity_w, "diversity") if not ignore_uniformity_diversity else None,
+                ObjectiveWrapper(novelty_w, "novelty") if not ignore_popularity_novelty else None,
+                ObjectiveWrapper(exploration_w, "exploration") if not ignore_exploitation_exploration else None
+            ]
+        elif "MAX" in cur_algorithm:
+            # Care about all 7 objectives, minus what the user wants to ignore
+            wrapped_objectives = [
+                ObjectiveWrapper(relevance_w, "relevance") if not ignore_relevance else None,
+                ObjectiveWrapper(diversity_w, "diversity") if not ignore_uniformity_diversity else None,
+                ObjectiveWrapper(novelty_w, "novelty") if not ignore_popularity_novelty else None,
+                ObjectiveWrapper(exploration_w, "exploration") if not ignore_exploitation_exploration else None,
+                ObjectiveWrapper(uniformity_w, "uniformity") if not ignore_uniformity_diversity else None,
+                ObjectiveWrapper(popularity_w, "popularity") if not ignore_popularity_novelty else None,
+                ObjectiveWrapper(exploitation_w, "exploitation") if not ignore_exploitation_exploration else None
+            ]
+        else:
+            assert False, f"Unknown EVOLUTIONARY algorithm: {cur_algorithm}"
+        
+        wrapped_objectives = [obj for obj in wrapped_objectives if obj is not None]
+        mgain_cdf, _, _ = calculate_normalization(ease, wrapped_objectives, np.concatenate([elicitation_shown, all_recommendations]).astype(np.int32), training_selections, k)
+        print(f"Calculating marginal gain CDF took: {time.perf_counter() - start_time}")
+        print(f"Inputs: {np.concatenate([elicitation_shown, all_recommendations]).astype(np.int32)}, {training_selections}")
+
     start_time = time.perf_counter()
     if cur_algorithm == "GREEDY-EXACT-1W":
         algo = greedy_exact(target_weights)
@@ -1152,8 +1159,10 @@ def mors_feedback():
             do_normalize=True, rnd_mixture=True
         )
     elif cur_algorithm == "EVOLUTIONARY-EXACT-1W":
-        objectives[0] = ObjectiveWrapper(lambda x: rel_scores_normed[x].sum(), "relevance-normed")
-        algo = evolutionary_exact(target_weights, rel_scores, user_vector, objectives, np.array(relevance_top_k), filter_out_items, k=k, time_limit_seconds=4)
+        # The exact variant takes rel_scores instead of rel_scores_normed, because objectives are not passed to jmetalpy framework directly
+        # and thus does not have to be scales to >= 0. At the same time, mgain_cdf needs unnormalized rel_scores, so this actually makes it simpler
+        #objectives[0] = ObjectiveWrapper(lambda x: rel_scores_normed[x].sum(), "relevance-normed")
+        algo = evolutionary_exact(mgain_cdf, target_weights, rel_scores, user_vector, objectives, relevance_top_k, filter_out_items, k=k, time_limit_seconds=4)
         top_k = algo()
     elif cur_algorithm == "GREEDY-MAX-1W":
         algo = greedy_max(target_weights)
@@ -1184,12 +1193,28 @@ def mors_feedback():
             do_normalize=True, rnd_mixture=True
         )
     elif cur_algorithm == "EVOLUTIONARY-MAX-1W":
-        objectives[0] = ObjectiveWrapper(lambda x: rel_scores_normed[x].sum(), "relevance-normed")
-        algo = evolutionary_max(target_weights, rel_scores, user_vector, objectives, np.array(relevance_top_k), filter_out_items, k=k, time_limit_seconds=4)
+        # For max, we need to distinguish between objectives passed to jmetalpy (have to be >= 0)
+        # and our internal, raw objectives (does not have to be >= 0)
+        # For us this is just about relevance, when can be negative and can cause problems
+        # So we only care when ignore_relevance is False
+        framework_objectives = objectives[:]
+        if not ignore_relevance:
+            framework_objectives[0] = ObjectiveWrapper(lambda x: rel_scores_normed[x].sum(), "relevance-normed")
+        algo = evolutionary_max(mgain_cdf, target_weights, rel_scores,
+                                user_vector, relevance_top_k, filter_out_items,
+                                our_objectives=objectives, framework_objectives=framework_objectives, k=k, time_limit_seconds=4)
         top_k = algo()
     elif cur_algorithm == "EVOLUTIONARY-MAX-2W":
-        objectives[0] = ObjectiveWrapper(lambda x: rel_scores_normed[x].sum(), "relevance-normed")
-        algo = evolutionary_max(target_weights, rel_scores, user_vector, objectives, np.array(relevance_top_k), filter_out_items, k=k, time_limit_seconds=4)
+        # For max, we need to distinguish between objectives passed to jmetalpy (have to be >= 0)
+        # and our internal, raw objectives (does not have to be >= 0)
+        # For us this is just about relevance, when can be negative and can cause problems
+        # So we only care when ignore_relevance is False
+        framework_objectives = objectives[:]
+        if not ignore_relevance:
+            objectives[0] = ObjectiveWrapper(lambda x: rel_scores_normed[x].sum(), "relevance-normed")
+        algo = evolutionary_max(mgain_cdf, target_weights, rel_scores,
+                                user_vector, relevance_top_k, filter_out_items,
+                                our_objectives=objectives, framework_objectives=framework_objectives, k=k, time_limit_seconds=4)
         top_k = algo()
     elif cur_algorithm == "RELEVANCE-BASED":
         top_k = relevance_top_k
@@ -1215,7 +1240,7 @@ def mors_feedback():
     set_val('recommendation', recommendation)
     
     shown_items = get_val('shown_items')
-    top_k_list = top_k if isinstance(top_k, list) else top_k.tolist()
+    top_k_list = top_k.tolist()
     shown_items[cur_algorithm].append(top_k_list)
     set_val('shown_items', shown_items)
 
@@ -1253,7 +1278,20 @@ def mors_feedback():
             "diversity": ignore_uniformity_diversity,
             "novelty": ignore_popularity_novelty,
             "exploration": ignore_exploitation_exploration
-        }
+        },
+        "objectives": {
+            "relevance": relevance_f(top_k).item(),
+            "relevance-normed": rel_scores_normed[top_k].sum().item(),
+            "diversity": div_f(top_k).item(),
+            "novelty": novelty_f(top_k).item(),
+            "exploration": exploration_f(top_k).item(),
+            "uniformity": uniformity_f(top_k).item(),
+            "exploitation": exploitation_f(top_k).item(),
+            "popularity": popularity_f(top_k).item()
+        },
+        "ease_selections": training_selections.tolist(),
+        "ease_filter_out": filter_out_items.tolist(),
+        "ease_top_k": relevance_top_k.tolist()
     }
     log_interaction(session["participation_id"], "mors-recommendation-started", **data)
     return flask.Flask.redirect(flask.current_app, url_for("journal.mors"))
@@ -1270,6 +1308,7 @@ def mors():
     cur_block = (int(it) - 1) // N_ITERATIONS
     cur_algorithm = user_data["selected_algorithms"][cur_block]
     cur_slider_version = user_data["selected_slider_versions"][cur_block]
+    show_modal = int(it) - 1 == 0 # Only show the modal in the very first iteration
 
     if (int(it) - 1) % N_ITERATIONS == 0:
         # Initialize sliders on the frontend to estimated weights
@@ -1302,8 +1341,10 @@ def mors():
     # TODO replace random with user_data['movies'] which in turn should be filled in by recommendation algorithms
     params = {
         "continuation_url": continuation_url,
-        "iteration": it,
-        "n_iterations": N_ITERATIONS * N_BLOCKS,
+        "iteration": (it - 1) % N_ITERATIONS + 1, #it,
+        "n_iterations": N_ITERATIONS,
+        "block": cur_block + 1,
+        "n_blocks": N_BLOCKS,
         "movies": get_val('recommendation'),
         "like_nothing": tr("compare_like_nothing"),
         "can_fine_tune": cur_algorithm != "RELEVANCE-BASED",
@@ -1312,6 +1353,7 @@ def mors():
         "slider_uniformity_diversity": slider_uniformity_diversity,
         "slider_popularity_novelty": slider_popularity_novelty,
         "slider_exploitation_exploration": slider_exploitation_exploration,
+        "show_modal": show_modal
     }
 
     if is_books(conf):
@@ -1333,6 +1375,8 @@ def mors():
         params["more_novel_help"] = tr("journal_more_novel_help_books")
         params["more_diverse_help"] = tr("journal_more_diverse_help_books")
         params["more_explorative_help"] = tr("journal_more_explorative_help_books")
+        params["block_start_header"] = tr("journal_block_start_header_books")
+        params["block_start_detail"] = tr("journal_block_start_detail_books")
     else:
         params["title"] = tr("journal_recommendation_title_movies")
         params["header"] = tr("journal_recommendation_header_movies")
@@ -1352,6 +1396,8 @@ def mors():
         params["more_novel_help"] = tr("journal_more_novel_help_movies")
         params["more_diverse_help"] = tr("journal_more_diverse_help_movies")
         params["more_explorative_help"] = tr("journal_more_explorative_help_movies")
+        params["block_start_header"] = tr("journal_block_start_header_movies")
+        params["block_start_detail"] = tr("journal_block_start_detail_movies")
 
     #assert session.modified == False
     return render_template("mors.html", **params)
@@ -1360,10 +1406,13 @@ def mors():
 # Endpoint for block questionnaire
 @bp.route("/block-questionnaire", methods=["GET", "POST"])
 def block_questionnaire():
+    user_data = get_all(get_uname())
+    it = user_data["iteration"]
+    cur_block = (int(it) - 1) // N_ITERATIONS
     params = {
         "continuation_url": url_for("journal.block_questionnaire_done"),
-        "header": "After-recommendation block questionnaire",
-        "hint": "Please answer the questions below before proceeding with the next step of the user study. Note that these questions are related only to the current block (last 6 iterations) of recommendations.",
+        "header": f"After-recommendation block questionnaire for block: ({cur_block + 1}/{N_BLOCKS})",
+        "hint": "Before proceeding to the next step, please answer questions specific to the recent block (last 6 iterations) of recommendations.",
         "finish": "Continue",
         "title": "Questionnaire"
     }
@@ -1623,6 +1672,98 @@ def get_final_questions():
     ]
     return jsonify(questions)
 
+@bp.route("/get-engagement-question", methods=["GET"])
+def get_engagement_question():
+    conf = load_user_study_config(session['user_study_id'])
+
+    if is_books(conf):
+        text= "How frequently do you find yourself reading books?"
+        options = [
+            "Non-Reader / Rare Reader (read books rarely/never)",
+            "Occasional Reader (read books infrequently, perhaps few times a year)",
+            "Regular Reader (read one or two books a month)",
+            "Enthusiastic Readers (read several books a more a month)"
+        ]
+    else:
+        text = "How often do you typically engage in watching movies?"
+        options = [
+            "Non-Watcher / Infrequent Viewer (watch movies rarely/never)",
+            "Casual Viewer (watch movies occasionally, maybe a few times a week)",
+            "Frequent Viewer (watch one or two movies per week)",
+            "Enthusiastic Viewer (watch several movies a week)"
+        ]
+
+    question = {
+        "text": text,
+        "options": options
+    }
+    return jsonify(question)
+
+@bp.route("/get-instruction-bullets", methods=["GET"])
+def get_instruction_bullets():
+    page = request.args.get("page")
+    if not page:
+        return jsonify([])
+
+    conf = load_user_study_config(session['user_study_id'])
+
+    if page == "mors":
+        if is_books(conf):
+            bullets = [
+                "Books are selected by clicking on them; each selected book is highlighted by a green frame."
+                "If you do not like any of the recommended books, there is a button at the bottom of this page that you should check.",
+                "When a mouse cursor is placed over a book, its title and description will be shown.",
+                "Completion of each step is final, and you cannot return to previous pages.",
+                "Also note that each book will be displayed only once within the block (i.e., you need to make an immediate decision)."
+            ]
+        else:
+            bullets = [
+                "Movies are selected by clicking on them; each selected movie is highlighted by a green frame.",
+                "If you do not like any of the recommended movies, there is a button at the bottom of this page that you should check.",
+                "When a mouse cursor is placed over a movie, its title and description will be shown.",
+                "Completion of each step is final, and you cannot return to previous pages.",
+                "Also note that each movie will be displayed only once within the block (i.e., you need to make an immediate decision)."
+            ]
+    elif page == "block-questionnaire":
+        bullets = [
+            "Important: These questions are about the recent recommendations, specifically recommendations from the last block (meaning the last 6 iterations).",
+            "Please answer them before moving on to the next step in the study.",
+            "If any question is unclear, choose 'I don't understand' as your response for that specific question."
+        ]
+    elif page == "pre-study-questionnaire":
+        bullets = [
+            "Please answer these questions before moving on to the next step in the study.",
+            "For questions 7 to 11, pick the answer that most aligns with your personal understanding of the specific recommendation mentioned in each question.",
+            "Considering that different people may have different views/interpretations, you can choose 'Other' and share your personal thoughts in the text box below each question."
+        ]
+    elif page == "final-questionnaire":
+        bullets = [
+            "Important: These questions are about the experience during the WHOLE user study.",
+            "Please answer these questions before finishing the study."
+        ]
+    elif page == "metric-assessment":
+        items_name = "books" if is_books(conf) else "movies"
+        bullets = [
+            f"This page displays three lists of recommendations: A, B, C, which were created for you based on the {items_name} you chose at the start of this study as part of stating your preferences (preference elicitation).",
+            "Your goal is to choose the one list that you think is the most DIVERSE (based on how you understand or interpret diversity).",
+            f"You can choose a list by clicking on any of its {items_name}.",
+            f"If you want more information about the displayed {items_name}, simply hover your mouse cursor over it, and both the description and its name will appear."
+        ]
+    elif page == "compare-alphas":
+        items_name = "books" if is_books(conf) else "movies"
+        bullets = [
+            f"This page once again presents three recommendation lists, but they differ from the previous step and are now labeled either 1, 2, 3 (in the first step) or 4, 5, 6 (in the second step).",
+            "Your goal is to order the recommendation lists from least diverse to most diverse.",
+            "To order them, drag and drop the colorful rectangles located at the bottom of this page into the adjacent gray area.",
+            "The further right you position the lists, the more diversity you perceive in them.",
+            f"If you want more information about the displayed {items_name}, simply hover your mouse cursor over it, and both the description and its name will appear."
+        ]
+    else:
+        bullets = []
+
+    return jsonify(bullets)
+get_instruction_bullets
+
 # Endpoint used to search items
 @bp.route("/item-search", methods=["GET"])
 def item_search():
@@ -1642,11 +1783,84 @@ def item_search():
     return jsonify(res)
 
 
+# Given list of shown_items and selected_items
+# train CDF for every objective
+# Shown_items are partitioned into N parts of length part_length
+# so when we iteratively calculate mgains, we always calculate it w.r.t. partition (to avoid mgain calculation against very long lists)
+def calculate_normalization(algo, objectives, shown_items, selected_items, part_length):
+
+    # n_parts = np.ceil(shown_items.size / part_length).astype(int)
+    parts = np.array_split(shown_items, np.arange(part_length, shown_items.size, part_length))
+    #print(f"Parts = {parts}")
+    user_vector_incremental = []
+    mgains = np.zeros(shape=(len(objectives), len(shown_items)), dtype=np.float32)
+    selected_mgains = [[] for _ in objectives]
+
+    items = algo.all_items
+    # items = np.arange(loader.rating_matrix.shape[1])
+    # algo = EASER_pretrained(items)
+    # algo = algo.load(os.path.join(get_cache_path(get_semi_local_cache_name(loader)), "item_item.npy"))
+
+    # To be consistent with exploration, that returns 0 when no user history is available
+    # we say items have 0 relevancy when we have no user history
+    relevances = np.zeros(shape=(items.size, ), dtype=np.float32)
+
+    for obj_idx, obj in enumerate(objectives):
+        for idx, item_idx in enumerate(shown_items):
+            # Get index of the part to which current item belongs to
+            cur_part = parts[idx // part_length]
+            within_part_idx = idx % cur_part.size
+
+            # Calculate objective of old list (before adding item_idx, thus using old relevances and old user_vector_incremental)
+            obj_old = obj(cur_part[:within_part_idx], user_vector_list=user_vector_incremental, relevances=relevances)
+
+            if item_idx in selected_items:
+                # We will end up in this place exactly len(objectives)-times, so we only append for the first time
+                if obj_idx == 0:
+                    print(f"Item idx = {item_idx}, idx = {idx} is selected, updating relevance")
+                    user_vector_incremental.append(item_idx)
+                    # Update relevance only prediction
+                    user_selections = np.array(user_vector_incremental)
+                    user_vector = np.zeros(shape=(items.size,), dtype=algo.item_item.dtype)
+                    user_vector[user_selections] = 1
+                    relevances = np.dot(user_vector, algo.item_item)
+                    print(f"Selected items: {user_selections} and their relevances: {relevances[user_selections]}")
+                    #relevances = (relevances - np.min(relevances)) / (np.max(relevances) - np.min(relevances))
+
+                # Since we added new item, we have to take updated user vector into an account
+                if obj_idx == 0:
+                    print(f"Selected 2 items: {user_selections} and their relevances: {relevances[user_selections]}")
+                obj_new = obj(cur_part[:within_part_idx+1], user_vector_list=user_vector_incremental, relevances=relevances)
+                mgains[obj_idx, idx] = obj_new - obj_old
+                if obj_idx == 0:
+                    print(f"obj_new -> {obj_new}, obj_old -> {obj_old}")
+                selected_mgains[obj_idx].append(mgains[obj_idx, idx])
+            else:
+                # We did not select anything, so user vector stays intact
+                mgains[obj_idx, idx] = obj(cur_part[:within_part_idx+1], user_vector_list=user_vector_incremental, relevances=relevances) - obj_old
+
+            if obj_idx == 0:
+                print(f"Mgains at index: obj={obj_idx}, idx={idx}, item_idx={item_idx}, within_part_idx={within_part_idx}, part_idx={idx // part_length}, cur_part={cur_part}: {mgains[obj_idx, idx]}")
+
+    # Default number of quantiles is 1000, however, if n_samples is smaller than n_quantiles, then n_samples is used and warning is raised
+    # to get rid of the warning, we calculates quantiles straight away
+    obj_cdf = QuantileTransformer(n_quantiles=min(1000, mgains.shape[1])).fit(mgains.T)
+    return obj_cdf, mgains, selected_mgains
+
+# Stable implementation of np.unique
+# meaning that elements are not sorted as in np.unique
+# but keep stable order of appearance
+def stable_unique(x):
+    if type(x) is not np.ndarray:
+        x = np.array(x)
+    _, index = np.unique(x, return_index=True)
+    return x[np.sort(index)]
+
 # If exact = True, then we are in "exact" algorithm world as apposed to "max", this also means that we do not normalize weights to sum to 1
 # selected_movies -> movies selected during elicitation
 # elicitation_movies -> movies displayed during elicitation
 # Note that we DO NOT NORMALIZE the WEIGHTS here
-def calculate_weight_estimate_generic(loader, objectives, selected_movies, elicitation_movies, return_supports=False):
+def calculate_weight_estimate_generic(algo, objectives, selected_movies, elicitation_movies, return_supports=False):
     
     n_objectives = len(objectives)
     if not selected_movies:
@@ -1661,42 +1875,12 @@ def calculate_weight_estimate_generic(loader, objectives, selected_movies, elici
         else:
             return x
 
-    if type(elicitation_movies[0]) == int:
-        movie_indices = np.unique(elicitation_movies)
-    elif type(elicitation_movies[0]) == dict:
-        movie_indices = np.unique([int(movie["movie_idx"]) for movie in elicitation_movies])
-    else:
-        assert False
-
     # If movies are selected after search, they are not correctly propagated through elicitation_movies
     # therefore we append them here
-    movie_indices = np.unique(np.concatenate([movie_indices, selected_movies]))
+    # We need to keep order of appearance instead of sorted order as is done by np.unique alone
+    movie_indices = stable_unique(np.concatenate([elicitation_movies, selected_movies]))
 
-    # We treat movie_indices as one long recommendation list and try to reconstruct it, calculating
-    # intermediate marginal gains for all the items
-    # We then estimate the gains from the weights
-    # We opt for optimization by doing the expansion (incrementally adding) s
-    mgains = np.zeros(shape=(len(objectives), len(movie_indices)), dtype=np.float32)
-    selected_mgains = [[] for _ in objectives]
-    # As the users are selecting the movies during elicitation, we can treat this as incrementally
-    # growing user profile (vector of selections)
-    user_vector_incremental = []
-    objective_index_to_name = []
-    for obj_idx, obj in enumerate(objectives):
-        objective_index_to_name.append(obj.name())
-        for idx, movie_idx in enumerate(movie_indices):
-            if movie_idx in selected_movies:
-                # We will end up in this place exactly len(objectives)-times, so we only append for the first time
-                if obj_idx == 0:
-                    user_vector_incremental.append(movie_idx)
-                # Since we added new item, we have to take updated user vector into an account
-                mgains[obj_idx, idx] = obj(movie_indices[:idx+1], user_vector_incremental) - obj(movie_indices[:idx], user_vector_incremental[:-1])
-                selected_mgains[obj_idx].append(mgains[obj_idx, idx])
-            else:
-                # We did not select anything, so user vector stays intact
-                mgains[obj_idx, idx] = obj(movie_indices[:idx+1], user_vector_incremental) - obj(movie_indices[:idx], user_vector_incremental)
-
-    obj_cdf = QuantileTransformer().fit(mgains.T)
+    obj_cdf, mgains, selected_mgains = calculate_normalization(algo, objectives, movie_indices, selected_movies, len(selected_movies))
     selected_mgains = np.array(selected_mgains)
     if selected_mgains.size == 0:
         x = {
@@ -1726,8 +1910,7 @@ def calculate_weight_estimate_generic(loader, objectives, selected_movies, elici
             "selected_movies": np.array(selected_movies),
             "selected_mgains": selected_mgains,
             "selected_mgains_normed": selected_mgains_normed,
-            "mgains": mgains,
-            "rating_matrix_shape": np.array(loader.rating_matrix.shape)
+            "mgains": mgains
         }
         return result, supports
 
