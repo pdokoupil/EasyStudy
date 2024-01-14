@@ -477,7 +477,16 @@ def send_feedback():
 
     # Proceed to weights estimation, use CF-ILD, popularity novelty, MER
     # and exploration
-    diversity_f = intra_list_diversity(loader.distance_matrix)
+    configured_metric_name = conf["mors_diversity_metric"]
+    if configured_metric_name == "CF-ILD":
+        diversity_f = intra_list_diversity(loader.distance_matrix)
+        distance_matrix = loader.distance_matrix
+    elif configured_metric_name == "CB-ILD":
+        distance_matrix_cb = get_distance_matrix_cb(os.path.join(get_cache_path(get_semi_local_cache_name(loader)), "distance_matrix_text.npy"))
+        diversity_f = intra_list_diversity(distance_matrix_cb)
+        distance_matrix = distance_matrix_cb
+    else:
+        assert False, f"Unknown configured diversity metric: {configured_metric_name}"
     novelty_f = popularity_based_novelty(loader.rating_matrix)
     #relevances = loader.rating_matrix.mean(axis=0)
 
@@ -499,7 +508,7 @@ def send_feedback():
         return novelty_f(top_k_list)
 
     def exploration_w(top_k_list, user_vector_list, *args, **kwargs):
-        f = exploration(np.array([]), loader.distance_matrix)
+        f = exploration(np.array([]), distance_matrix)
         f.user_vector = np.array(user_vector_list, dtype=np.int32) # fixup
         return f(top_k_list)
 
@@ -994,13 +1003,6 @@ def mors_feedback():
 
     items = np.arange(loader.rating_matrix.shape[1])
     selected_metric_name = user_data['selected_metric_name']
-    if selected_metric_name == "CF-ILD":
-        div_f = intra_list_diversity(loader.distance_matrix)
-    elif selected_metric_name == "CB-ILD":
-        distance_matrix_cb = get_distance_matrix_cb(os.path.join(get_cache_path(get_semi_local_cache_name(loader)), "distance_matrix_text.npy"))
-        div_f = intra_list_diversity(distance_matrix_cb)
-    elif selected_metric_name == "BIN-DIV":
-        div_f = binomial_diversity(loader.all_categories, loader.get_item_index_categories, loader.rating_matrix, 0.0, loader.name())
 
 
     #cdf_div = load_cdf_cache(get_cache_path(get_semi_local_cache_name(loader)), selected_metric_name)
@@ -1030,13 +1032,46 @@ def mors_feedback():
 
     def relevance_f(top_k_list):
         return rel_scores[top_k_list].sum()
+    
+        # We construct all objectives as we want to use them for logging
+    cf_ild = intra_list_diversity(loader.distance_matrix)
+    cf_uniformity = intra_list_diversity(1.0 - loader.distance_matrix)
+    cf_exploration = exploration(user_vector, loader.distance_matrix)
+    cf_exploitation = exploitation(user_vector, 1.0 - loader.distance_matrix)
+    
+    distance_matrix_cb = get_distance_matrix_cb(os.path.join(get_cache_path(get_semi_local_cache_name(loader)), "distance_matrix_text.npy"))
+    cb_ild = intra_list_diversity(distance_matrix_cb)
+    cb_uniformity = intra_list_diversity(1.0 - distance_matrix_cb)
+    cb_exploration = exploration(user_vector, distance_matrix_cb)
+    cb_exploitation = exploitation(user_vector, 1.0 - distance_matrix_cb)
 
-    uniformity_f = lambda x: -1 * div_f(x)
+    bin_div = binomial_diversity(loader.all_categories, loader.get_item_index_categories, loader.rating_matrix, 0.0, loader.name())
+    
+    configured_metric_name = conf["mors_diversity_metric"]
+    if configured_metric_name == "CF-ILD":
+        div_f = cf_ild
+        uniformity_f = cf_uniformity
+        exploration_f = cf_exploration
+        exploitation_f = cf_exploitation
+        distance_matrix = loader.distance_matrix
+    elif configured_metric_name == "CB-ILD":
+        div_f = cb_ild
+        uniformity_f = cb_uniformity
+        exploration_f = cb_exploration
+        exploitation_f = cb_exploitation
+        distance_matrix = distance_matrix_cb
+    else:
+        assert False, f"Uknown metric name encountered in configuration: {configured_metric_name}"
+
+    # if selected_metric_name == "CF-ILD":
+    #     div_f = cf_ild
+    # elif selected_metric_name == "CB-ILD":
+    #     div_f = cb_ild
+    # elif selected_metric_name == "BIN-DIV":
+    #     div_f = bin_div
 
     popularity_f = item_popularity(loader.rating_matrix)
     novelty_f = popularity_based_novelty(loader.rating_matrix)
-    exploration_f = exploration(user_vector, loader.distance_matrix)
-    exploitation_f = exploitation(user_vector, 1.0 - loader.distance_matrix)
 
     if "EXACT" in cur_algorithm or "1W" in cur_algorithm:
         # We use one-way backend version of the slider and just 4 objectives
@@ -1099,12 +1134,12 @@ def mors_feedback():
             return novelty_f(top_k_list)
 
         def exploration_w(top_k_list, user_vector_list, *args, **kwargs):
-            f = exploration(np.array([]), loader.distance_matrix)
+            f = exploration(np.array([]), distance_matrix)
             f.user_vector = np.array(user_vector_list, dtype=np.int32) # fixup
             return f(top_k_list)
         
         def exploitation_w(top_k_list, user_vector_list, *args, **kwargs):
-            f = exploitation(np.array([]), 1.0 - loader.distance_matrix)
+            f = exploitation(np.array([]), 1.0 - distance_matrix)
             f.user_vector = np.array(user_vector_list, dtype=np.int32) # fixup
             return f(top_k_list)
         
@@ -1267,6 +1302,7 @@ def mors_feedback():
         "weights": target_weights.tolist(),
         "objective_names": [obj.name() for obj in objectives],
         "selected_metric_name": selected_metric_name,
+        "configured_metric_name": configured_metric_name,
         "raw_slider_values": {
             "relevance": slider_relevance,
             "diversity": slider_uniformity_diversity,
@@ -1282,11 +1318,16 @@ def mors_feedback():
         "objectives": {
             "relevance": relevance_f(top_k).item(),
             "relevance-normed": rel_scores_normed[top_k].sum().item(),
-            "diversity": div_f(top_k).item(),
+            "cf_ild": cf_ild(top_k).item(),
+            "cb_ild": cb_ild(top_k).item(),
+            "bin_div": bin_div(top_k).item(),
             "novelty": novelty_f(top_k).item(),
-            "exploration": exploration_f(top_k).item(),
-            "uniformity": uniformity_f(top_k).item(),
-            "exploitation": exploitation_f(top_k).item(),
+            "cf_exploration": cf_exploration(top_k).item(),
+            "cb_exploration": cb_exploration(top_k).item(),
+            "cf_uniformity": cf_uniformity(top_k).item(),
+            "cb_uniformity": cb_uniformity(top_k).item(),
+            "cf_exploitation": cf_exploitation(top_k).item(),
+            "cb_exploitation": cb_exploitation(top_k).item(),
             "popularity": popularity_f(top_k).item()
         },
         "ease_selections": training_selections.tolist(),
