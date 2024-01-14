@@ -140,7 +140,7 @@ class RecommendationProblemExact(IntegerProblem):
         rnd_item = np.random.choice(self.item_indices)
         new_solution.variables[rnd_idx] = rnd_item
         # Finally we repair duplicates (no duplicates are allowed)
-        return repair_duplicates(self.item_indices, new_solution)
+        return repair_duplicates(self.n_items, new_solution)
     
     def number_of_variables(self):
         return self.number_of_variables
@@ -229,7 +229,7 @@ class RecommendationProblemMax(IntegerProblem):
         rnd_item = np.random.choice(self.item_indices)
         new_solution.variables[rnd_idx] = rnd_item
         # Finaly we get rid of all duplicates as these are prohibited
-        return repair_duplicates(self.item_indices, new_solution)
+        return repair_duplicates(self.n_items, new_solution)
 
     def number_of_variables(self):
         return self.number_of_variables
@@ -246,41 +246,38 @@ class RecommendationProblemMax(IntegerProblem):
 # Function for repairing integer solution by getting rid of duplicated entries
 # Whenever we see an item that is present multiple times, we start getting rid of its occurrences (while we have > 1 of them)
 # by replacing these items by randomly sampled items
-def repair_duplicates(all_items, res: IntegerSolution):
-    # Those are items not in the recommendation yet
-    candidate_items = np.setdiff1d(all_items, res.variables)
+def repair_duplicates(n_items, res: IntegerSolution):
+    unique_values = set()
     for i in range(len(res.variables)):
-        if res.variables[i] in res.variables[i+1:]:
-            rnd_candidate_index = np.random.randint(low=0, high=candidate_items.size)
-            res.variables[i] = candidate_items[rnd_candidate_index]
-            # Delete the candidate
-            np.delete(candidate_items, rnd_candidate_index)
+        while res.variables[i] in unique_values:
+            res.variables[i] = np.random.randint(0, n_items)
+        unique_values.add(res.variables[i])
     return res
 
 # Same as IntegerPolynomialMutation, but does "repair" the solution
 # by removing duplicates
 class FixingMutation(IntegerPolynomialMutation):
-    def __init__(self, items, relevance_scores, *args, **kwargs):
+    def __init__(self, n_items, relevance_scores, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.items = items
+        self.n_items = n_items
     
     def execute(self, solution: IntegerSolution) -> IntegerSolution:
         res = super().execute(solution)
-        return repair_duplicates(self.items, res)
+        return repair_duplicates(self.n_items, res)
     
 # Same as IntegerSBXCrossover, but does "repair" the solution
 # by removing duplicates
 class FixingCrossover(IntegerSBXCrossover):
-    def __init__(self, items, relevance_scores, *args, **kwargs):
+    def __init__(self, n_items, relevance_scores, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.items = items
+        self.n_items = n_items
 
     def execute(self, parents: List[IntegerSolution]) -> List[IntegerSolution]:
         res = super().execute(parents)
         assert len(res) == 2
         
-        res[0] = repair_duplicates(self.items, res[0])
-        res[1] = repair_duplicates(self.items, res[1])
+        res[0] = repair_duplicates(self.n_items, res[0])
+        res[1] = repair_duplicates(self.n_items, res[1])
         return res
 
 ##### End of evolutionary helpers ######
@@ -308,8 +305,8 @@ class evolutionary_max:
             problem=self.problem,
             population_size=10,
             offspring_population_size=10,
-            mutation=FixingMutation(self.problem.item_indices, relevance_estimates, probability=self.p_mutation, distribution_index=20),
-            crossover=FixingCrossover(self.problem.item_indices, relevance_estimates, probability=self.p_crossover, distribution_index=20),
+            mutation=FixingMutation(self.problem.n_items, relevance_estimates, probability=self.p_mutation, distribution_index=20),
+            crossover=FixingCrossover(self.problem.n_items, relevance_estimates, probability=self.p_crossover, distribution_index=20),
             #mutation=IntegerPolynomialMutation(probability=p_mutation),
             #crossover=IntegerSBXCrossover(probability=p_crossover),
             #termination_criterion=StoppingByEvaluations(max_evaluations=25000),
@@ -383,8 +380,8 @@ class evolutionary_exact:
             problem=self.problem,
             population_size=10,
             offspring_population_size=10,
-            mutation=FixingMutation(self.problem.item_indices, relevance_estimates, probability=self.p_mutation, distribution_index=20),
-            crossover=FixingCrossover(self.problem.item_indices, relevance_estimates, probability=self.p_crossover, distribution_index=20),
+            mutation=FixingMutation(self.problem.n_items, relevance_estimates, probability=self.p_mutation, distribution_index=20),
+            crossover=FixingCrossover(self.problem.n_items, relevance_estimates, probability=self.p_crossover, distribution_index=20),
             #mutation=IntegerPolynomialMutation(probability=p_mutation),
             #crossover=IntegerSBXCrossover(probability=p_crossover),
             #termination_criterion=StoppingByEvaluations(max_evaluations=25000),
