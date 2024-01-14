@@ -41,7 +41,7 @@ from jmetal.core.solution import IntegerSolution
 # For exact, we treat recommendation problem as single-objective optimization, where the single objective
 # corresponds to distance between weights and objectives evaluated on top of each solution
 class RecommendationProblemExact(IntegerProblem):
-    def __init__(self, k, objs, user_idx, relevance_scores, user_vector, relevance_top_k, filter_out_items, target_weights):
+    def __init__(self, k, objs, user_idx, relevance_scores, user_vector, relevance_top_k, filter_out_items, target_weights, mgain_cdf):
         super(RecommendationProblemExact, self).__init__()
         
         # Single objective that corresponds to distance between weights and actual objectives
@@ -86,21 +86,41 @@ class RecommendationProblemExact(IntegerProblem):
         # Target weights we are interested in achieving in our recommendation
         self.target_weights = target_weights
 
+        # CDF normalization for marginal gains
+        self.mgain_cdf = mgain_cdf
+
+        # Calculate marginal gain of each of the k items w.r.t. each objective
+        # we allocate the array here so we can reuse it in evaluate
+        self.mgains = np.zeros(shape=(len(self.objs), k))
+
     # Evaluate solution w.r.t. the objectives
     def evaluate(self, solution: IntegerSolution) -> IntegerSolution:
-        # The variables of solution ecode the recommendation
+        # The variables of solution encode the recommendation
         top_k_list = solution.variables
+
+        # The problem here is that we need to normalize objectives to calculate distance w.r.t. weights
+        # properly. However, we do not have right normalization available that would work for whole lists.
+        # For that reason, we resort to use approximation by calculating normalized marginal gains
+        # for individual items in the recommendation and representing whole recommendation as an average distance
+        # over the individual items.
         
         # During evaluation we need to map items, note that item 0 corresponds to actual item being self.items[0] (due to filtering)
         # We need to perform evaluation on original items instead of just their indices
         # Evaluate all the objectives on the given recommendation list
         top_k_mapped = self.items[top_k_list]
-        obj_vals = np.zeros(shape=(len(self.objs),), dtype=np.float32)
-        for i, obj in enumerate(self.objs):
-            obj_vals[i] = obj(top_k_mapped)
-        
-        # MO-EA's objective is distance between actual and target weights
-        solution.objectives = [((obj_vals - self.target_weights) ** 2).sum()]
+
+        for item_idx, item_mapped in enumerate(top_k_mapped):
+            # Get marginal gains
+            for obj_idx, obj in enumerate(self.objs):
+                self.mgains[obj_idx, item_idx] = obj(top_k_mapped[:item_idx+1]) - obj(top_k_mapped[:item_idx])
+
+        # Normalize the marginal gains
+        # We need to do double transpose, first we want mgains (n_objs, n_items) to be (n_items, n_objs) and then we transform it back
+        mgains = self.mgain_cdf.transform(self.mgains.T).T
+        # Get distance of the items
+        item_distances = ((mgains - self.target_weights[:, np.newaxis]) ** 2).sum(axis=0)
+        # MO-EA's objective is mean distance over the items from the recommendation
+        solution.objectives = [item_distances.mean()]
 
         assert solution is not None
         return solution
@@ -137,11 +157,11 @@ class RecommendationProblemExact(IntegerProblem):
 # Abstraction of Recommendation problem (as integer problem from jmetalpy)
 class RecommendationProblemMax(IntegerProblem):
 
-    def __init__(self, k, objs, user_idx, relevance_scores, user_vector, relevance_top_k, filter_out_items):
+    def __init__(self, k, framework_objectives, user_idx, relevance_scores, user_vector, relevance_top_k, filter_out_items):
         super(RecommendationProblemMax, self).__init__()
 
         # Number of MO-EA's objective is same as our objectives
-        self.number_of_objectives = len(objs)
+        self.number_of_objectives = len(framework_objectives)
         # We do not have any constraints
         self.number_of_constraints = 0
         # Number of variables corresponds to the length of the recommendation list
@@ -165,7 +185,7 @@ class RecommendationProblemMax(IntegerProblem):
         # Index of the user for which we generate the recommendation
         self.user_idx = user_idx
         # Save the objectives
-        self.objs = objs
+        self.framework_objectives = framework_objectives
         # Relevance-only recommendation list
         self.relevance_top_k = relevance_top_k
     
@@ -174,8 +194,8 @@ class RecommendationProblemMax(IntegerProblem):
         assert user_vector.ndim == 1 and user_vector.size == n_all_items
 
         # By default we maximize all the objectives in recommendation
-        self.obj_directions = [self.MAXIMIZE] * len(objs)
-        self.obj_labels = [o.name() for o in objs]
+        self.obj_directions = [self.MAXIMIZE] * len(framework_objectives)
+        self.obj_labels = [o.name() for o in framework_objectives]
         
         # Lower bound is 0
         self.lower_bound = [0] * self.number_of_variables
@@ -188,10 +208,10 @@ class RecommendationProblemMax(IntegerProblem):
         
         # During evaluation we need to map items, note that item 0 corresponds to actual item being self.items[0] (due to filtering)
         # We need to perform evaluation on original items instead of just their indices
+        # We evaluate framework objetives here
         top_k_mapped = self.items[top_k_list]
-        for i, obj in enumerate(self.objs):
+        for i, obj in enumerate(self.framework_objectives):
             solution.objectives[i] = obj(top_k_mapped)
-        
         assert solution is not None
         return solution
 
@@ -267,14 +287,17 @@ class FixingCrossover(IntegerSBXCrossover):
 
 # Actual evolutionary algorithm that wraps the underlying helpers passed to MO-EA jmetalpy framework
 class evolutionary_max:
-    def __init__(self, weights, relevance_estimates, user_vector, objectives, relevance_top_k, filter_out_items, k=10, time_limit_seconds=4):
+    def __init__(self, mgain_cdf, weights, relevance_estimates, user_vector, relevance_top_k, filter_out_items, our_objectives, framework_objectives, k=10, time_limit_seconds=4):
+        # our and framework objectives have to have the same length
+        assert len(our_objectives) == len(framework_objectives)
+        
         self.weights = weights
         self.p_mutation = P_MUTATION
         self.p_crossover = P_CROSSOVER
         self.problem = RecommendationProblemMax(
             relevance_scores=relevance_estimates,
             k=k,
-            objs=objectives,
+            framework_objectives=framework_objectives,
             user_idx=0, # We expect a single user
             user_vector=user_vector,
             relevance_top_k=relevance_top_k,
@@ -293,13 +316,39 @@ class evolutionary_max:
             termination_criterion=StoppingByTime(max_seconds=time_limit_seconds),
             selection=RouletteWheelSelection()
         )
+
+        self.mgain_cdf = mgain_cdf
+        self.our_objectives = our_objectives
+        self.k = k
     
     def select_single_solution(self, front):
         min_dist = np.inf
         min_dist_idx = None
 
+        item_distances = np.zeros(shape=(self.k), dtype=np.float32)
+        # Calculate marginal gain of each of the k items w.r.t. each objective
+        mgains = np.zeros(shape=(len(self.our_objectives), self.k))
+
         for idx, solution in enumerate(front):
-            dist = ((solution.objectives - self.weights) ** 2).sum()
+            assert len(solution.variables) == self.k
+            # The problem here is that we need to normalize objectives to calculate distance w.r.t. weights
+            # properly. However, we do not have right normalization available that would work for whole lists.
+            # For that reason, we resort to use approximation by calculating normalized marginal gains
+            # for individual items in the recommendation and representing whole recommendation as an average distance
+            # over the individual items.
+            variables_mapped = self.problem.items[solution.variables]
+            for item_idx, item_mapped in enumerate(variables_mapped):
+                # Get marginal gains
+                for obj_idx, obj in enumerate(self.our_objectives):
+                    mgains[obj_idx, item_idx] = obj(variables_mapped[:item_idx+1]) - obj(variables_mapped[:item_idx])
+
+            # Normalize the marginal gains
+            # We need to do double transpose, first we want mgains (n_objs, n_items) to be (n_items, n_objs) and then we transform it back
+            mgains = self.mgain_cdf.transform(mgains.T).T
+            # Get distance of the items
+            item_distances = ((mgains - self.weights[:, np.newaxis]) ** 2).sum(axis=0)
+
+            dist = item_distances.mean()
             if min_dist_idx is None or dist < min_dist:
                 min_dist_idx = idx
                 min_dist = dist
@@ -314,7 +363,7 @@ class evolutionary_max:
         return self.problem.items[best_solution.variables]
 
 class evolutionary_exact:
-    def __init__(self, weights, relevance_estimates, user_vector, objectives, relevance_top_k, filter_out_items, k=10, time_limit_seconds=4):
+    def __init__(self, mgain_cdf, weights, relevance_estimates, user_vector, objectives, relevance_top_k, filter_out_items, k=10, time_limit_seconds=4):
         self.weights = weights
         self.p_mutation = P_MUTATION
         self.p_crossover = P_CROSSOVER
@@ -326,7 +375,8 @@ class evolutionary_exact:
             user_vector=user_vector,
             relevance_top_k=relevance_top_k,
             filter_out_items=filter_out_items,
-            target_weights=weights
+            target_weights=weights,
+            mgain_cdf=mgain_cdf
         )
 
         self.algorithm = NSGAII(
@@ -349,6 +399,19 @@ class evolutionary_exact:
         best_solution = front[0]
         # Do the item index mapping
         return self.problem.items[best_solution.variables]
+
+# Basic implementation that calculates scores as (1 - alpha) * mgain_rel + alpha * mgain_div
+# that is used in diversification experiments
+class unit_normalized_diversification:
+    def __init__(self, alpha):
+        self.alpha = alpha
+    def __call__(self, mgains, seen_items_mask):
+        # We ignore seen items mask here
+        assert mgains.ndim == 2 and mgains.shape[0] == 2, f"shape={mgains.shape}"
+        scores = (1.0 - self.alpha) * mgains[0] + self.alpha * mgains[1]
+        assert scores.ndim == 1 and scores.shape[0] == mgains.shape[1], f"shape={scores.shape}"
+        scores = mask_scores(scores, seen_items_mask)
+        return scores.argmax()
 
 class item_wise_exact:
     def __init__(self, weights):
@@ -386,34 +449,24 @@ class item_wise_max:
         print(f"Max score = {scores.max()}, mgains: {mgains[:, scores.argmax()]}")
         return scores.argmax()
 
-# TODO modify
 class greedy_exact:
     def __init__(self, weights):
         self.weights = weights
         self.n_objectives = weights.size
-        self.TOT = 0.0
-        self.gm = np.zeros(shape=(self.n_objectives, ), dtype=np.float32)
+        self.TOT = np.zeros(shape=(self.n_objectives, ), dtype=np.float32)
 
     # Returns single item recommended at a given time
     def __call__(self, mgains, seen_items_mask):
-        _, n_items = mgains.shape
         assert np.all(mgains >= 0.0), "We expect all mgains to be normalized to be greater than 0"
-        tots = np.zeros(shape=(n_items, ), dtype=np.float32)
-        remainder = np.zeros_like(self.gm)
-        scores = np.zeros_like(tots)
-        for item_idx in np.arange(n_items):
-            tots[item_idx] = max(self.TOT, self.TOT + mgains[:, item_idx].sum())
-            remainder = tots[item_idx] * self.weights - self.gm
-            assert remainder.shape == (self.n_objectives,)
-            # We want to push remainder to 0 by maximizing score (so we minimize its negative)
-            scores[item_idx] = -((remainder - mgains[:, item_idx]) ** 2).sum()
 
+        scores = -(self.TOT[:, np.newaxis] + ((mgains - self.weights[:, np.newaxis]) ** 2)).sum(axis=0)
+        assert scores.shape == (mgains.shape[1], )
         scores = mask_scores(scores, seen_items_mask)
+
         i_best = scores.argmax()
 
-        self.gm = self.gm + mgains[:, i_best]
-        self.TOT = np.clip(self.gm, 0.0, None).sum()
-
+        self.TOT = (self.TOT[:, np.newaxis] + self.weights[:, np.newaxis] - mgains)[:, i_best]
+        assert self.TOT.shape == (self.n_objectives, ), f"Shape={self.TOT.shape}"
         return i_best
 
 # Original rlprop algorithm

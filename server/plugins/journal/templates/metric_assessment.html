@@ -24,14 +24,41 @@
         </b-jumbotron> -->
 
         <b-jumbotron style="max-height: 10vh;" class="smallJumbotron" header-level="8">
-            <template #header>
+            <!-- <template #header>
                 <h1 style="font-size: 1.0rem; margin-bottom: -0.5em; padding: 0;">{{header}} ({{iteration}}/{{n_iterations}})</h1>
             </template>
             <p style="margin-top: 0px;">
                 {{hint}}
-            </p>
+            </p> -->
+            <b-row>
+                <b-col cols="auto" style="text-align: left;">
+                    <h1 style="font-size: 1.0rem; margin-bottom: -0.1em; padding: 0;">{{header}} ({{iteration}}/{{n_iterations}})</h1>
+                    <p style="margin-top: 0px;">
+                        {{hint}}
+                    </p>
+                </b-col>
+                <b-col style="text-align: right;">
+                    <b-button size="lg" name="instructionsBtn" variant="info" class="mb-2" v-b-toggle.sidebar-1>
+                        Instructions <b-icon icon="question-square-fill" aria-hidden="true"></b-icon>
+                      </b-button>
+                </b-col>
+            </b-row>
         </b-jumbotron>
     
+        <template>
+            <div>
+              <b-sidebar id="sidebar-1" title="Instructions" shadow>
+                <div class="px-3 py-2">
+                  <ol>
+                    <li v-for="bulletText in instructionBullets">
+                        [[bulletText]]
+                    </li>
+                  </ol>
+                </div>
+              </b-sidebar>
+            </div>
+        </template>
+
         <!-- <b-row align-h="center">
             <b-col class="text-center">
                 <b-form method="POST" action="{{continuation_url}}">
@@ -81,11 +108,20 @@
         
         <b-row align-h="center">
             <b-col class="text-center">
-                <b-form method="POST" action="{{url_for('journal.metric_feedback')}}">
+                <b-form method="POST" ref="myForm" @submit.prevent="onSubmit" action="{{url_for('journal.metric_feedback')}}">
                     <input type="hidden" name="csrf_token" value="{{csrf_token()}}"/>
                     <input type="hidden" name="selected_metric_name" :value="selectedMetric == null ? null : selectedMetric.variantName"/>
                     <input type="hidden" name="selected_metric_index" :value="selectedMetric == null ? null : selectedMetric.variant"/>
-                    <b-button :disabled="selectedMetric == null" variant="success" class="mt-1 mb-1" type="submit">Continue</b-button>
+                    <b-overlay
+                        :show="busy"
+                        rounded
+                        opacity="0.6"
+                        spinner-small
+                        spinner-variant="primary"
+                        class="d-inline-block"
+                    >
+                        <b-button :disabled="selectedMetric == null" name="continueBtn" variant="success" class="mt-1 mb-1" type="submit">Continue</b-button>
+                    </b-overlay>
                 </b-form>
             </b-col>
         </b-row>
@@ -181,7 +217,9 @@
             variantsResults: moviesColumnified,
             variantNames: variantNames,
             algorithmRatingsValidated: [false, false],
-            selectedMetric: null
+            selectedMetric: null,
+            busy: false,
+            instructionBullets: []
         };
     },
     computed: {
@@ -345,6 +383,10 @@
                 }
             });
         },
+        onSubmit() {
+            this.busy = true;
+            this.$refs.myForm.submit();
+        }
     },
     async mounted() {
         const btns = document.querySelectorAll("button");
@@ -352,6 +394,14 @@
         const checkboxes = document.querySelectorAll("input[type=checkbox]");
         const textboxes = document.querySelectorAll("input[type=text]");
         const selects = document.querySelectorAll("select");
+
+        this.instructionBullets = await fetch("{{url_for('journal.get_instruction_bullets', page='metric-assessment')}}")
+                            .then(response => {
+                                if (!response.ok) {
+                                    console.log("Erorr");
+                                }
+                                return response.json();
+                            });
         
         // Register the handlers for event reporting
         startViewportChangeReportingWithLimit(`/utils/changed-viewport`, csrfToken, 1.0, true);

@@ -6,13 +6,40 @@
             {{hint}}
         </b-jumbotron> -->
         <b-jumbotron style="max-height: 7vh;" class="smallJumbotron" header-level="8">
-            <template #header>
+            <!-- <template #header>
                 <h1 style="font-size: 1.0rem; margin-bottom: -0.5em; padding: 0;">{{header}}</h1>
             </template>
             <p style="margin-top: 0px;">
                 {{hint}}
-            </p>
+            </p> -->
+            <b-row>
+                <b-col cols="auto" style="text-align: left;">
+                    <h1 style="font-size: 1.0rem; margin-bottom: -0.1em; padding: 0;">{{header}}</h1>
+                    <p style="margin-top: 0px;">
+                        {{hint}}
+                    </p>
+                </b-col>
+                <b-col style="text-align: right;">
+                    <b-button size="lg" name="instructionsBtn" variant="info" class="mb-2" v-b-toggle.sidebar-1>
+                        Instructions <b-icon icon="question-square-fill" aria-hidden="true"></b-icon>
+                      </b-button>
+                </b-col>
+            </b-row>
         </b-jumbotron>
+
+        <template>
+            <div>
+              <b-sidebar id="sidebar-1" title="Instructions" shadow>
+                <div class="px-3 py-2">
+                  <ol>
+                    <li v-for="bulletText in instructionBullets">
+                        [[bulletText]]
+                    </li>
+                  </ol>
+                </div>
+              </b-sidebar>
+            </div>
+        </template>
     
         <b-form method="POST" action="{{ continuation_url }}">
             <b-row class="mb-3" align-h="center">
@@ -467,7 +494,7 @@
                     <!-- <b-form method="POST" action="{{continuation_url}}"> -->
                         <input type="hidden" name="csrf_token" value="{{csrf_token()}}"/>
                         <!-- <input type="hidden" name="final_questionnaire_data" value="final_questionnaire_data"/> -->
-                        <b-button class="mb-3" variant="success" type="submit">{{finish}}</b-button>
+                        <b-button class="mb-3" variant="success" type="submit" name="finishBtn">{{finish}}</b-button>
                     <!-- </b-form> -->
                 </b-col>
             </b-row>
@@ -494,7 +521,8 @@
     data: function() {
         
         return {
-            questions: null
+            questions: null,
+            instructionBullets: []
         };
     },
     methods: {
@@ -507,6 +535,14 @@
         const selects = document.querySelectorAll("select");
         
         this.questions = await fetch("{{url_for('journal.get_block_questions')}}")
+                            .then(response => {
+                                if (!response.ok) {
+                                    console.log("Erorr");
+                                }
+                                return response.json();
+                            });
+
+        this.instructionBullets = await fetch("{{url_for('journal.get_instruction_bullets', page='block-questionnaire')}}")
                             .then(response => {
                                 if (!response.ok) {
                                     console.log("Erorr");

@@ -78,5 +78,7 @@
     "questionnaire_hint": "Answer all the questions below",
     "questionnaire_title": "Final questionnaire",
     "questionnaire_header": "Final questionnaire",
-    "questionnaire_finish": "Finish user study"
+    "questionnaire_finish": "Finish user study",
+    "elicitation_not_enough_movies_detail": "You have to select at least 5-10 items for correct recommendation functionality.",
+    "elicitation_not_enough_movies_header": "Insufficient selected items"
 }
