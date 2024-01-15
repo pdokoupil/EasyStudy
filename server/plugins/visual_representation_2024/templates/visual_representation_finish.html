@@ -1,0 +1,64 @@
+{% include 'header.html' %}
+    <!-- Our application root element -->
+    <div id="app">
+      <b-container align-h="center" fluid>
+        
+        {% if finished_text_override is defined and finished_text_override is not none  %}
+        <div class="jumbotron smallJumbotron">
+            {{ finished_text_override | safe }}
+        </div>
+        {% else %}
+        <b-jumbotron class="smallJumbotron" header="Done" lead="Thank you!" header-level="4">
+        </b-jumbotron>
+        {% endif %}
+
+        <b-row align-h="center">
+          <b-col class="text-center">
+            You correctly identified the corresponding class in <strong>{{ n_identified }}</strong> out of <strong>{{ n_shown }}</strong> cases. Congratulations!
+          </b-col>
+        </b-row>
+
+        {% if prolific_pid is defined and prolific_pid is not none %}
+        <b-row align-h="center">
+            <b-col class="text-center" align-h="center" cols="6">
+                <p>{{auto_redirect}}.</p>
+                <b-btn @click="prolificRedirect" variant="success" type="submit">Finish and go back to prolific</b-btn>
+            </b-col>
+        </b-row>
+        {% endif %}
+      </b-container>
+    </div>
+
+    <!-- Start running your app -->
+    {% if prolific_pid is defined and prolific_pid is not none %}
+    <script>
+        console.log("Redirecting in 15 seconds");
+        window.setTimeout(function (){
+            window.location = "{{prolific_url}}";
+        }, 15000);
+    </script>
+    {% endif %}
+    <script>
+      window.app = new Vue({
+        el: '#app',
+        delimiters: ['[[',']]'], // Used to replace double { escaping with double [ escaping (to prevent jinja vs vue inference)
+        data: function() {
+            return {
+            }
+        },
+        methods: {
+          prolificRedirect() {
+            window.location = "{{prolific_url}}";
+          }
+        }
+      })
+    </script>
+{% if footer_override is defined and footer_override is not none %}
+<div class="footerDiv mt-3">
+  {{ footer_override|safe }}
+</div>
+</body>
+</html>
+{% else %}
+{% include 'footer.html' %}
+{% endif %}

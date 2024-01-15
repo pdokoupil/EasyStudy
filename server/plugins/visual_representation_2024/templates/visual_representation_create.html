@@ -1,0 +1,175 @@
+{% include 'header.html' %}
+    <!-- Our application root element -->
+    <div id="app">
+      <b-container align-h="center" fluid>
+        <b-jumbotron header-level="4" header="{{plugin_name}} Create" lead="Create user study.">
+            Specify parameter values.
+        </b-jumbotron>
+          <b-row align-h="center" class="mb-3">
+            <b-col cols="8">
+              <b-input type="text" id="prolific_code" name="prolific_code" v-model="prolificCode" placeholder="Please enter prolific code (if needed)"/>
+            </b-col>
+          </b-row>
+          <b-row align-h="center" class="mb-3">
+            <b-col class="text-center" cols="8">
+              <b-form-checkbox v-model="overrideFooter">{{override_footer}}</b-form-checkbox>
+            </b-col>
+          </b-row>
+          <b-row :hidden="!overrideFooter" align-h="center" class="mb-3">
+            <b-col cols="8">
+              <textarea placeholder="{{footer_placeholder}}" id="footer"></textarea>
+            </b-col>
+          </b-row>
+          <b-row align-h="center" class="mb-3">
+            <b-col class="text-center" cols="8">
+              <b-form-checkbox v-model="overrideAbout">{{override_about}}</b-form-checkbox>
+            </b-col>
+          </b-row>
+          <b-row :hidden="!overrideAbout" align-h="center" class="mb-3">
+            <b-col cols="8">
+              <textarea placeholder="{{about_placeholder}}" id="about"></textarea>
+            </b-col>
+          </b-row>
+          <b-row align-h="center" class="mb-3">
+            <b-col class="text-center" cols="8">
+              <b-form-checkbox v-model="overrideInformedConsent">{{override_informed_consent}}</b-form-checkbox>
+            </b-col>
+          </b-row>
+          <b-row :hidden="!overrideInformedConsent" align-h="center" class="mb-3">
+            <b-col cols="8">
+              <textarea placeholder="{{informed_consent_placeholder}}" id="informedConsent"></textarea>
+            </b-col>
+          </b-row>
+          <b-row align-h="center" class="mb-3">
+            <b-col class="text-center" cols="8">
+              <b-form-checkbox v-model="overrideComparisonHint">{{override_algorithm_comparison_hint}}</b-form-checkbox>
+            </b-col>
+          </b-row>
+          <b-row :hidden="!overrideComparisonHint" align-h="center" class="mb-3">
+            <b-col cols="8">
+              <textarea placeholder="{{algorithm_comparison_placeholder}}" id="comparisonHint"></textarea>
+            </b-col>
+          </b-row>
+          <b-row align-h="center" class="mb-3">
+            <b-col class="text-center" cols="8">
+              <b-form-checkbox v-model="overrideFinishedText">{{override_finished_text}}</b-form-checkbox>
+            </b-col>
+          </b-row>
+          <b-row :hidden="!overrideFinishedText" align-h="center" class="mb-3">
+            <b-col cols="8">
+              <textarea placeholder="{{finished_text_placeholder}}" id="finishedText"></textarea>
+            </b-col>
+          </b-row>
+          <b-row align-h="center">
+            <b-col cols="8" class="text-right" align-h="end">
+              <b-btn variant="warning" v-on:click="cancelCreateUserStudy">Cancel</b-btn>
+              <b-btn variant="primary" v-on:click="onCreateUserStudy">Create</b-btn>
+            </b-col>
+          </b-row>
+      </b-container>
+    </div>
+
+    <!-- WYSIWYG HTML Editor -->
+    <script src="../static/tinymce/tinymce.min.js" referrerpolicy="origin"></script>
+    <!-- Start running your app -->
+    <script>
+      tinymce.init({
+        selector: '#about',
+        plugins: 'lists, advlist, link, image',
+      });
+      tinymce.init({
+        selector: '#footer',
+        plugins: 'lists, advlist, link, image',
+      });
+      tinymce.init({
+        selector: '#informedConsent',
+        plugins: 'lists, advlist, link, image',
+      });
+      tinymce.init({
+        selector: '#comparisonHint',
+        plugins: 'lists, advlist, link, image',
+      });
+      tinymce.init({
+        selector: '#finishedText',
+        plugins: 'lists, advlist, link, image',
+      });
+
+      window.app = new Vue({
+        el: '#app',
+        delimiters: ['[[',']]'], // Used to replace double { escaping with double [ escaping (to prevent jinja vs vue inference)
+        data: function() {
+            return {
+              prolificCode: null,
+              overrideInformedConsent: false,
+              overrideComparisonHint: false,
+              overrideFinishedText: false,
+              overrideAbout: false,
+              overrideFooter: false
+            }
+        },
+        methods: {
+            prepareOverrides() {
+                let textOverrides = {};
+                if (this.overrideInformedConsent) {
+                  textOverrides["informed_consent"] = tinymce.get("informedConsent").getContent();
+                }
+                if (this.overrideComparisonHint) {
+                  textOverrides["comparison_hint"] = tinymce.get("comparisonHint").getContent();
+                }
+                if (this.overrideFinishedText) {
+                  textOverrides["finished_text"] = tinymce.get("finishedText").getContent();
+                }
+                if (this.overrideAbout) {
+                  textOverrides["about"] = tinymce.get("about").getContent();
+                }
+                if (this.overrideFooter) {
+                  textOverrides["footer"] = tinymce.get("footer").getContent();
+                }
+                return textOverrides;
+              },
+            async onCreateUserStudy() {
+                let pluginName = "{{plugin_name}}";
+                console.log("Creating user study for plugin: " + pluginName);
+                //let k = document.getElementById("k").value;
+                //let prolific_code = document.getElementById("prolific_code").value;
+
+                let textOverrides = this.prepareOverrides();
+
+                let userStudyConfiguration = {
+                    "prolific_code": this.prolificCode,
+                    "text_overrides": textOverrides
+                };
+
+                let userStudyData = {
+                    "parent_plugin": pluginName,
+                    "config": userStudyConfiguration
+                };
+
+                let res = await fetch("/create-user-study",
+                    {
+                        method: "POST",
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRFToken': '{{ csrf_token() }}'
+                        },
+                        body: JSON.stringify(userStudyData),
+                        redirect: "follow"
+                    }
+                ).then(response => {
+                    if (response.redirected) {
+                        console.log(response);
+                        window.location.href = response.url;
+                    } else {
+                        return response.text()
+                    }
+                });
+                console.log(res);
+            },
+            
+            cancelCreateUserStudy() {
+                window.location.href = "{{ url_for('main.administration') }}"
+            }
+        }
+      })
+    </script>
+{% include 'footer.html' %}

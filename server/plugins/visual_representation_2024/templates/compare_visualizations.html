@@ -1,0 +1,352 @@
+{% include 'header.html' %}
+    <!-- Our application root element -->
+    <style>
+      .selected {
+        outline: 5px solid greenyellow;
+        outline-offset: -5px;
+      }
+
+      .hovered {
+        outline: 5px solid greenyellow !important;
+        outline-offset: -5px;
+      }
+
+      .selectableItem {
+        cursor: pointer;
+      }
+
+      .theImage {
+        outline: 2px solid grey;
+      }
+
+      .negativeImage {
+        outline: 2px solid rgb(247, 122, 122);
+      }
+
+      .targetImage {
+        outline: 2px solid rgb(110, 250, 238);
+      }
+
+      .myContainer {
+        width: 100%; /* Set the desired width of the container */
+        overflow-x: scroll; /* Enable horizontal scrolling for the container */
+        white-space: nowrap; /* Prevent rows from wrapping to the next line */
+        position: relative;
+      }
+
+      .myRow {
+        display: inline-block; /* Display rows in a horizontal line */
+        width: 100%; /* Set the desired width for each row */
+      }
+
+
+      .centered-content {
+        position: sticky;
+        left: 50%;
+        transform: translateX(-50%);
+        text-align: center;
+        z-index: 1;
+        background-color: white;
+        width: max-content;
+      }
+
+      .horizontal-separator {
+        height: 5px;
+        width:100%; 
+        background-color: red; 
+        position: sticky; 
+        top: 0; 
+        left: 0;
+      }
+
+      .verticalSeparator {
+          border-left: 5px solid red;
+      }
+
+    </style>
+    <div id="app">
+      <b-container align-h="center" fluid>
+        
+        {% if comparison_hint_override is defined and comparison_hint_override is not none  %}
+        <div class="jumbotron smallJumbotron">
+            {{ comparison_hint_override | safe }}
+            <h5>({{iteration + 1}}/{{n_iterations}})</h5>
+        </div>
+        {% else %}
+        <b-jumbotron class="smallJumbotron" header="{{header}} ({{iteration + 1}}/{{n_iterations}})" lead="{{hint_lead}}" header-level="4">
+            {{hint}}
+            <strong>{{note}}:</strong> {{note_text}}
+        </b-jumbotron>
+        {% endif %}
+
+        <!-- <b-row align-h="center" class="mt-3 mb-3">
+          <b-col cols="auto" style="text-align: center;">
+            <h2>Target</h2>
+          </b-col>
+          <b-col cols="auto" style="text-align: center;">
+            <h2>Negative samples</h2>
+          </b-col>
+        </b-row> -->
+        <b-row align-h="center" style="text-align: center;" class="mt-3 mb-3" v-if="studyData != null">
+          <b-col class="mr-3" cols="auto" style="text-align: center;">
+            <b-row align-h="center">
+              <h2>Target</h2>
+            </b-row>
+            <b-row>
+              <b-img class="targetImage" :src="studyData.target"></b-img>
+            </b-row>
+          </b-col>
+          <b-col cols="auto" class="verticalSeparator">
+            <b-row align-h="center">
+              <h2>Negative samples</h2>
+            </b-row>
+            <b-row align-h="center" style="text-align: center;">
+              <b-col cols="auto" style="text-align: center;" v-for="negativeSample in studyData.negative_samples">
+                <b-img class="negativeImage" :src="negativeSample"></b-img>
+              </b-col>
+            </b-row>
+          </b-col>
+        </b-row>
+        <div class="mt-3 mb-3 horizontal-separator"></div>
+        <b-row align-h="center" class="mb-2 mt-2" v-for="row in variantResults">
+          <b-col class="col" xl="auto" class="align-middle" v-for="col in row">
+            <!-- <b-img class="theImage theItem" :src="col"></b-img> -->
+            <b-img height="308px" class="theImage theItem selectableItem" :id="col" v-b-hover="handleHover" @click="onSelectVisualization($event)" :src="col"/>
+            <!-- <b-img @mouseenter="itemMouseEnter" @mouseleave="itemMouseLeave" :id="variantNames[algoIdx] + '_' + col.movie_idx" style="width: 175px; height: 260px;" block center :src="col.url" v-on:click="onSelectMovie($event, col, variantsResults.indexOf(variantResults))" :name="col.movie_idx" :alt="col.movie" /> -->
+          </b-col>
+      </b-row>
+
+        
+
+        <!-- <div class="myContainer" name="scrollableDiv">
+          <b-row align-h="center" class="mt-1 mb-1">
+            <b-col class="text-center">
+              <b-col class="centered-content">
+                <h5>Input visualization</h5>
+              </b-col>
+            </b-col>
+          </b-row>
+          <b-row align-h="center">
+            <b-col align-h="center" style="text-align: center;" cols="auto" class="text-center align-middle">
+                {% if iteration_data['method'] == 'table-t' %}
+                    <div class="theItem" :id="data.method + '_' + data.dataset + '_' + data.example.name + '_' + data.example.example_class_name + '_src'" id="sourceDiv"></div>
+                {% else %}
+                    <b-img height="308px" :id="data.method + '_' + data.dataset + '_' + data.example.name + '_' + data.example.example_class_name + '_src'" class="theImage theItem" :src="data.example.rel_path"/>
+                {% endif %}
+            </b-col>
+          </b-row>
+          <div class="mt-3 mb-3 horizontal-separator"></div>
+          <b-row align-h="center" class="mb-5">
+            <b-col class="text-center">
+              <b-col class="centered-content">
+                <h5>Please select the class visualization (from the list below) that is most similar to the input visualization</h5>
+              </b-col>
+            </b-col>
+          </b-row>
+          {% if iteration_data['method'] == 'table-t' %}
+          <b-row v-for="shown_class in data.shown_classes" align-h="center" class="text-center">
+              <div class="myRow">
+                <div class="theItem selectableItem" :id="data.method + '_' + data.dataset + '_' + shown_class.name" style="padding-left: 15px; padding-right: 15px; z-index: 1; position: relative; display: inline-block;" @click="onSelectVisualization($event, shown_class)" v-b-hover="handleHover">
+                  <div :id="data.method + '_' + data.dataset + '_' + shown_class.name + '_table'" style="position: relative; z-index: -1; display: inline-block;"></div>
+                </div>
+                
+              </div>
+            </b-row>
+          
+
+          {% else %}
+          <b-row>
+            <b-col v-for="shown_class in data.shown_classes" align-h="center" class="text-center">
+                <b-img height="308px" class="theImage theItem selectableItem" :id="data.method + '_' + data.dataset + '_' + shown_class.name" v-b-hover="handleHover" @click="onSelectVisualization($event, shown_class)" :src="shown_class.class_image_rel_path"/>
+            </b-col>
+          </b-row>
+          {% endif %}
+
+          <b-row align-h="center" class="mt-3 mb-3">
+            <b-col class="text-center">
+              <b-col class="centered-content">
+                {% if iteration < n_iterations - 1 %}
+                <b-form action="{{ continuation_url }}" method="GET">
+                    <input type="hidden" hidden="true" :value="selectedItem.method" name="method"/>
+                    <input type="hidden" hidden="true" :value="selectedItem.dataset" name="dataset"/>
+                    <input type="hidden" hidden="true" :value="selectedItem.id" name="selection_id"/>
+                    <input type="hidden" hidden="true" :value="selectedItem.className" name="class_name"/>
+                    <input type="hidden" hidden="true" :value="selectedItem.example.name" name="example_name"/>
+                    <input type="hidden" hidden="true" :value="selectedItem.example.example_class_name" name="example_class_name"/>
+                    <b-btn type="submit" variant="primary" block :disabled="selectedItem.id == null">Continue</b-btn>
+                </b-form>
+                {% else %}
+                <b-form action="{{ continuation_url }}" method="GET">
+                    <input type="hidden" hidden="true" :value="selectedItem.method" name="method"/>
+                    <input type="hidden" hidden="true" :value="selectedItem.dataset" name="dataset"/>
+                    <input type="hidden" hidden="true" :value="selectedItem.id" name="selection_id"/>
+                    <input type="hidden" hidden="true" :value="selectedItem.className" name="class_name"/>
+                    <input type="hidden" hidden="true" :value="selectedItem.example.name" name="example_name"/>
+                    <input type="hidden" hidden="true" :value="selectedItem.example.example_class_name" name="example_class_name"/>
+                    <b-btn type="submit" variant="success" block :disabled="selectedItem.id == null">Finish</b-btn>
+                </b-form>
+                {% endif %}
+              </b-col>
+            </b-col>
+          </b-row>
+        </div> -->
+
+        
+      </b-container>
+    </div>
+    <script src="{{url_for('static', filename='resolution_handling.js')}}"></script>
+    <script src="{{url_for('static', filename='interaction_reporting.js')}}"></script>
+    <script src="{{url_for('static', filename='message_reporting.js')}}"></script>
+
+    <!-- Start running your app -->
+    <script>
+      var csrfToken = "{{csrf_token()}}";
+      var data = JSON.parse('{{ iteration_data | tojson | safe}}');
+      //console.log(data);
+
+      function get_compare_ctx_lambda(src) {
+        return function compare_ctx_lambda() {
+            return {
+                "items": Array.from(document.getElementsByClassName("theItem")).map(x => {
+                    return {
+                        "id": x.id, // Corresponds to movie idx
+                        "name": x.name,
+                        "url": x.src,
+                        "title": x.title,
+                        "viewport": getElementBoundingBox(x),
+                        "source": src
+                    };
+                })
+            };
+        }
+      }
+      
+      window.app = new Vue({
+        el: '#app',
+        delimiters: ['[[',']]'], // Used to replace double { escaping with double [ escaping (to prevent jinja vs vue inference)
+        data: function() {
+
+            return {
+                selected: [],
+                data: data,
+                studyData: null,
+                variantResults: null
+            }
+        },
+        methods: {
+            handleHover(mouseOver, event) {
+              if (mouseOver) {
+                event.srcElement.classList.add("hovered");
+              } else {
+                event.srcElement.classList.remove("hovered");
+              }
+            },
+            onSelectVisualization(event) {
+              let id = event.srcElement.id;
+              let index = this.selected.indexOf(id);
+              if (index > -1) {
+                  // Already there, remove it
+                  var copy = document.getElementById(id);
+                  copy.classList.remove("selected");
+                  this.selected.splice(index, 1);
+                  reportDeselectedItem(`/utils/deselected-item`, csrfToken, id, this.selected, ()=>{ 
+                      return {
+                          "id": id
+                      }; 
+                  });
+              } else {
+                  // Not there, insert
+                  var copy = document.getElementById(id);
+                  copy.classList.add("selected");
+                  this.selected.push(id);
+                  reportSelectedItem(`/utils/selected-item`, csrfToken, id, this.selected, ()=>{
+                      return {
+                          "id": id
+                      };
+                  });
+              }
+
+              //reportSelectedItem(`/utils/selected-item`, csrfToken, item, this.selected, ()=>{ return {"variant": variant}; });
+              reportOnInput("/utils/on-input", csrfToken, "selected-candidate", {
+                  "id": event.srcElement.id
+              });
+            }
+        },
+        async mounted() {
+            window.addEventListener("load", function(event) {
+              reportLoadedPage(`/utils/loaded-page`, csrfToken, "compare_visualizations", ()=>
+                {
+                    return {
+                        "data": data,
+                        "iteration": "{{iteration}}",
+                        "full_dom_loaded": true
+                    };
+                }
+            );
+            });
+
+            this.studyData = await fetch("{{url_for('visualrepresentation2024.get_image_paths')}}").then(response => response.json());
+
+            const colsPerRow = 5;
+
+            let variantResultsColumnified = [];
+            let row = [];
+            for (idx in this.studyData.candidate_list) {
+                let candidate = this.studyData.candidate_list[idx];
+                row.push(candidate);
+                if (row.length >= colsPerRow) {
+                    variantResultsColumnified.push(row);
+                    row = [];
+                }
+            }
+            if (row.length > 0) {
+                variantResultsColumnified.push(row);
+            }
+            this.variantResults = variantResultsColumnified;
+
+            history.pushState(null, document.title, location.href);
+            window.addEventListener('popstate', function (event)
+            {
+              history.pushState(null, document.title, location.href);
+              reportError("/utils/on-message", csrfToken, window.location.href, "Attempt to navigate back", ()=> {
+                  return {"type": "Navigate back", "iteration": "{{iteration}}"};
+                });
+            });
+            
+
+            let elem = document.getElementById("sourceDiv");
+            if (elem != null) {
+              elem.innerHTML = await fetch(`{{url_for('visualrepresentation2024.table_data_example')}}?name=${data.example.name}`).then(resp => resp.text()).catch(err => null);
+            }
+            for (idx in data.shown_classes) {
+              let d = data.shown_classes[idx];
+              let elem = document.getElementById(data.method + '_' + data.dataset + '_' + d.name + '_table');
+              if (elem == null) {
+                continue;
+              }
+              elem.innerHTML = await fetch(`{{url_for('visualrepresentation2024.table_data')}}?name=${d.name}`).then(resp => resp.text()).catch(err => null);
+            }
+
+            // Register the handlers for event reporting
+            startViewportChangeReportingWithLimit(`/utils/changed-viewport`, csrfToken, 1.0, true, get_compare_ctx_lambda("page-scroll"));
+            startScrollReportingWithLimit(`/utils/changed-viewport`, csrfToken, 1.0, document.getElementsByName("scrollableDiv"), get_compare_ctx_lambda("horizontal-scroll"));
+            reportLoadedPage(`/utils/loaded-page`, csrfToken, "compare_visualizations", ()=>
+                {
+                    return {
+                        "data": data,
+                        "iteration": "{{iteration}}"
+                    };
+                }
+            );
+          },
+      })
+    </script>
+{% if footer_override is defined and footer_override is not none %}
+<div class="footerDiv mt-3">
+  {{ footer_override|safe }}
+</div>
+</body>
+</html>
+{% else %}
+{% include 'footer.html' %}
+{% endif %}
