@@ -78,10 +78,14 @@
                         <div>
                             <b-popover @show="popoverShown" @hidden="popoverHidden" :target="variantNames[algoIdx] + '_' + col.movie_idx" triggers="hover" placement="right">
                                 <template #title>[[col.movie]]</template>
-                                 <div>
+                                <div v-if="col.genres">
+                                    <strong>Genres: </strong>
+                                    <i>[[col.genres.join(', ')]]</i>
+                                </div>
+                                <div v-if="col.plot">
                                     <strong>Plot: </strong>
                                     [[col.plot]]
-                                 </div>
+                                </div>
                                  <div v-if="col.trailer_url" class="mt-1 text-center">
                                     <b-button target="_blank" @click="onTrailerWatch(col)" :href="col.trailer_url" size="sm" variant="primary">IMDb trailer</b-button>
                                  </div>
