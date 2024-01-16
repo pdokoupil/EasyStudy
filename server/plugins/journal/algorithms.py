@@ -64,6 +64,9 @@ class RecommendationProblemExact(IntegerProblem):
         # Number of items after filtering! This is the number we choose from in individuals
         self.n_items = self.items.size
 
+        # Maping from items to item_indices used internally by this problem
+        self.inverse_mapping = { item: item_idx for item_idx, item in enumerate(self.items) }
+
         assert self.n_items <= n_all_items, f"{self.n_items} <= {n_all_items}"
         # We need consecutive numbers for the items (we are sampling from [lower_bound, upper_bound))
         self.item_indices = np.arange(self.n_items)
@@ -134,7 +137,7 @@ class RecommendationProblemExact(IntegerProblem):
         )
  
         # Instead of generating new solution from random variables, we start with relevance only recommendation
-        new_solution.variables = self.relevance_top_k.copy()
+        new_solution.variables = np.array([self.inverse_mapping[item] for item in self.relevance_top_k])
         # And replace position at random index with a random item
         rnd_idx = np.random.randint(low=0, high=self.relevance_top_k.size)
         rnd_item = np.random.choice(self.item_indices)
@@ -178,6 +181,9 @@ class RecommendationProblemMax(IntegerProblem):
         # Relevances (normalized so they are >= 0) predicted by relevance baseline for each of the items
         self.relevance_scores = relevance_scores
 
+        # Maping from items to item_indices used internally by this problem
+        self.inverse_mapping = { item: item_idx for item_idx, item in enumerate(self.items) }
+
         assert self.n_items <= n_all_items, f"{self.n_items} <= {n_all_items}"
         # We need consecutive numbers for the items (we are sampling from [lower_bound, upper_bound))
         self.item_indices = np.arange(self.n_items)
@@ -194,7 +200,7 @@ class RecommendationProblemMax(IntegerProblem):
         assert user_vector.ndim == 1 and user_vector.size == n_all_items
 
         # By default we maximize all the objectives in recommendation
-        self.obj_directions = [self.MAXIMIZE] * len(framework_objectives)
+        # self.obj_directions = [self.MAXIMIZE] * len(framework_objectives)
         self.obj_labels = [o.name() for o in framework_objectives]
         
         # Lower bound is 0
@@ -205,13 +211,12 @@ class RecommendationProblemMax(IntegerProblem):
     # Evaluate solution w.r.t. the objectives
     def evaluate(self, solution: IntegerSolution) -> IntegerSolution:
         top_k_list = solution.variables
-        
         # During evaluation we need to map items, note that item 0 corresponds to actual item being self.items[0] (due to filtering)
         # We need to perform evaluation on original items instead of just their indices
         # We evaluate framework objetives here
         top_k_mapped = self.items[top_k_list]
         for i, obj in enumerate(self.framework_objectives):
-            solution.objectives[i] = obj(top_k_mapped)
+            solution.objectives[i] = 1 / (1 + obj(top_k_mapped)) # We need to maximize
         assert solution is not None
         return solution
 
@@ -223,7 +228,7 @@ class RecommendationProblemMax(IntegerProblem):
         )
  
         # Instead of generating new solution from random variables, we start with relevance only recommendation
-        new_solution.variables = self.relevance_top_k.copy()
+        new_solution.variables = np.array([self.inverse_mapping[item] for item in self.relevance_top_k])
         # And we replace item at random position with a random item
         rnd_idx = np.random.randint(low=0, high=self.relevance_top_k.size)
         rnd_item = np.random.choice(self.item_indices)
