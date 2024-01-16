@@ -1038,7 +1038,10 @@ def mors_feedback():
 
     # Needed for proper working of evolutionary algorithms
     # as here we need the objective values to be non-negative
-    rel_scores_normed = (rel_scores - rel_scores.min()) / (rel_scores.max() - rel_scores.min())
+    # rel_scores_normed = (rel_scores - rel_scores.min()) / (rel_scores.max() - rel_scores.min())
+    # Unfortunately simple MinMax scaling does not work due to NEG_INF presence in the scores (everything else will be 1)
+    # Using quantile tranformer, all NEG_INF values will get mapped to 0 without significantly distorting the range
+    rel_scores_normed = QuantileTransformer().fit_transform(rel_scores.reshape(-1, 1)).reshape(rel_scores.shape)
 
     def relevance_f(top_k_list):
         return rel_scores[top_k_list].sum()
@@ -1267,6 +1270,11 @@ def mors_feedback():
         assert False, f"Unknown algorithm: {cur_algorithm} for it={it}"
 
     print(f"@@@ Morsify took: {time.perf_counter() - start_time}")
+    # print(f"@@@@@ Rel scores normed: {rel_scores_normed.min()}, {rel_scores_normed.max()}, {rel_scores_normed.mean()}, {np.percentile(rel_scores_normed, [10, 25, 50, 70, 80, 90, 95, 99])}")
+    # print(f"@@@@@ Rel scores: {rel_scores.min()}, {rel_scores.max()}, {rel_scores.mean()}, {np.percentile(rel_scores, [10, 25, 50, 70, 80, 90, 95, 99])}")
+    # print(rel_scores_normed)
+    # print(rel_scores)
+    # print("@@ done")
 
     algorithm_anon_name = f"ALGORITHM {ALGORITHM_ANON_NAMES[cur_block]}"
     recommendation[algorithm_anon_name] = {
@@ -1345,7 +1353,11 @@ def mors_feedback():
             "cb_uniformity": cb_uniformity(top_k).item(),
             "cf_exploitation": cf_exploitation(top_k).item(),
             "cb_exploitation": cb_exploitation(top_k).item(),
-            "popularity": popularity_f(top_k).item()
+            "popularity": popularity_f(top_k).item(),
+            "ease_top_k_relevance": relevance_f(relevance_top_k).item(),
+            # "relevance_2": objectives[0](top_k).item(),
+            # "ease_top_k_relevance2": objectives[0](relevance_top_k).item(),
+            # "ease_top_k_relevance_normed": rel_scores_normed[relevance_top_k].sum().item()
         },
         "ease_selections": training_selections.tolist(),
         "ease_filter_out": filter_out_items.tolist(),
