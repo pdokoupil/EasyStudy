@@ -461,6 +461,10 @@ def send_feedback():
     # We read k from configuration of the particular user study
     conf = load_user_study_config(session['user_study_id'])
 
+    # Some future steps (outside of this plugin) may relay on presence of "iteration" key in session
+    # we just have to set it, not keep it updated
+    session["iteration"] = 0
+
     # Get a loader
     loader_factory = load_data_loaders()[conf["selected_data_loader"]]
     loader = loader_factory(**filter_params(conf["data_loader_parameters"], loader_factory))
@@ -1508,7 +1512,8 @@ def finish_user_study():
     data.update(**request.form)
     log_interaction(session["participation_id"], "final-questionnaire", **data)
 
-    session["iteration"] = get_val("iteration")
+    session["iteration"] = int(get_val("iteration"))
+    session.modified = True
     return redirect(url_for("utils.finish"))
 
 # Long-running initialization
