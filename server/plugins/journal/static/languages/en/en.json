@@ -140,7 +140,7 @@
     "questionnaire_header": "Final questionnaire",
     "questionnaire_finish": "Finish user study",
     
-    "journal_metric_assessment_hint": "Select a recommendation list (by clicking anywhere on the list) that you perceive to be the most diverse.",
+    "journal_metric_assessment_hint": "Select a recommendation list (by clicking anywhere on the list) that you perceive to be the <strong>most diverse</strong>.",
     "journal_metric_assessment_title": "Metric assessment",
     "journal_metric_assessment_header": "Metric assessment",
     "journal_metric_assessment_finish": "Finish metric assessment",
