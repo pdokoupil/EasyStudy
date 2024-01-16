@@ -99,11 +99,13 @@
                                     <br v-if="q.text2"><strong class="ml-3" v-if="q.text2">[[q.text2]]</strong>
                                 </b-label>
                                 <b-form-radio-group :name="q.name" required>
-                                    <b-form-radio value="-2">Strongly Disagree</b-form-radio>
-                                    <b-form-radio value="-1">Disagree</b-form-radio>
-                                    <b-form-radio value="1">Agree</b-form-radio>
-                                    <b-form-radio value="2" class="mr-5">Strongly Agree</b-form-radio>
-                                    <b-form-radio v-if="q.atn == undefined" value="3" class="ml-5">I don't understand</b-form-radio>
+                                    <b-form-radio value="-3">Strongly Disagree</b-form-radio>
+                                    <b-form-radio value="-2">Disagree</b-form-radio>
+                                    <b-form-radio value="-1">Slightly Disagree</b-form-radio>
+                                    <b-form-radio value="1">Slightly Agree</b-form-radio>
+                                    <b-form-radio value="2">Agree</b-form-radio>
+                                    <b-form-radio value="3" class="mr-5">Strongly Agree</b-form-radio>
+                                    <b-form-radio v-if="q.atn == undefined" value="4" class="ml-5">I don't understand</b-form-radio>
                                 </b-form-radio-group>
                             </b-form-group>
                         </b-col>
