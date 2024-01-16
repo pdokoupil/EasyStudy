@@ -692,6 +692,12 @@ def send_feedback():
             "slider_uniformity_diversity": [],
             "slider_popularity_novelty": []
         },
+        "slider_ignores": {
+            "ignore_relevance": [],
+            "ignore_exploitation_exploration": [],
+            "ignore_uniformity_diversity": [],
+            "ignore_popularity_novelty": []
+        },
         "assessment_recommendations": params
     })
 
@@ -1290,6 +1296,13 @@ def mors_feedback():
     slider_values["slider_popularity_novelty"].append(slider_popularity_novelty)
     set_val("slider_values", slider_values)
 
+    slider_ignores = get_val("slider_ignores")
+    slider_ignores["ignore_relevance"].append(ignore_relevance)
+    slider_ignores["ignore_exploitation_exploration"].append(ignore_exploitation_exploration)
+    slider_ignores["ignore_uniformity_diversity"].append(ignore_uniformity_diversity)
+    slider_ignores["ignore_popularity_novelty"].append(ignore_popularity_novelty)
+    set_val("slider_ignores", slider_ignores)
+
     #print(f"MORS feedback iter after: {session['iteration']} but should have been {it + 1}")
     #assert session.modified == True
     #session.modified = True
@@ -1363,6 +1376,8 @@ def mors():
         slider_popularity_novelty = weights["values"]["novelty"]
         slider_exploitation_exploration = weights["values"]["exploration"]
         print(f"Setting sliders to initial estimate {[slider_relevance, slider_uniformity_diversity, slider_popularity_novelty, slider_exploitation_exploration]}")
+        # Set all of the ignores to False at the beginning of block
+        ignore_relevance = ignore_uniformity_diversity = ignore_popularity_novelty = ignore_exploitation_exploration = False
     else:
         # Otherwise get values previously set by the user
         slider_values = get_val("slider_values")
@@ -1371,6 +1386,12 @@ def mors():
         slider_uniformity_diversity = slider_values["slider_uniformity_diversity"][-1]
         slider_popularity_novelty = slider_values["slider_popularity_novelty"][-1]
         print(f"Setting sliders to previous values: {[slider_relevance, slider_uniformity_diversity, slider_popularity_novelty, slider_exploitation_exploration]}")
+        # Set all of the ignores to values previously set by the user
+        slider_ignores = get_val("slider_ignores")
+        ignore_relevance = slider_ignores["ignore_relevance"][-1]
+        ignore_uniformity_diversity = slider_ignores["ignore_uniformity_diversity"][-1]
+        ignore_popularity_novelty = slider_ignores["ignore_popularity_novelty"][-1]
+        ignore_exploitation_exploration = slider_ignores["ignore_exploitation_exploration"][-1]
 
     print(f"Algorithm = {cur_algorithm}")
 
@@ -1398,6 +1419,10 @@ def mors():
         "slider_uniformity_diversity": slider_uniformity_diversity,
         "slider_popularity_novelty": slider_popularity_novelty,
         "slider_exploitation_exploration": slider_exploitation_exploration,
+        "ignore_relevance": ignore_relevance,
+        "ignore_uniformity_diversity": ignore_uniformity_diversity,
+        "ignore_popularity_novelty": ignore_popularity_novelty,
+        "ignore_exploitation_exploration": ignore_exploitation_exploration,
         "show_modal": show_modal
     }
 

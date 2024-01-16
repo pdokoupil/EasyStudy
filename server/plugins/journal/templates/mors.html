@@ -563,6 +563,11 @@
     var sliderVersion = "{{slider_version}}";
     var showModal = "{{show_modal}}" == "True" ? true : false;
 
+    var ignoreRelevanceRaw = "{{ignore_relevance}}" == "True" ? true : false;
+    var ignoreExploitationExplorationRaw = "{{ignore_exploitation_exploration}}" == "True" ? true : false;
+    var ignoreUniformityDiversityRaw = "{{ignore_uniformity_diversity}}" == "True" ? true : false;
+    var ignorePopularityNoveltyRaw = "{{ignore_popularity_novelty}}" == "True" ? true : false;
+
     var defaultComparisonValue = "{{disable_relative_comparison}}";
     var defaultComparisonValidation = defaultComparisonValue == "True" ? true : false;
     defaultComparisonValue = defaultComparisonValue == "True" ? 0 : null;
@@ -650,10 +655,10 @@
             sliderPopularityNovelty: parseFloat("{{slider_popularity_novelty}}"),
             sliderUniformityDiversity: parseFloat("{{slider_uniformity_diversity}}"),
             sliderExploitationExploration: parseFloat("{{slider_exploitation_exploration}}"),
-            ignoreRelevance: false,
-            ignorePopularityNovelty: false,
-            ignoreUniformityDiversity: false,
-            ignoreExploitationExploration: false,
+            ignoreRelevance: ignoreRelevanceRaw,
+            ignorePopularityNovelty: ignorePopularityNoveltyRaw,
+            ignoreUniformityDiversity: ignoreUniformityDiversityRaw,
+            ignoreExploitationExploration: ignoreExploitationExplorationRaw,
             canFineTune: canFineTune,
             sliderVersion: sliderVersion,
             busy: false,
