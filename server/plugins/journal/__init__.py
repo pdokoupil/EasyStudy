@@ -797,7 +797,8 @@ def metric_feedback():
                         "compare-alphas-ended",
                         iteration=cur_iter - 1,
                         drag_and_drop_positions=drag_and_drop_positions,
-                        dropzone_position=dropzone_position)
+                        dropzone_position=dropzone_position,
+                        alphas_p=user_data['alphas_p'])
     
     if cur_iter >= N_ALPHA_ITERS:
         continuation_url = url_for("journal.mors_feedback")
@@ -936,9 +937,10 @@ def mors_feedback():
         dropzone_position = json.loads(request.form.get("dropzone_position"))
         log_interaction(session["participation_id"],
                         "compare-alphas-ended",
-                        iteration=user_data['alphas_iteration'],
+                        iteration=user_data['alphas_iteration'] - 1,
                         drag_and_drop_positions=drag_and_drop_positions,
-                        dropzone_position=dropzone_position)
+                        dropzone_position=dropzone_position,
+                        alphas_p=user_data['alphas_p'])
     else:
         log_interaction(session["participation_id"], "mors-recommendation-ended", iteration=it - 1)
 
