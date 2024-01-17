@@ -1003,6 +1003,8 @@ def mors_feedback():
 
         print(f"Ignoring options: [{ignore_relevance}, {ignore_uniformity_diversity}, {ignore_popularity_novelty}, {ignore_exploitation_exploration}]")
 
+    ignore_all = ignore_exploitation_exploration and ignore_uniformity_diversity and ignore_popularity_novelty and ignore_relevance
+
     # Set weights for inverse objectives
     uniformity_weight = 1.0 - diversity_weight
     popularity_weight = 1.0 - novelty_weight
@@ -1132,7 +1134,10 @@ def mors_feedback():
     objectives = [obj for obj in objectives if obj is not None]
     target_weights = np.array([w for w in target_weights if w is not None])
 
-    if "EVOLUTIONARY" in cur_algorithm:
+    if ignore_all:
+        assert len(objectives) == target_weights.size == 0
+
+    if "EVOLUTIONARY" in cur_algorithm and not ignore_all:
         # We need to prepare mgain_cdf
         # Unfortunately calculate_normalization requires special wrappers over the objective
         # that support incrementally built user history
@@ -1192,7 +1197,10 @@ def mors_feedback():
         print(f"Inputs: {np.concatenate([elicitation_shown, all_recommendations]).astype(np.int32)}, {training_selections}")
 
     start_time = time.perf_counter()
-    if cur_algorithm == "GREEDY-EXACT-1W":
+    if ignore_all:
+        print(f"Random recommendation")
+        top_k = np.random.choice(items, k)
+    elif cur_algorithm == "GREEDY-EXACT-1W":
         algo = greedy_exact(target_weights)
         top_k = morsify(
             k, rel_scores, algo,
