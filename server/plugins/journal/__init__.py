@@ -1806,7 +1806,7 @@ def get_instruction_bullets():
             bullets = [
                 "Books are selected by clicking on them; each selected book is highlighted by a green frame."
                 "If you do not like any of the recommended books, there is a button at the bottom of this page that you should check.",
-                "When a mouse cursor is placed over a book, its title, description, and genres will be shown.",
+                "When a mouse cursor is placed over a book, its title (including authors), description, and genres will be shown.",
                 "Completion of each step is final, and you cannot return to previous pages.",
                 "Also note that each book will be displayed only once within the block (i.e., you need to make an immediate decision)."
             ]
@@ -1814,7 +1814,7 @@ def get_instruction_bullets():
             bullets = [
                 "Movies are selected by clicking on them; each selected movie is highlighted by a green frame.",
                 "If you do not like any of the recommended movies, there is a button at the bottom of this page that you should check.",
-                "When a mouse cursor is placed over a movie, its title, description, and genres will be shown.",
+                "When a mouse cursor is placed over a movie, its title (including release year), description, and genres will be shown.",
                 "Completion of each step is final, and you cannot return to previous pages.",
                 "Also note that each movie will be displayed only once within the block (i.e., you need to make an immediate decision)."
             ]
@@ -1837,20 +1837,22 @@ def get_instruction_bullets():
         ]
     elif page == "metric-assessment":
         items_name = "books" if is_books(conf) else "movies"
+        extra_info = "authors" if is_books(conf) else "release year"
         bullets = [
             f"This page displays three lists of recommendations: A, B, C, which were created for you based on the {items_name} you chose at the start of this study as part of stating your preferences (preference elicitation).",
             "Your goal is to choose the one list that you think is the most DIVERSE (based on how you understand or interpret diversity).",
             f"You can choose a list by clicking on any of its {items_name}.",
-            f"If you want more information about the displayed {items_name}, simply hover your mouse cursor over it, and the description, genres, and name will all appear."
+            f"If you want more information about the displayed {items_name}, simply hover your mouse cursor over it, and the description, genres, and name (including {extra_info}) will all appear."
         ]
     elif page == "compare-alphas":
         items_name = "books" if is_books(conf) else "movies"
+        extra_info = "authors" if is_books(conf) else "release year"
         bullets = [
             f"This page once again presents three recommendation lists, but they differ from the previous step and are now labeled either 1, 2, 3 (in the first step) or 4, 5, 6 (in the second step).",
             "Your goal is to order the recommendation lists from least diverse to most diverse.",
             "To order them, drag and drop the colorful rectangles located at the bottom of this page into the adjacent gray area.",
             "The further right you position the lists, the more diversity you perceive in them.",
-            f"If you want more information about the displayed {items_name}, simply hover your mouse cursor over it, and the description, genres, and name will all appear."
+            f"If you want more information about the displayed {items_name}, simply hover your mouse cursor over it, and the description, genres, and name (including {extra_info}) will all appear."
         ]
     else:
         bullets = []
