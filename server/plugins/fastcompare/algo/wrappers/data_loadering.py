@@ -860,6 +860,7 @@ class GoodBooksFilteredDataLoader(DataLoaderBase):
         # TODO remove "movie" in column names to "item"
 
         # Maps movie index to text description
+        self.books_df.loc[:, "title"] = self.books_df.title + " | [" + self.books_df.authors + "]"
         self.books_df.loc[:, "description"] = self.books_df.title
         self.books_df_indexed = self.books_df.set_index("item_id")
         self.item_index_to_description = { item_idx : self.books_df_indexed.loc[item_id].description for item_idx, item_id in self.item_index_to_id.items() }

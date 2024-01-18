@@ -22,7 +22,6 @@ import numpy as np
 from common import get_tr, load_languages, multi_lang, load_user_study_config
 from flask import Blueprint, jsonify, make_response, request, redirect, render_template, url_for, session
 
-from plugins.utils.preference_elicitation import enrich_results
 from plugins.utils.interaction_logging import log_interaction
 from plugins.fastcompare.loading import load_data_loaders
 from plugins.fastcompare import elicitation_ended, filter_params, load_data_loader_cached, search_for_item
@@ -1587,9 +1586,11 @@ def get_block_questions():
     if "Goodbooks" in conf["selected_data_loader"]:
         item_text = "books"
         popular_text = "bestsellers"
+        do_text = "read"
     else:
         item_text = "movies"
         popular_text = "blockbusters"
+        do_text = "watch"
 
     questions = [
         {
@@ -1618,7 +1619,7 @@ def get_block_questions():
             "icon": "grid"
         },
         {
-            "text": f"The recommended {item_text} were mostly similar to what I usually watch.",
+            "text": f"The recommended {item_text} were mostly similar to what I usually {do_text}.",
             "name": "q6",
             "icon": "grid"
         },
