@@ -67,17 +67,37 @@
     <div id="app">
       <b-container align-h="center" fluid>
         
-        {% if comparison_hint_override is defined and comparison_hint_override is not none  %}
-        <div class="jumbotron smallJumbotron">
-            {{ comparison_hint_override | safe }}
-            <h5>({{iteration + 1}}/{{n_iterations}})</h5>
+        <b-jumbotron  class="smallJumbotron" header-level="8">
+
+          <b-row>
+              <b-col cols="auto" style="text-align: left;">
+                  <h1 style="font-size: 1.0rem; margin-bottom: -0.1em; padding: 0;">{{header}} ({{iteration + 1}}/{{n_iterations}})</h1>
+                  <p style="margin-top: 0px;">
+                      {{hint}}
+                  </p>
+              </b-col>
+              <b-col style="text-align: right;">
+                  <b-button size="lg" name="instructionsBtn" variant="info" class="mb-2" v-b-toggle.sidebar-1>
+                      Instructions <b-icon icon="question-square-fill" aria-hidden="true"></b-icon>
+                    </b-button>
+              </b-col>
+          </b-row>
+      </b-jumbotron>
+
+      <template>
+        <div>
+          <b-sidebar id="sidebar-1" title="Instructions" shadow>
+            <div class="px-3 py-2">
+              <ol>
+                <li v-for="bulletText in instructionBullets">
+                    [[bulletText]]
+                </li>
+              </ol>
+              <!-- <b-img src="https://picsum.photos/500/500/?image=54" fluid thumbnail></b-img> -->
+            </div>
+          </b-sidebar>
         </div>
-        {% else %}
-        <b-jumbotron class="smallJumbotron" header="{{header}} ({{iteration + 1}}/{{n_iterations}})" lead="{{hint_lead}}" header-level="4">
-            {{hint}}
-            <strong>{{note}}:</strong> {{note_text}}
-        </b-jumbotron>
-        {% endif %}
+    </template>
 
         <!-- <b-row align-h="center" class="mt-3 mb-3">
           <b-col cols="auto" style="text-align: center;">
@@ -88,20 +108,20 @@
           </b-col>
         </b-row> -->
         <b-row align-h="center" style="text-align: center;" class="mt-3 mb-3" v-if="studyData != null">
-          <b-col class="mr-3" cols="auto" style="text-align: center;">
+          <b-col class="mr-3" style="text-align: center;">
             <b-row align-h="center">
               <h2>Target</h2>
             </b-row>
-            <b-row>
+            <b-row align-h="center">
               <b-img class="targetImage" :src="studyData.target"></b-img>
             </b-row>
           </b-col>
-          <b-col cols="auto" class="verticalSeparator">
+          <b-col class="verticalSeparator">
             <b-row align-h="center">
               <h2>Negative samples</h2>
             </b-row>
             <b-row align-h="center" style="text-align: center;">
-              <b-col cols="auto" style="text-align: center;" v-for="negativeSample in studyData.negative_samples">
+              <b-col style="text-align: center;" v-for="negativeSample in studyData.negative_samples">
                 <b-img class="negativeImage" :src="negativeSample"></b-img>
               </b-col>
             </b-row>
@@ -109,9 +129,9 @@
         </b-row>
         <div class="mt-3 mb-3 horizontal-separator"></div>
         <b-row align-h="center" class="mb-2 mt-2" v-for="row in variantResults">
-          <b-col class="col" xl="auto" class="align-middle" v-for="col in row">
+          <b-col :key="imageKey" class="col" xl="auto" class="align-middle" v-for="col in row">
             <!-- <b-img class="theImage theItem" :src="col"></b-img> -->
-            <b-img height="308px" class="theImage theItem selectableItem" :id="col" v-b-hover="handleHover" @click="onSelectVisualization($event)" :src="col"/>
+            <b-img :height="imageSize+'px'" class="theImage theItem selectableItem" :id="col" v-b-hover="handleHover" @click="onSelectVisualization($event)" :src="col"/>
             <!-- <b-img @mouseenter="itemMouseEnter" @mouseleave="itemMouseLeave" :id="variantNames[algoIdx] + '_' + col.movie_idx" style="width: 175px; height: 260px;" block center :src="col.url" v-on:click="onSelectMovie($event, col, variantsResults.indexOf(variantResults))" :name="col.movie_idx" :alt="col.movie" /> -->
           </b-col>
       </b-row>
@@ -230,7 +250,11 @@
                 selected: [],
                 data: data,
                 studyData: null,
-                variantResults: null
+                variantResults: null,
+                instructionBullets: [],
+                imageSize: 300,
+                imageKey: 1,
+                colsPerRow: 7
             }
         },
         methods: {
@@ -270,6 +294,13 @@
               reportOnInput("/utils/on-input", csrfToken, "selected-candidate", {
                   "id": event.srcElement.id
               });
+            },
+            updateImageSize() {
+              this.imageSize = Math.min(300, parseInt(window.innerWidth / (this.colsPerRow * 1.5)));
+            },
+            handleResize() {
+              this.updateImageSize();
+              this.imageKey++;
             }
         },
         async mounted() {
@@ -285,16 +316,20 @@
             );
             });
 
+            window.addEventListener('resize', this.handleResize);
+
+
             this.studyData = await fetch("{{url_for('visualrepresentation2024.get_image_paths')}}").then(response => response.json());
 
-            const colsPerRow = 5;
+
+            this.updateImageSize();
 
             let variantResultsColumnified = [];
             let row = [];
             for (idx in this.studyData.candidate_list) {
                 let candidate = this.studyData.candidate_list[idx];
                 row.push(candidate);
-                if (row.length >= colsPerRow) {
+                if (row.length >= this.colsPerRow) {
                     variantResultsColumnified.push(row);
                     row = [];
                 }
@@ -326,6 +361,15 @@
               }
               elem.innerHTML = await fetch(`{{url_for('visualrepresentation2024.table_data')}}?name=${d.name}`).then(resp => resp.text()).catch(err => null);
             }
+
+            this.instructionBullets = await fetch("{{url_for('visualrepresentation2024.get_instruction_bullets', page='compare-visualizations')}}")
+                            .then(response => {
+                                if (!response.ok) {
+                                    console.log("Erorr");
+                                }
+                                return response.json();
+                            });
+
 
             // Register the handlers for event reporting
             startViewportChangeReportingWithLimit(`/utils/changed-viewport`, csrfToken, 1.0, true, get_compare_ctx_lambda("page-scroll"));

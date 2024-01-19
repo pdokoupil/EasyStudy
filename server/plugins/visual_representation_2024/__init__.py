@@ -298,6 +298,24 @@ def get_image_paths():
     }
     return jsonify(paths)
 
+
+@bp.route("/get-instruction-bullets", methods=["GET"])
+def get_instruction_bullets():
+    page = request.args.get("page")
+    if not page:
+        return jsonify([])
+
+    if page == "compare-visualizations":
+        bullets = [
+            "Instruction A With some text",
+            "Instruction B",
+            "Instruction C",
+        ]
+    else:
+        bullets = []
+
+    return jsonify(bullets)
+
 @functools.cache
 def load_configuration_json():
     # Load the JSON with configurations
