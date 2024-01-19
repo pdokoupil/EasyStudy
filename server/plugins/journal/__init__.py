@@ -5,6 +5,7 @@ import random
 import sys
 import os
 import time
+from cachetools import cached
 
 import flask
 from sklearn.preprocessing import QuantileTransformer
@@ -211,6 +212,30 @@ def enrich_results(top_k, loader, support=None):
 @functools.lru_cache(maxsize=None)
 def get_distance_matrix_cb(path):
     return np.load(path)
+
+# For a given distance_matrix_cb, we calculate similarity_matrix, cached by path to the distance matrix (if it changes, cache should be invalid)
+@functools.lru_cache(maxsize=None)
+def get_similarity_matrix_cb(distance_matrix_cb_path):
+    distance_matrix_cb = get_distance_matrix_cb(distance_matrix_cb_path)
+    return 1.0 - distance_matrix_cb
+
+# Get item_popularity -> cached version to prevent huge allocations when called for multiple users
+# Keyed by loader name as it just depends on the loader's rating matrix
+@cached(cache={}, key=lambda loader: loader.name())
+def get_item_popularity(loader):
+    return item_popularity(loader.rating_matrix)
+
+# Get popularity_based_novelty -> cached version to prevent huge allocations when called for multiple users
+# Keyed by loader name as it just depends on the loader's rating matrix
+@cached(cache={}, key=lambda loader: loader.name())
+def get_popularity_based_novelty(loader):
+    return popularity_based_novelty(loader.rating_matrix)
+
+# Get similarity_matrix (CF) -> cached version to prevent huge allocations when called for multiple users
+# Keyed by loader name as it just depends on the loader's distance_matrix
+@cached(cache={}, key=lambda loader: loader.name())
+def get_similarity_matrix_cf(loader):
+    return 1.0 - loader.distance_matrix
 
 # Get cdf cache for a given metric
 # this function is cached, so the cdf file is read just once
@@ -490,7 +515,7 @@ def send_feedback():
         distance_matrix = distance_matrix_cb
     else:
         assert False, f"Unknown configured diversity metric: {configured_metric_name}"
-    novelty_f = popularity_based_novelty(loader.rating_matrix)
+    novelty_f = get_popularity_based_novelty(loader)
     #relevances = loader.rating_matrix.mean(axis=0)
 
     items = np.arange(loader.rating_matrix.shape[1])
@@ -1051,15 +1076,19 @@ def mors_feedback():
     
         # We construct all objectives as we want to use them for logging
     cf_ild = intra_list_diversity(loader.distance_matrix)
-    cf_uniformity = intra_list_diversity(1.0 - loader.distance_matrix)
+    similarity_matrix_cf = get_similarity_matrix_cf(loader)
+    cf_uniformity = intra_list_diversity(similarity_matrix_cf)
     cf_exploration = exploration(user_vector, loader.distance_matrix)
-    cf_exploitation = exploitation(user_vector, 1.0 - loader.distance_matrix)
+    cf_exploitation = exploitation(user_vector, similarity_matrix_cf)
     
-    distance_matrix_cb = get_distance_matrix_cb(os.path.join(get_cache_path(get_semi_local_cache_name(loader)), "distance_matrix_text.npy"))
+    distance_matrix_cb_path = os.path.join(get_cache_path(get_semi_local_cache_name(loader)), "distance_matrix_text.npy")
+    distance_matrix_cb = get_distance_matrix_cb(distance_matrix_cb_path)
+    # Here we intentianally pass distance_matrix_cb path as it uses the path as key to cache
+    similarity_matrix_cb = get_similarity_matrix_cb(distance_matrix_cb_path)
     cb_ild = intra_list_diversity(distance_matrix_cb)
-    cb_uniformity = intra_list_diversity(1.0 - distance_matrix_cb)
+    cb_uniformity = intra_list_diversity(similarity_matrix_cb)
     cb_exploration = exploration(user_vector, distance_matrix_cb)
-    cb_exploitation = exploitation(user_vector, 1.0 - distance_matrix_cb)
+    cb_exploitation = exploitation(user_vector, similarity_matrix_cb)
 
     bin_div = binomial_diversity(loader.all_categories, loader.get_item_index_categories, loader.rating_matrix, 0.0, loader.name())
     
@@ -1070,12 +1099,14 @@ def mors_feedback():
         exploration_f = cf_exploration
         exploitation_f = cf_exploitation
         distance_matrix = loader.distance_matrix
+        similarity_matrix = similarity_matrix_cf
     elif configured_metric_name == "CB-ILD":
         div_f = cb_ild
         uniformity_f = cb_uniformity
         exploration_f = cb_exploration
         exploitation_f = cb_exploitation
         distance_matrix = distance_matrix_cb
+        similarity_matrix = similarity_matrix_cb
     else:
         assert False, f"Uknown metric name encountered in configuration: {configured_metric_name}"
 
@@ -1086,8 +1117,8 @@ def mors_feedback():
     # elif selected_metric_name == "BIN-DIV":
     #     div_f = bin_div
 
-    popularity_f = item_popularity(loader.rating_matrix)
-    novelty_f = popularity_based_novelty(loader.rating_matrix)
+    popularity_f = get_item_popularity(loader)
+    novelty_f = get_popularity_based_novelty(loader)
 
     if "EXACT" in cur_algorithm or "1W" in cur_algorithm:
         # We use one-way backend version of the slider and just 4 objectives
@@ -1158,7 +1189,7 @@ def mors_feedback():
             return f(top_k_list)
         
         def exploitation_w(top_k_list, user_vector_list, *args, **kwargs):
-            f = exploitation(np.array([]), 1.0 - distance_matrix)
+            f = exploitation(np.array([]), similarity_matrix)
             f.user_vector = np.array(user_vector_list, dtype=np.int32) # fixup
             return f(top_k_list)
         
@@ -1858,7 +1889,7 @@ def get_instruction_bullets():
         bullets = []
 
     return jsonify(bullets)
-get_instruction_bullets
+
 
 # Endpoint used to search items
 @bp.route("/item-search", methods=["GET"])
