@@ -41,7 +41,7 @@
             </div>
         </template>
     
-        <b-form method="POST" action="{{ continuation_url }}">
+        <b-form method="POST" ref="myForm" @submit.prevent="onSubmit" action="{{ continuation_url }}">
             <b-row class="mb-3" align-h="center">
                 <b-col cols="auto" >
 
@@ -496,7 +496,16 @@
                     <!-- <b-form method="POST" action="{{continuation_url}}"> -->
                         <input type="hidden" name="csrf_token" value="{{csrf_token()}}"/>
                         <!-- <input type="hidden" name="final_questionnaire_data" value="final_questionnaire_data"/> -->
-                        <b-button class="mb-3" variant="success" type="submit" name="finishBtn">{{finish}}</b-button>
+                        <b-overlay
+                            :show="busy"
+                            rounded
+                            opacity="0.6"
+                            spinner-small
+                            spinner-variant="primary"
+                            class="d-inline-block"
+                        >
+                            <b-button class="mb-3" variant="success" type="submit" name="finishBtn">{{finish}}</b-button>
+                        </b-overlay>
                     <!-- </b-form> -->
                 </b-col>
             </b-row>
@@ -524,11 +533,15 @@
         
         return {
             questions: null,
-            instructionBullets: []
+            instructionBullets: [],
+            busy: false
         };
     },
     methods: {
-        
+        onSubmit() {
+            this.busy = true;
+            this.$refs.myForm.submit();
+        }
     },
     async mounted() {
         const btns = document.querySelectorAll("button");
