@@ -801,6 +801,8 @@ def metric_feedback():
     # Take alpha values to be shown in the current step
     current_alphas = user_data['alphas_p'][cur_iter - 1]
 
+    conf = load_user_study_config(session['user_study_id'])
+
     print(f"METRIC FEEDBACK step 1 = {cur_iter}")
     if cur_iter == 1:
         # We need to map back from "hidden name", e.g. "List A" to actual name of the diversity metric
@@ -808,10 +810,26 @@ def metric_feedback():
         mapping = get_val("metric_assessment_list_to_diversity")
         selected_metric_name = mapping[selected_metric_name]
 
-        #selected_metric_index = request.form.get("selected_metric_index")
-        set_val('selected_metric_name', selected_metric_name)
-        # Mark end of metric assessment here
-        log_interaction(session["participation_id"], "metric-assessment-ended", selected_metric_name=selected_metric_name)
+        # We need to ensure backward compatibility with studies where conf
+        # is already persisted
+        if "given_metric" not in conf or conf["given_metric"] == "SELECTED":
+            # So if it is either not in conf (old version of the study)
+            # or it is set to SELECTED, then we use the "SELECTED" metric in
+            # compare alphas
+            
+            # Mark end of metric assessment here and log what the user has really selected
+            log_interaction(session["participation_id"], "metric-assessment-ended", selected_metric_name=selected_metric_name, given_metric_name=selected_metric_name)
+            set_val('selected_metric_name', selected_metric_name)
+            #print(f"## Default implementation, all good @@@@")
+        else:
+            # Otherwise we use the one that is set
+            assert conf["given_metric"] in ["CF-ILD", "CB-ILD", "BIN-DIV"], f"Unknown value for given_metric: {conf['given_metric']}"
+            # Mark end of metric assessment here and log what the user has really selected
+            log_interaction(session["participation_id"], "metric-assessment-ended", selected_metric_name=selected_metric_name, given_metric_name=conf["given_metric"])
+            # The rest of code operates on top of selected_metric_name, so override it
+            set_val('selected_metric_name', conf["given_metric"])
+            selected_metric_name = conf["given_metric"]
+            #print(f"@@@ New implementation")
     else:
         selected_metric_name = user_data['selected_metric_name']
         # Here we first mark end of previous iteration, then start of current iteration
@@ -832,7 +850,6 @@ def metric_feedback():
 
     #@profile
     #def compare_alphas_x():
-    conf = load_user_study_config(session['user_study_id'])
     params = {}
 
     # Get a loader
