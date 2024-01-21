@@ -87,6 +87,13 @@
           </b-row>
 
           <b-row align-h="center" class="mb-3">
+            <b-col cols="8">
+              <label for="given-diversity-metric">Please select a diversity metric for compare-alphas</label>
+              <b-form-select :state="givenMetricName != null" name="given-diversity-metric" v-model="givenMetricName" :options="givenMetricOptions" required="True" type=""/>
+            </b-col>
+          </b-row>
+
+          <b-row align-h="center" class="mb-3">
             <b-col class="text-center" cols="8">
               <b-form-checkbox v-model="disableRelativeComparison">{{disable_relative_comparison}}</b-form-checkbox>
             </b-col>
@@ -198,7 +205,15 @@
                 { value: "CF-ILD", text: "CF-ILD" },
                 { value: "CB-ILD", text: "CB-ILD" }
               ],
+              givenMetricOptions: [
+                { value: null, text: "Please select diversity metric for compare-alphas" },
+                { value: "CF-ILD", text: "CF-ILD" },
+                { value: "CB-ILD", text: "CB-ILD" },
+                { value: "BIN-DIV", text: "BIN-DIV" },
+                { value: "SELECTED", text: "SELECTED" }
+              ],
               diversityMetric: null,
+              givenMetricName: null,
               dataLoader: null,
               dataLoaders: [
                 { value: null, text: '{{select_loader}}' }
@@ -210,7 +225,7 @@
         },
         computed: {
           allValidated() {
-            return this.dataLoader != null && this.diversityMetric != null;
+            return this.dataLoader != null && this.diversityMetric != null && this.givenMetricName != null;
           }
         },
         methods: {
@@ -259,7 +274,8 @@
                     "selected_algorithms": ["Most Popular Items Baseline", "Random Items Baseline"],
                     "algorithm_parameters": [{"displayed_name": "BETA", "name": "Most Popular Items Baseline"}, {"displayed_name": "GAMMA", "name": "Random Items Baseline"}],
                     "shuffle_recommendations": true,
-                    "mors_diversity_metric": this.diversityMetric
+                    "mors_diversity_metric": this.diversityMetric,
+                    "given_metric": this.givenMetricName
                 };
 
                 let userStudyData = {
