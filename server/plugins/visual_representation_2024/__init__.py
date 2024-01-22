@@ -151,11 +151,12 @@ def on_joined():
         session["uuid"] = secrets.token_urlsafe(16)
 
     set_val("iteration", 0)
-    
+
     data = load_configuration_json()
     selected_user = np.random.choice(list(data.keys()))
 
     set_val("selected_user", selected_user)
+    set_val("selections", {})
 
     log_interaction(session["participation_id"], "user-selected", selected_user=selected_user, uuid=session["uuid"])
 
@@ -195,38 +196,34 @@ def compare_visualizations():
 
     return render_template("compare_visualizations.html", **params)
 
+@bp.route("/submit-selections", methods=["POST"])
+def submit_selections():
+    it = get_val("iteration")
 
-@bp.route("/handle-feedback")
+    selections = get_val("selections")
+    selections[it] = request.get_json()
+    set_val("selections", selections)
+
+    return "OK"
+
+@bp.route("/handle-feedback", methods=["POST", "GET"])
 def handle_feedback():
     selected_user = get_val("selected_user")
     data = load_configuration_json()
     it = get_val("iteration")
     shown_data = data[selected_user][it]
+    iteration_selections = get_val("selections")[it]
     it = it + 1
     set_val("iteration", it)
-    
-    method = request.args.get("method")
-    dataset = request.args.get("dataset")
-    selection_id = request.args.get("selection_id")
-    class_name = request.args.get("class_name")
-    example_name = request.args.get("example_name")
-    example_class_name = request.args.get("example_class_name")
 
     payload = {
-        "selected": {
-            "method": method,
-            "dataset": dataset,
-            "selection_id": selection_id,
-            "class_name": class_name,
-            "example_name": example_name,
-            "example_class_name": example_class_name
-        },
+        "selected": iteration_selections,
         "shown": shown_data
     }
 
     iteration_ended(it - 1, payload)
 
-    if it >= len(session["permutation"]):
+    if it >= len(data[selected_user]):
         return redirect(url_for(f"{__plugin_name__}.finish_user_study"))
 
     return redirect(url_for(f"{__plugin_name__}.compare_visualizations"))
@@ -267,11 +264,11 @@ def finish_user_study():
 
     return render_template("visual_representation_finish.html", **params)
 
-@bp.route("/get-image-paths", methods=["GET"])
-def get_image_paths():
+@bp.route("/get-image-data", methods=["GET"])
+def get_image_data():
     selected_user = get_val("selected_user")
     data = load_configuration_json()
-    it = 40 #get_val("iteration")
+    it = get_val("iteration")
     iteration_data = data[selected_user][it]
 
     dataset = iteration_data["dataset"]
@@ -282,17 +279,32 @@ def get_image_paths():
 
     for neg in iteration_data["negativeSamples"]:
         [class_name, file_name] = neg.split("/")
-        negative_samples.append(url_for('static', filename=f'datasets/vizualizations2024/{dataset}/{viz_method}/{class_name}/{file_name}.png'))
+        negative_samples.append({
+            "class_name": class_name,
+            "dataset": dataset,
+            "viz_method": viz_method,
+            "file_path": url_for('static', filename=f'datasets/vizualizations2024/{dataset}/{viz_method}/{class_name}/{file_name}.png')
+        })
 
     for candidate in iteration_data["candidateList"]:
         [class_name, file_name] = candidate.split("/")
-        candidate_list.append(url_for('static', filename=f'datasets/vizualizations2024/{dataset}/{viz_method}/{class_name}/{file_name}.png'))
+        candidate_list.append({
+            "class_name": class_name,
+            "dataset": dataset,
+            "viz_method": viz_method,
+            "file_path": url_for('static', filename=f'datasets/vizualizations2024/{dataset}/{viz_method}/{class_name}/{file_name}.png')
+        })
 
     [target_class_name, target_file_name] = iteration_data["target"].split("/")
-    target_path = url_for('static', filename=f'datasets/vizualizations2024/{dataset}/{viz_method}/{target_class_name}/{target_file_name}.png')
+    target = {
+        "class_name": target_class_name,
+        "file_path": url_for('static', filename=f'datasets/vizualizations2024/{dataset}/{viz_method}/{target_class_name}/{target_file_name}.png'),
+        "dataset": dataset,
+        "viz_method": viz_method,
+    }
 
     paths = {
-        "target": target_path,
+        "target": target,
         "candidate_list": candidate_list,
         "negative_samples": negative_samples
     }

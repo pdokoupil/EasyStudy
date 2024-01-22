@@ -113,7 +113,7 @@
               <h2>Target</h2>
             </b-row>
             <b-row align-h="center">
-              <b-img class="targetImage" :src="studyData.target"></b-img>
+              <b-img :id="studyData.target.file_path + 'tg'" class="targetImage" :src="studyData.target.file_path"></b-img>
             </b-row>
           </b-col>
           <b-col class="verticalSeparator">
@@ -122,94 +122,29 @@
             </b-row>
             <b-row align-h="center" style="text-align: center;">
               <b-col style="text-align: center;" v-for="negativeSample in studyData.negative_samples">
-                <b-img class="negativeImage" :src="negativeSample"></b-img>
+                <b-img :id="negativeSample.file_path + 'neg'" class="negativeImage" :src="negativeSample.file_path"></b-img>
               </b-col>
             </b-row>
           </b-col>
         </b-row>
+
         <div class="mt-3 mb-3 horizontal-separator"></div>
-        <b-row align-h="center" class="mb-2 mt-2" v-for="row in variantResults">
+        <b-row align-h="center" class="mb-3 mt-3" v-for="row in variantResults">
           <b-col :key="imageKey" class="col" xl="auto" class="align-middle" v-for="col in row">
             <!-- <b-img class="theImage theItem" :src="col"></b-img> -->
-            <b-img :height="imageSize+'px'" class="theImage theItem selectableItem" :id="col" v-b-hover="handleHover" @click="onSelectVisualization($event)" :src="col"/>
+            <b-img :height="imageSize+'px'" class="theImage theItem selectableItem" :id="col.file_path" v-b-hover="handleHover" @click="onSelectVisualization($event)" :src="col.file_path"/>
             <!-- <b-img @mouseenter="itemMouseEnter" @mouseleave="itemMouseLeave" :id="variantNames[algoIdx] + '_' + col.movie_idx" style="width: 175px; height: 260px;" block center :src="col.url" v-on:click="onSelectMovie($event, col, variantsResults.indexOf(variantResults))" :name="col.movie_idx" :alt="col.movie" /> -->
           </b-col>
-      </b-row>
+        </b-row>
 
         
-
-        <!-- <div class="myContainer" name="scrollableDiv">
-          <b-row align-h="center" class="mt-1 mb-1">
-            <b-col class="text-center">
-              <b-col class="centered-content">
-                <h5>Input visualization</h5>
-              </b-col>
-            </b-col>
-          </b-row>
-          <b-row align-h="center">
-            <b-col align-h="center" style="text-align: center;" cols="auto" class="text-center align-middle">
-                {% if iteration_data['method'] == 'table-t' %}
-                    <div class="theItem" :id="data.method + '_' + data.dataset + '_' + data.example.name + '_' + data.example.example_class_name + '_src'" id="sourceDiv"></div>
-                {% else %}
-                    <b-img height="308px" :id="data.method + '_' + data.dataset + '_' + data.example.name + '_' + data.example.example_class_name + '_src'" class="theImage theItem" :src="data.example.rel_path"/>
-                {% endif %}
-            </b-col>
-          </b-row>
-          <div class="mt-3 mb-3 horizontal-separator"></div>
-          <b-row align-h="center" class="mb-5">
-            <b-col class="text-center">
-              <b-col class="centered-content">
-                <h5>Please select the class visualization (from the list below) that is most similar to the input visualization</h5>
-              </b-col>
-            </b-col>
-          </b-row>
-          {% if iteration_data['method'] == 'table-t' %}
-          <b-row v-for="shown_class in data.shown_classes" align-h="center" class="text-center">
-              <div class="myRow">
-                <div class="theItem selectableItem" :id="data.method + '_' + data.dataset + '_' + shown_class.name" style="padding-left: 15px; padding-right: 15px; z-index: 1; position: relative; display: inline-block;" @click="onSelectVisualization($event, shown_class)" v-b-hover="handleHover">
-                  <div :id="data.method + '_' + data.dataset + '_' + shown_class.name + '_table'" style="position: relative; z-index: -1; display: inline-block;"></div>
-                </div>
-                
-              </div>
-            </b-row>
-          
-
-          {% else %}
-          <b-row>
-            <b-col v-for="shown_class in data.shown_classes" align-h="center" class="text-center">
-                <b-img height="308px" class="theImage theItem selectableItem" :id="data.method + '_' + data.dataset + '_' + shown_class.name" v-b-hover="handleHover" @click="onSelectVisualization($event, shown_class)" :src="shown_class.class_image_rel_path"/>
-            </b-col>
-          </b-row>
-          {% endif %}
-
-          <b-row align-h="center" class="mt-3 mb-3">
-            <b-col class="text-center">
-              <b-col class="centered-content">
-                {% if iteration < n_iterations - 1 %}
-                <b-form action="{{ continuation_url }}" method="GET">
-                    <input type="hidden" hidden="true" :value="selectedItem.method" name="method"/>
-                    <input type="hidden" hidden="true" :value="selectedItem.dataset" name="dataset"/>
-                    <input type="hidden" hidden="true" :value="selectedItem.id" name="selection_id"/>
-                    <input type="hidden" hidden="true" :value="selectedItem.className" name="class_name"/>
-                    <input type="hidden" hidden="true" :value="selectedItem.example.name" name="example_name"/>
-                    <input type="hidden" hidden="true" :value="selectedItem.example.example_class_name" name="example_class_name"/>
-                    <b-btn type="submit" variant="primary" block :disabled="selectedItem.id == null">Continue</b-btn>
-                </b-form>
-                {% else %}
-                <b-form action="{{ continuation_url }}" method="GET">
-                    <input type="hidden" hidden="true" :value="selectedItem.method" name="method"/>
-                    <input type="hidden" hidden="true" :value="selectedItem.dataset" name="dataset"/>
-                    <input type="hidden" hidden="true" :value="selectedItem.id" name="selection_id"/>
-                    <input type="hidden" hidden="true" :value="selectedItem.className" name="class_name"/>
-                    <input type="hidden" hidden="true" :value="selectedItem.example.name" name="example_name"/>
-                    <input type="hidden" hidden="true" :value="selectedItem.example.example_class_name" name="example_class_name"/>
-                    <b-btn type="submit" variant="success" block :disabled="selectedItem.id == null">Finish</b-btn>
-                </b-form>
-                {% endif %}
-              </b-col>
-            </b-col>
-          </b-row>
-        </div> -->
+        <b-row align-h="center">
+          <b-form @submit.prevent="submitForm" ref="myForm" action="{{url_for('visualrepresentation2024.handle_feedback')}}" method="POST">
+            <input type="hidden" name="csrf_token" value="{{csrf_token()}}"/>
+            <b-button :disabled="selected.length == 0" variant="primary" id="mySubmitButton" type="submit">Continue</b-button>
+          </b-form>
+        </b-row>
+      
 
         
       </b-container>
@@ -254,7 +189,8 @@
                 instructionBullets: [],
                 imageSize: 300,
                 imageKey: 1,
-                colsPerRow: 7
+                colsPerRow: 7,
+                pathToItem: {}
             }
         },
         methods: {
@@ -273,9 +209,10 @@
                   var copy = document.getElementById(id);
                   copy.classList.remove("selected");
                   this.selected.splice(index, 1);
-                  reportDeselectedItem(`/utils/deselected-item`, csrfToken, id, this.selected, ()=>{ 
+                  reportDeselectedItem(`/utils/deselected-item`, csrfToken, id, this.selected.map(x => this.pathToItem[x]), ()=>{ 
                       return {
-                          "id": id
+                          "id": id,
+                          "item": this.pathToItem[id]
                       }; 
                   });
               } else {
@@ -283,9 +220,10 @@
                   var copy = document.getElementById(id);
                   copy.classList.add("selected");
                   this.selected.push(id);
-                  reportSelectedItem(`/utils/selected-item`, csrfToken, id, this.selected, ()=>{
+                  reportSelectedItem(`/utils/selected-item`, csrfToken, id, this.selected.map(x => this.pathToItem[x]), ()=>{
                       return {
-                          "id": id
+                          "id": id,
+                          "item": this.pathToItem[id]
                       };
                   });
               }
@@ -301,6 +239,24 @@
             handleResize() {
               this.updateImageSize();
               this.imageKey++;
+            },
+            async submitForm() {
+              // Convert study data to JSON
+              var jsonData = JSON.stringify(this.selected.map(x => this.pathToItem[x]));
+
+              await fetch("{{url_for('visualrepresentation2024.submit_selections')}}", {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  'X-CSRFToken': '{{ csrf_token() }}'
+                },
+                body: jsonData
+              }).then(response => response.text())
+                .catch(error => {
+                  console.error("Error submitting data:", error);
+                });
+
+                this.$refs.myForm.submit();
             }
         },
         async mounted() {
@@ -310,7 +266,7 @@
                     return {
                         "data": data,
                         "iteration": "{{iteration}}",
-                        "full_dom_loaded": true
+                        "full_dom_loaded": true,
                     };
                 }
             );
@@ -319,7 +275,7 @@
             window.addEventListener('resize', this.handleResize);
 
 
-            this.studyData = await fetch("{{url_for('visualrepresentation2024.get_image_paths')}}").then(response => response.json());
+            this.studyData = await fetch("{{url_for('visualrepresentation2024.get_image_data')}}").then(response => response.json());
 
 
             this.updateImageSize();
@@ -328,6 +284,7 @@
             let row = [];
             for (idx in this.studyData.candidate_list) {
                 let candidate = this.studyData.candidate_list[idx];
+                this.pathToItem[candidate.file_path] = candidate;
                 row.push(candidate);
                 if (row.length >= this.colsPerRow) {
                     variantResultsColumnified.push(row);
