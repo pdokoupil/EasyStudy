@@ -132,7 +132,7 @@
         <b-row align-h="center" class="mb-3 mt-3" v-for="row in variantResults">
           <b-col :key="imageKey" class="col" xl="auto" class="align-middle" v-for="col in row">
             <!-- <b-img class="theImage theItem" :src="col"></b-img> -->
-            <b-img :height="imageSize+'px'" class="theImage theItem selectableItem" :id="col.file_path" v-b-hover="handleHover" @click="onSelectVisualization($event)" :src="col.file_path"/>
+            <b-img :height="imageSize+'px'" class="theImage theItem selectableItem" :id="col.file_path + col.idx" v-b-hover="handleHover" @click="onSelectVisualization($event)" :src="col.file_path"/>
             <!-- <b-img @mouseenter="itemMouseEnter" @mouseleave="itemMouseLeave" :id="variantNames[algoIdx] + '_' + col.movie_idx" style="width: 175px; height: 260px;" block center :src="col.url" v-on:click="onSelectMovie($event, col, variantsResults.indexOf(variantResults))" :name="col.movie_idx" :alt="col.movie" /> -->
           </b-col>
         </b-row>
@@ -284,7 +284,7 @@
             let row = [];
             for (idx in this.studyData.candidate_list) {
                 let candidate = this.studyData.candidate_list[idx];
-                this.pathToItem[candidate.file_path] = candidate;
+                this.pathToItem[candidate.file_path + candidate.idx] = candidate;
                 row.push(candidate);
                 if (row.length >= this.colsPerRow) {
                     variantResultsColumnified.push(row);

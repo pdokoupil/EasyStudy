@@ -14,7 +14,8 @@
 
         <b-row align-h="center">
           <b-col class="text-center">
-            You correctly identified the corresponding class in <strong>{{ n_identified }}</strong> out of <strong>{{ n_shown }}</strong> cases. Congratulations!
+            In total, {{n_shown}} candidate images were shown to you and you made {{n_selections}} selections, correctly identifying {{n_identified}} out of {{n_total_positive}} positive examples (precision {{precision}}).
+            <!-- You correctly identified the positive examples in <strong>{{ n_identified }}</strong> out of <strong>{{ n_shown }}</strong> cases. Congratulations! -->
           </b-col>
         </b-row>
 

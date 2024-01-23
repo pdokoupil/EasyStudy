@@ -24,7 +24,7 @@ import os
 import numpy as np
 
 from app import rds
-
+from collections import Counter
 import pickle
 
 
@@ -151,7 +151,7 @@ def on_joined():
         session["uuid"] = secrets.token_urlsafe(16)
 
     set_val("iteration", 0)
-
+    session["iteration"] = 0
     data = load_configuration_json()
     selected_user = np.random.choice(list(data.keys()))
 
@@ -251,16 +251,57 @@ def finish_user_study():
     else:
         params["prolific_pid"] = None
 
-    iterations = Interaction.query.filter((Interaction.participation == session["participation_id"]) & (Interaction.interaction_type == "iteration-ended")).all()
+
+    selected_user = get_val("selected_user")
+    data = load_configuration_json()
+
+    iteration_data = data[selected_user]
+    selections = get_val("selections")
+
+    if len(iteration_data) != len(selections):
+        print(f"Warning, lengths differ: {len(iteration_data) != len(selections)}, selections={selections}")
+
+    #iterations = Interaction.query.filter((Interaction.participation == session["participation_id"]) & (Interaction.interaction_type == "iteration-ended")).all()
     n_identified = 0
-    for it in iterations:
-        d = json.loads(it.data)
-        n_identified += d["selected"]["class_name"] == d["selected"]["example_class_name"]
+    n_failed_checks = 0
+    n_total_positive = 0
+    n_total_candidates = 0
+    n_selections = 0
+    for iteration, iteration_selections in selections.items():
+        n_selections += len(iteration_selections)
+        current_iteration_data = iteration_data[iteration]
+        n_total_candidates += len(current_iteration_data["candidateList"])
+        if current_iteration_data["attentionCheck"] == 1:
+            cnts_real = dict(Counter([x['example_name'] for x in iteration_selections]))
+            cnts_goal = dict(Counter([x for x in current_iteration_data["candidateList"] if x == current_iteration_data["target"]]))
+            if cnts_goal != cnts_real:
+                n_failed_checks += 1
+        failed_check = 0
+        for candidate_name, is_correct in zip(current_iteration_data["candidateList"], current_iteration_data["correct"]):
 
-    params["n_identified"] = min(n_identified, len(session["permutation"]))
-    params["n_shown"] = len(session["permutation"])
+            if is_correct:
+                n_identified += len([x for x in iteration_selections if x["example_name"] == candidate_name]) > 0
+                n_total_positive += 1
 
-    study_ended(session["participation_id"], iteration=session["iteration"])
+        n_failed_checks += 1 if failed_check else 0
+
+    precision = round(n_identified / n_selections, 2)
+    params["n_shown"] = n_total_candidates
+    params["n_selections"] = n_selections
+    params["n_identified"] = n_identified
+    params["n_total_positive"] = n_total_positive
+    params["precision"] = precision
+
+
+    study_ended(session["participation_id"],
+                iteration=get_val("iteration"),
+                n_failed_checks=n_failed_checks,
+                n_identified=n_identified,
+                n_total_positive=n_total_positive,
+                precision=precision,
+                n_total_candidates=n_total_candidates,
+                n_selections=n_selections
+    )
 
     return render_template("visual_representation_finish.html", **params)
 
@@ -283,16 +324,19 @@ def get_image_data():
             "class_name": class_name,
             "dataset": dataset,
             "viz_method": viz_method,
+            "example_name": neg,
             "file_path": url_for('static', filename=f'datasets/vizualizations2024/{dataset}/{viz_method}/{class_name}/{file_name}.png')
         })
 
-    for candidate in iteration_data["candidateList"]:
+    for idx, candidate in enumerate(iteration_data["candidateList"]):
         [class_name, file_name] = candidate.split("/")
         candidate_list.append({
             "class_name": class_name,
             "dataset": dataset,
             "viz_method": viz_method,
-            "file_path": url_for('static', filename=f'datasets/vizualizations2024/{dataset}/{viz_method}/{class_name}/{file_name}.png')
+            "example_name": candidate,
+            "file_path": url_for('static', filename=f'datasets/vizualizations2024/{dataset}/{viz_method}/{class_name}/{file_name}.png'),
+            'idx': idx
         })
 
     [target_class_name, target_file_name] = iteration_data["target"].split("/")
@@ -300,6 +344,7 @@ def get_image_data():
         "class_name": target_class_name,
         "file_path": url_for('static', filename=f'datasets/vizualizations2024/{dataset}/{viz_method}/{target_class_name}/{target_file_name}.png'),
         "dataset": dataset,
+        "example_name": iteration_data["target"],
         "viz_method": viz_method,
     }
 
