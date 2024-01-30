@@ -160,10 +160,45 @@ def on_joined():
 
     log_interaction(session["participation_id"], "user-selected", selected_user=selected_user, uuid=session["uuid"])
 
+    return redirect(url_for(f"{__plugin_name__}.pre_study_questionnaire"))
+
+@bp.route("/pre-study-questionnaire", methods=["GET", "POST"])
+def pre_study_questionnaire():
+    params = {
+        "questions_url": url_for(f"{__plugin_name__}.get_pre_study_questions"),
+        "continuation_url": url_for(f"{__plugin_name__}.pre_study_questionnaire_done"),
+        "instructions_url": url_for(f"{__plugin_name__}.get_instruction_bullets", page="pre_study_questionnaire"),
+        "finish": "Continue"
+    }
+    return render_template("generic_questionnaire.html", **params)
+
+@bp.route("/pre-study-questionnaire-done", methods=["GET", "POST"])
+def pre_study_questionnaire_done():
     return redirect(url_for(f"{__plugin_name__}.compare_visualizations",
             consuming_plugin=__plugin_name__
         )
     )
+
+@bp.route("/after-block-questionnaire", methods=["GET", "POST"])
+def after_block_questionnaire():
+    params = {
+        "questions_url": url_for(f"{__plugin_name__}.get_after_block_questions"),
+        "continuation_url": url_for(f"{__plugin_name__}.after_block_questionnaire_done"),
+        "instructions_url": url_for(f"{__plugin_name__}.get_instruction_bullets", page="after_block_questionnaire"),
+        "finish": "Continue"
+    }
+    return render_template("generic_questionnaire.html", **params)
+
+@bp.route("/after-block-questionnaire-done", methods=["GET", "POST"])
+def after_block_questionnaire_done():
+    it = get_val("iteration")
+    selected_user = get_val("selected_user")
+    data = load_configuration_json()
+ 
+    if it >= len(data[selected_user]):
+        return redirect(url_for(f"{__plugin_name__}.finish_user_study"))
+
+    return redirect(url_for(f"{__plugin_name__}.compare_visualizations"))
 
 @bp.route("/compare-visualizations")
 def compare_visualizations():
@@ -223,8 +258,10 @@ def handle_feedback():
 
     iteration_ended(it - 1, payload)
 
-    if it >= len(data[selected_user]):
-        return redirect(url_for(f"{__plugin_name__}.finish_user_study"))
+    # If the visualization method is going to change, we mark end of block and show after block questionnaire
+    # before proceeding further
+    if it >= len(data[selected_user]) or shown_data["vizMethod"] != data[selected_user][it]['vizMethod']:
+        return redirect(url_for(f"{__plugin_name__}.after_block_questionnaire"))
 
     return redirect(url_for(f"{__plugin_name__}.compare_visualizations"))
 
@@ -372,6 +409,48 @@ def get_instruction_bullets():
         bullets = []
 
     return jsonify(bullets)
+
+@bp.route("/get-pre-study-questions", methods=["GET"])
+def get_pre_study_questions():
+    q = [
+        {
+            "text": "First question",
+            "name": "q1",
+            "type": "select",
+            "options": ["Answer 1", "Answer 2"]
+        },
+        {
+            "text": "Second question",
+            "name": "q2",
+            "type": "select",
+            "options": ["Answer 1", "Answer 2", "Answer 3"]
+        }
+    ]
+    return q
+
+@bp.route("/get-after-block-questions", methods=["GET"])
+def get_after_block_questions():
+    q = [
+        {
+            "text": "First question",
+            "name": "q1",
+            "type": "likert5",
+            "neutral": False
+        },
+        {
+            "text": "Second question",
+            "name": "q2",
+            "type": "likert5",
+            "neutral": True
+        },
+        {
+            "text": "Third question",
+            "name": "q3",
+            "type": "likert7",
+            "neutral": True
+        },
+    ]
+    return q
 
 @functools.cache
 def load_configuration_json():

@@ -113,7 +113,7 @@
               <h2>Target</h2>
             </b-row>
             <b-row align-h="center">
-              <b-img :id="studyData.target.file_path + 'tg'" class="targetImage" :src="studyData.target.file_path"></b-img>
+              <b-img :height="imageSize+'px'" :id="studyData.target.file_path + 'tg'" class="targetImage" :src="studyData.target.file_path"></b-img>
             </b-row>
           </b-col>
           <b-col class="verticalSeparator">
@@ -122,7 +122,7 @@
             </b-row>
             <b-row align-h="center" style="text-align: center;">
               <b-col style="text-align: center;" v-for="negativeSample in studyData.negative_samples">
-                <b-img :id="negativeSample.file_path + 'neg'" class="negativeImage" :src="negativeSample.file_path"></b-img>
+                <b-img :height="imageSize+'px'" :id="negativeSample.file_path + 'neg'" class="negativeImage" :src="negativeSample.file_path"></b-img>
               </b-col>
             </b-row>
           </b-col>
@@ -306,18 +306,18 @@
             });
             
 
-            let elem = document.getElementById("sourceDiv");
-            if (elem != null) {
-              elem.innerHTML = await fetch(`{{url_for('visualrepresentation2024.table_data_example')}}?name=${data.example.name}`).then(resp => resp.text()).catch(err => null);
-            }
-            for (idx in data.shown_classes) {
-              let d = data.shown_classes[idx];
-              let elem = document.getElementById(data.method + '_' + data.dataset + '_' + d.name + '_table');
-              if (elem == null) {
-                continue;
-              }
-              elem.innerHTML = await fetch(`{{url_for('visualrepresentation2024.table_data')}}?name=${d.name}`).then(resp => resp.text()).catch(err => null);
-            }
+            // let elem = document.getElementById("sourceDiv");
+            // if (elem != null) {
+            //   elem.innerHTML = await fetch(`{{url_for('visualrepresentation2024.table_data_example')}}?name=${data.example.name}`).then(resp => resp.text()).catch(err => null);
+            // }
+            // for (idx in data.shown_classes) {
+            //   let d = data.shown_classes[idx];
+            //   let elem = document.getElementById(data.method + '_' + data.dataset + '_' + d.name + '_table');
+            //   if (elem == null) {
+            //     continue;
+            //   }
+            //   elem.innerHTML = await fetch(`{{url_for('visualrepresentation2024.table_data')}}?name=${d.name}`).then(resp => resp.text()).catch(err => null);
+            // }
 
             this.instructionBullets = await fetch("{{url_for('visualrepresentation2024.get_instruction_bullets', page='compare-visualizations')}}")
                             .then(response => {
