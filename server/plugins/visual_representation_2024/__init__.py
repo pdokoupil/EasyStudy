@@ -401,9 +401,10 @@ def get_instruction_bullets():
 
     if page == "compare-visualizations":
         bullets = [
-            "Instruction A With some text",
-            "Instruction B",
-            "Instruction C",
+            "You can select the candidate by simply clicking on it",
+            "If needed, you can de-select the candidate by clicking again",
+            "All selected candidates are highlighted by a green border",
+            "Once done, click on 'Continue' button. Note that you cannot go back after that."
         ]
     else:
         bullets = []
@@ -414,38 +415,76 @@ def get_instruction_bullets():
 def get_pre_study_questions():
     q = [
         {
-            "text": "First question",
+            "text": "Are you familiar with machine learning (ML)?",
             "name": "q1",
             "type": "select",
-            "options": ["Answer 1", "Answer 2"]
+            "options": [
+                "Not familiar at all",
+                "User knowledge (I have an idea what ML is; I sometimes use its outputs, e.g., ChatGPT)",
+                "Substantive knowledge (I understand how some ML algorithms work, I know its limitations)"
+            ]
         },
         {
-            "text": "Second question",
+            "text": "Are you familiar with visualization techniques (VT)?",
             "name": "q2",
             "type": "select",
-            "options": ["Answer 1", "Answer 2", "Answer 3"]
+            "options": [
+                "Not familiar at all",
+                "User knowledge (I have an idea what VT is; I sometimes use basic methods, e.g., bar charts or line charts)",
+                "Substantive knowledge (I have a good overview of different VT techniques, I can tune or adapt them to my needs)"
+            ]
+        },
+        {
+            "text": "Do you have any visual impairment?",
+            "name": "q3",
+            "type": "select",
+            "options": [
+                "None",
+                "Glasses or contact lenses",
+                "Color blindness or similar conditions affecting the perception of colors",
+                "Other (please specify)"
+            ]
         }
     ]
+
     return q
 
 @bp.route("/get-after-block-questions", methods=["GET"])
 def get_after_block_questions():
     q = [
         {
-            "text": "First question",
+            "text": "It was easy to perceive differences/similarities using these visualizations.",
             "name": "q1",
-            "type": "likert5",
-            "neutral": False
-        },
-        {
-            "text": "Second question",
-            "name": "q2",
-            "type": "likert5",
+            "type": "likert7",
             "neutral": True
         },
         {
-            "text": "Third question",
+            "text": "Using these visualizations took a lot of work and required substantial effort.",
+            "name": "q2",
+            "type": "likert7",
+            "neutral": True
+        },
+        {
+            "text": "The visualizations were rather disturbing.",
             "name": "q3",
+            "type": "likert7",
+            "neutral": True
+        },
+        {
+            "text": "Overall, visualizations displayed enough information to distinguish positive vs. negative examples.",
+            "name": "q4",
+            "type": "likert7",
+            "neutral": True
+        },
+        {
+            "text": "Overall, I am confident that the candidates I selected are indeed from the same classes as the positive examples.",
+            "name": "q5",
+            "type": "likert7",
+            "neutral": True
+        },
+        {
+            "text": "I would feel unpleasant if I had to see these visualizations more often.",
+            "name": "q6",
             "type": "likert7",
             "neutral": True
         },
