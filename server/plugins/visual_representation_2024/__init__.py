@@ -172,6 +172,11 @@ def pre_study_questionnaire():
         "header": "Pre-study questionnaire",
         "hint": "Please fill in the questionnaire before proceeding to the following steps."
     }
+    params["footer_override"] = None
+    conf = load_user_study_config(session["user_study_id"])
+    if "text_overrides" in conf:
+        if "footer" in conf["text_overrides"]:
+            params["footer_override"] = conf["text_overrides"]["footer"]
     return render_template("generic_questionnaire.html", **params)
 
 @bp.route("/pre-study-questionnaire-done", methods=["GET", "POST"])
@@ -191,6 +196,11 @@ def after_block_questionnaire():
         "hint": "Note that the questions relate only to the <b>current visualization method</b>, i.e., only to the last few tasks you completed.",
         "header": "Please fill in the questionnaire about the visualization method"
     }
+    conf = load_user_study_config(session["user_study_id"])
+    params["footer_override"] = None
+    if "text_overrides" in conf:
+        if "footer" in conf["text_overrides"]:
+            params["footer_override"] = conf["text_overrides"]["footer"]
     return render_template("generic_questionnaire.html", **params)
 
 @bp.route("/after-block-questionnaire-done", methods=["GET", "POST"])
