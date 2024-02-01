@@ -170,6 +170,11 @@ def pre_study_questionnaire():
         "instructions_url": url_for(f"{__plugin_name__}.get_instruction_bullets", page="pre_study_questionnaire"),
         "finish": "Continue"
     }
+    params["footer_override"] = None
+    conf = load_user_study_config(session["user_study_id"])
+    if "text_overrides" in conf:
+        if "footer" in conf["text_overrides"]:
+            params["footer_override"] = conf["text_overrides"]["footer"]
     return render_template("generic_questionnaire.html", **params)
 
 @bp.route("/pre-study-questionnaire-done", methods=["GET", "POST"])
@@ -187,6 +192,11 @@ def after_block_questionnaire():
         "instructions_url": url_for(f"{__plugin_name__}.get_instruction_bullets", page="after_block_questionnaire"),
         "finish": "Continue"
     }
+    conf = load_user_study_config(session["user_study_id"])
+    params["footer_override"] = None
+    if "text_overrides" in conf:
+        if "footer" in conf["text_overrides"]:
+            params["footer_override"] = conf["text_overrides"]["footer"]
     return render_template("generic_questionnaire.html", **params)
 
 @bp.route("/after-block-questionnaire-done", methods=["GET", "POST"])
