@@ -168,7 +168,9 @@ def pre_study_questionnaire():
         "questions_url": url_for(f"{__plugin_name__}.get_pre_study_questions"),
         "continuation_url": url_for(f"{__plugin_name__}.pre_study_questionnaire_done"),
         "instructions_url": url_for(f"{__plugin_name__}.get_instruction_bullets", page="pre_study_questionnaire"),
-        "finish": "Continue"
+        "finish": "Continue",
+        "header": "Pre-study questionnaire",
+        "hint": "Please fill in the questionnaire before proceeding to the following steps."
     }
     return render_template("generic_questionnaire.html", **params)
 
@@ -185,7 +187,9 @@ def after_block_questionnaire():
         "questions_url": url_for(f"{__plugin_name__}.get_after_block_questions"),
         "continuation_url": url_for(f"{__plugin_name__}.after_block_questionnaire_done"),
         "instructions_url": url_for(f"{__plugin_name__}.get_instruction_bullets", page="after_block_questionnaire"),
-        "finish": "Continue"
+        "finish": "Continue",
+        "hint": "Note that the questions relate only to the <b>current visualization method</b>, i.e., only to the last few tasks you completed.",
+        "header": "Please fill in the questionnaire about the visualization method"
     }
     return render_template("generic_questionnaire.html", **params)
 
@@ -213,7 +217,9 @@ def compare_visualizations():
         "finish_url": url_for(f"{__plugin_name__}.finish_user_study"),
         "iteration": iteration,
         "iteration_data": iteration_data,
-        "n_iterations": len(data[selected_user])
+        "n_iterations": len(data[selected_user]),
+        "hint": "Below, there is a visual representation of one data record belonging to the target class (positive example) and several representations o negative examples (items belonging to different classes).<br>Please select all candidates, which, you think, belong to the same class as the positive example (i.e., they seem close enough to it). Note that in several cases, the question may be an attention check, where the exact duplicate of the positive example is displayed.",
+        "header": "Select all candidates that belong to the same class as the positive example."
     }
 
     conf = load_user_study_config(session["user_study_id"])
