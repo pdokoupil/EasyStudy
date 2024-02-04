@@ -5,7 +5,7 @@
         <!-- <b-jumbotron class="smallJumbotron" header="{{header}}" lead="">
             {{hint}}
         </b-jumbotron> -->
-        <b-jumbotron style="max-height: 7vh;" class="smallJumbotron" header-level="8">
+        <b-jumbotron class="smallJumbotron" header-level="8">
             <!-- <template #header>
                 <h1 style="font-size: 1.0rem; margin-bottom: -0.5em; padding: 0;">{{header}}</h1>
             </template>
@@ -20,7 +20,7 @@
                     </p>
                 </b-col>
                 <b-col style="text-align: right;">
-                    <b-button size="lg" name="instructionsBtn" variant="info" class="mb-2" v-b-toggle.sidebar-1>
+                    <b-button v-if="instructionBullets && instructionBullets.length > 0" size="lg" name="instructionsBtn" variant="info" class="mb-2" v-b-toggle.sidebar-1>
                         Instructions <b-icon icon="question-square-fill" aria-hidden="true"></b-icon>
                       </b-button>
                 </b-col>
@@ -83,7 +83,8 @@
                                     <b-form-radio value="2">Agree</b-form-radio>
                                     <b-form-radio value="3">Strongly Agree</b-form-radio>
                                 </b-form-radio-group>
-                                <b-form-select v-else-if="q.type === 'select'" :name="q.name" :id="q.name" :options="q.options" required></b-form-select>
+                                <b-form-select v-else-if="q.type === 'select'" :name="q.name" v-model="qValues[index]" :id="q.name" :options="q.options" required></b-form-select>
+                                <b-input v-if="qValues[index] && qValues[index].toLowerCase().startsWith('other')" :name="q.name + 'Other'" :id="q.name + 'Other'" type="text" placeholder="Please specify" required/>
                             </b-form-group>
                         </b-col>
                     </b-row>
@@ -123,7 +124,8 @@
         
         return {
             questions: null,
-            instructionBullets: []
+            instructionBullets: [],
+            qValues: {}
         };
     },
     methods: {
@@ -143,6 +145,8 @@
                                 return response.json();
                             });
 
+        this.qValues = new Array(this.questions.length);
+
         this.instructionBullets = await fetch("{{instructions_url}}")
                             .then(response => {
                                 if (!response.ok) {
@@ -160,7 +164,7 @@
             registerClickedRadioReporting("/utils/on-input", csrfToken, radios);
             registerClickedCheckboxReporting("/utils/on-input", csrfToken, checkboxes);
             registerChangedSelectionReporting("/utils/on-input", csrfToken, selects);
-            reportLoadedPage(`/utils/loaded-page`, csrfToken, "after_block_questionnaire");
+            reportLoadedPage(`/utils/loaded-page`, csrfToken, "generic_questionnaire");
         });
     }
 })

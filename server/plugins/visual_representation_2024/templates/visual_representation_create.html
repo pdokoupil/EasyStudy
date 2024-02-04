@@ -12,6 +12,11 @@
           </b-row>
           <b-row align-h="center" class="mb-3">
             <b-col class="text-center" cols="8">
+              <b-form-checkbox v-model="disableDemographics">{{disable_demographics}}</b-form-checkbox>
+            </b-col>
+          </b-row>
+          <b-row align-h="center" class="mb-3">
+            <b-col class="text-center" cols="8">
               <b-form-checkbox v-model="overrideFooter">{{override_footer}}</b-form-checkbox>
             </b-col>
           </b-row>
@@ -104,7 +109,8 @@
               overrideComparisonHint: false,
               overrideFinishedText: false,
               overrideAbout: false,
-              overrideFooter: false
+              overrideFooter: false,
+              disableDemographics: false,
             }
         },
         methods: {
@@ -137,7 +143,8 @@
 
                 let userStudyConfiguration = {
                     "prolific_code": this.prolificCode,
-                    "text_overrides": textOverrides
+                    "text_overrides": textOverrides,
+                    "disable_demographics": this.disableDemographics
                 };
 
                 let userStudyData = {

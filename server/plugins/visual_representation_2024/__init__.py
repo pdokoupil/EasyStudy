@@ -66,7 +66,8 @@ def create():
         "override_about": "Override About",
         "override_informed_consent": "Override Informed Consent",
         "override_algorithm_comparison_hint": "Override Selection Instructions",
-        "override_finished_text": "Override Final Text"
+        "override_finished_text": "Override Final Text",
+        "disable_demographics": "Disable demographics"
     }
     return render_template("visual_representation_create.html", **params)
 
@@ -181,6 +182,13 @@ def pre_study_questionnaire():
 
 @bp.route("/pre-study-questionnaire-done", methods=["GET", "POST"])
 def pre_study_questionnaire_done():
+
+    data = {}
+    data.update(**request.form)
+
+    # We just log the question answers as there is no other useful data gathered during pre-study-questionnaire
+    log_interaction(session["participation_id"], "pre-study-questionnaire", **data)
+
     return redirect(url_for(f"{__plugin_name__}.compare_visualizations",
             consuming_plugin=__plugin_name__
         )
@@ -208,6 +216,12 @@ def after_block_questionnaire_done():
     it = get_val("iteration")
     selected_user = get_val("selected_user")
     data = load_configuration_json()
+
+    q_data = {}
+    q_data.update(**request.form)
+
+    # We just log the question answers as there is no other useful data gathered during after-block-questionnaire
+    log_interaction(session["participation_id"], "after-block-questionnaire", **q_data)
  
     if it >= len(data[selected_user]):
         return redirect(url_for(f"{__plugin_name__}.finish_user_study"))
