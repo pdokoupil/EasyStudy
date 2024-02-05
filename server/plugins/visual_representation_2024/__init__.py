@@ -151,9 +151,10 @@ def on_joined():
     if "uuid" not in session:
         session["uuid"] = secrets.token_urlsafe(16)
 
+    conf = load_user_study_config(session["user_study_id"])
     set_val("iteration", 0)
     session["iteration"] = 0
-    data = load_configuration_json()
+    data = load_configuration_json(conf["study_data_version"])
     selected_user = np.random.choice(list(data.keys()))
 
     set_val("selected_user", selected_user)
@@ -215,7 +216,8 @@ def after_block_questionnaire():
 def after_block_questionnaire_done():
     it = get_val("iteration")
     selected_user = get_val("selected_user")
-    data = load_configuration_json()
+    conf = load_user_study_config(session["user_study_id"])
+    data = load_configuration_json(conf["study_data_version"])
 
     q_data = {}
     q_data.update(**request.form)
@@ -232,7 +234,8 @@ def after_block_questionnaire_done():
 def compare_visualizations():
     iteration = get_val("iteration")
     selected_user = get_val("selected_user")
-    data = load_configuration_json()
+    conf = load_user_study_config(session["user_study_id"])
+    data = load_configuration_json(conf["study_data_version"])
 
     iteration_data = data[selected_user][iteration]
 
@@ -246,7 +249,6 @@ def compare_visualizations():
         "header": "Select all candidates that belong to the same class as the positive example."
     }
 
-    conf = load_user_study_config(session["user_study_id"])
     if "text_overrides" in conf:
         if "comparison_hint" in conf["text_overrides"]:
             params["comparison_hint_override"] = conf["text_overrides"]["comparison_hint"]
@@ -274,7 +276,8 @@ def submit_selections():
 @bp.route("/handle-feedback", methods=["POST", "GET"])
 def handle_feedback():
     selected_user = get_val("selected_user")
-    data = load_configuration_json()
+    conf = load_user_study_config(session["user_study_id"])
+    data = load_configuration_json(conf["study_data_version"])
     it = get_val("iteration")
     shown_data = data[selected_user][it]
     iteration_selections = get_val("selections")[it]
@@ -320,7 +323,7 @@ def finish_user_study():
 
 
     selected_user = get_val("selected_user")
-    data = load_configuration_json()
+    data = load_configuration_json(conf["study_data_version"])
 
     iteration_data = data[selected_user]
     selections = get_val("selections")
@@ -375,7 +378,8 @@ def finish_user_study():
 @bp.route("/get-image-data", methods=["GET"])
 def get_image_data():
     selected_user = get_val("selected_user")
-    data = load_configuration_json()
+    conf = load_user_study_config(session["user_study_id"])
+    data = load_configuration_json(conf["study_data_version"])
     it = get_val("iteration")
     iteration_data = data[selected_user][it]
 
@@ -460,8 +464,8 @@ def get_pre_study_questions():
             "type": "select",
             "options": [
                 "Not familiar at all",
-                "User knowledge (I have an idea what VT is; I sometimes use basic methods, e.g., bar charts or line charts)",
-                "Substantive knowledge (I have a good overview of different VT techniques, I can tune or adapt them to my needs)"
+                "User knowledge (I have an idea what VT are; I sometimes use basic methods, e.g., bar charts or line charts)",
+                "Substantive knowledge (I have a good overview of different VT, I can tune or adapt them to my needs)"
             ]
         },
         {
@@ -522,9 +526,18 @@ def get_after_block_questions():
     return q
 
 @functools.cache
-def load_configuration_json():
+def load_configuration_json(study_data_version):
     # Load the JSON with configurations
-    json_path = os.path.join(get_abs_project_root_path(), 'static', 'datasets', 'vizualizations2024', 'studyUsersRaw.json')
+    if study_data_version == "FULL":
+        f_name = 'studyUsersRaw.json'
+    elif study_data_version == "1-TASK":
+        f_name = 'studyUsersRaw_1task.json'
+    elif study_data_version == "2-TASKS":
+        f_name = 'studyUsersRaw_2tasks.json'
+    else:
+        assert False
+    print(f"Load configuration json with: {study_data_version}, leads to file: {f_name}")
+    json_path = os.path.join(get_abs_project_root_path(), 'static', 'datasets', 'vizualizations2024', f_name)
     with open(json_path, "r") as f:
         return json.load(f)
 
@@ -534,8 +547,10 @@ def long_initialization(guid):
     session = Session(engine)
     q = session.query(UserStudy).filter(UserStudy.guid == guid).first()
     
+    conf = json.loads(q.settings)
+    
     # Just to populate the cache
-    _ = load_configuration_json()
+    _ = load_configuration_json(conf["study_data_version"])
 
     q.initialized = True
     q.active = True

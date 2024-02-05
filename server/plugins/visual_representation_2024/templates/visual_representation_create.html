@@ -11,6 +11,12 @@
             </b-col>
           </b-row>
           <b-row align-h="center" class="mb-3">
+            <b-col cols="8">
+              <label for="k">Please select study data version</label>
+              <b-form-select v-model="studyDataVersion" :options="studyDataVersions" required="True" type=""/>
+            </b-col>
+          </b-row>
+          <b-row align-h="center" class="mb-3">
             <b-col class="text-center" cols="8">
               <b-form-checkbox v-model="disableDemographics">{{disable_demographics}}</b-form-checkbox>
             </b-col>
@@ -111,6 +117,8 @@
               overrideAbout: false,
               overrideFooter: false,
               disableDemographics: false,
+              studyDataVersions: ["FULL", "1-TASK", "2-TASKS"],
+              studyDataVersion: "FULL"
             }
         },
         methods: {
@@ -144,7 +152,8 @@
                 let userStudyConfiguration = {
                     "prolific_code": this.prolificCode,
                     "text_overrides": textOverrides,
-                    "disable_demographics": this.disableDemographics
+                    "disable_demographics": this.disableDemographics,
+                    "study_data_version": this.studyDataVersion
                 };
 
                 let userStudyData = {
