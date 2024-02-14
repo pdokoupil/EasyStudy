@@ -494,7 +494,7 @@ def get_after_block_questions():
     if block == 0:
         # First attention check, manipulation
         q.append({
-            "text": "I believe visualization techniques are a very useful tool. To answer <br> this attention check question correctly, you must select 'Strongly Disagree'",
+            "text": "I believe visualization techniques are a very useful tool. To answer this attention check question <br> correctly, you must select 'Strongly Disagree'",
             "name": "qs1",
             "type": "likert7",
             "neutral": True
