@@ -36,9 +36,6 @@ __description__ = "Comparing different visual representations of data"
 
 bp = Blueprint(__plugin_name__, __plugin_name__, url_prefix=f"/{__plugin_name__}")
 
-MIN_ITERATIONS = 5
-N_ITERATIONS = 100
-
 def get_uname():
     return f"user:{__plugin_name__}-{session['uuid']}"
 
@@ -77,49 +74,12 @@ from markupsafe import Markup
 
 loader = FileSystemLoader('./')
 
-
-def include_file(name):
-    print("OK")
-    return Markup(loader.get_source(env, name)[0])
-
-env = Environment(loader=loader)
-env.globals['include_file'] = include_file
-
 @bp.context_processor
 def plugin_name():
     return {
         "plugin_name": __plugin_name__,
-        "include_file": include_file
     }
 
-@bp.route("/table-data-example", methods=["GET"])
-def table_data_example():
-    example_name = request.args.get('name')
-    p = session["permutation"][session["iteration"]]
-    
-    if p.method != "table-t":
-        return "", 404
-    
-    if example_name != p.example.name:
-        return "", 404
-
-    return include_file('static/datasets/vizualizations/' + p.example.path.split(f'vizualizations/')[1])
-
-@bp.route("/table-data", methods=["GET"])
-def table_data():
-    class_name = request.args.get('name')
-
-    p = session["permutation"][session["iteration"]]
-    if p.method != "table-t":
-        return "", 404
-
-    shown_classes = p.shown_classes
-    for cls in shown_classes:
-        if cls.name == class_name:
-            return include_file('static/datasets/vizualizations/' + cls.class_image_path.split(f'vizualizations/')[1])
-
-    return "", 404
-#current_app.jinja_env.globals.update(include_file=include_file)
 
 # Helpers
 def iteration_ended(iteration, payload):
@@ -159,6 +119,7 @@ def on_joined():
 
     set_val("selected_user", selected_user)
     set_val("selections", {})
+    set_val("block", 0)
 
     log_interaction(session["participation_id"], "user-selected", selected_user=selected_user, uuid=session["uuid"])
 
@@ -225,6 +186,9 @@ def after_block_questionnaire_done():
     # We just log the question answers as there is no other useful data gathered during after-block-questionnaire
     log_interaction(session["participation_id"], "after-block-questionnaire", **q_data)
  
+    block = get_val("block")
+    set_val("block", block + 1)
+
     if it >= len(data[selected_user]):
         return redirect(url_for(f"{__plugin_name__}.finish_user_study"))
 
@@ -435,10 +399,11 @@ def get_instruction_bullets():
 
     if page == "compare-visualizations":
         bullets = [
-            "You can select the candidate by simply clicking on it",
-            "If needed, you can de-select the candidate by clicking again",
-            "All selected candidates are highlighted by a green border",
+            "You can select the candidate by simply clicking on it.",
+            "If needed, you can de-select the candidate by clicking again.",
+            "All selected candidates are highlighted by a green border.",
             "Once done, click on 'Continue' button. Note that you cannot go back after that."
+            "The volume of correct answers differs between tasks, but there is always at least one correct example.",
         ]
     else:
         bullets = []
@@ -455,7 +420,7 @@ def get_pre_study_questions():
             "options": [
                 "Not familiar at all",
                 "User knowledge (I have an idea what ML is; I sometimes use its outputs, e.g., ChatGPT)",
-                "Substantive knowledge (I understand how some ML algorithms work, I know its limitations)"
+                "Substantial knowledge (I understand how some ML algorithms work, I know its limitations)"
             ]
         },
         {
@@ -465,7 +430,7 @@ def get_pre_study_questions():
             "options": [
                 "Not familiar at all",
                 "User knowledge (I have an idea what VT are; I sometimes use basic methods, e.g., bar charts or line charts)",
-                "Substantive knowledge (I have a good overview of different VT, I can tune or adapt them to my needs)"
+                "Substantial knowledge (I have a good overview of different VT, I can tune or adapt them to my needs)"
             ]
         },
         {
@@ -485,6 +450,8 @@ def get_pre_study_questions():
 
 @bp.route("/get-after-block-questions", methods=["GET"])
 def get_after_block_questions():
+    block = get_val("block")
+
     q = [
         {
             "text": "It was easy to perceive differences/similarities using these visualizations.",
@@ -523,6 +490,42 @@ def get_after_block_questions():
             "neutral": True
         },
     ]
+
+    if block == 0:
+        # First attention check, manipulation
+        q.append({
+            "text": "I believe visualization techniques are a very useful tool. To answer <br> this attention check question correctly, you must select 'Strongly Disagree'",
+            "name": "qs1",
+            "type": "likert7",
+            "neutral": True
+        })
+    elif block == 1:
+        # Second attention check, nonsensical
+        q.append({
+            "text": "This system provided me recommendations for great recipes for exotic cuisines.",
+            "name": "qs2",
+            "type": "likert7",
+            "neutral": False
+        })
+    elif block == 2:
+        # Third attention check, nonsensical
+        q.append({
+            "text": "This system provided me with many tips for interesting computer games.",
+            "name": "qs3",
+            "type": "likert7",
+            "neutral": False
+        })
+    elif block == 3:
+        # Fourth attention check, manipulation
+        q.append({
+            "text": "Interacting with different visualization techniques was entertaining and I would recommend it to my friends. To answer <br> this attention check question correctly, you must select 'Disagree'.",
+            "name": "qs4",
+            "type": "likert7",
+            "neutral": True
+        })
+    else:
+        pass # No attention checks
+
     return q
 
 @functools.cache

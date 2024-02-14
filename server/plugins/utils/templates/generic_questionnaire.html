@@ -64,7 +64,7 @@
                         <b-col align-h="center">
                             <b-form-group :name="q.name + 'g'" id="q.name + 'g'">
                                 <b-label :for="q.name">
-                                    <strong>[[index + 1]]. [[q.text]]</strong>
+                                    <strong>[[index + 1]]. <span v-html="q.text"></span></strong>
                                     <br v-if="q.text2"><strong class="ml-3" v-if="q.text2">[[q.text2]]</strong>
                                 </b-label>
                                 <b-form-radio-group v-if="q.type === 'likert5'" :id="q.name" :name="q.name" required>

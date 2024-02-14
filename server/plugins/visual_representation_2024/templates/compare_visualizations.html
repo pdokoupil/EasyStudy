@@ -139,9 +139,19 @@
 
         
         <b-row align-h="center">
-          <b-form @submit.prevent="submitForm" ref="myForm" action="{{url_for('visualrepresentation2024.handle_feedback')}}" method="POST">
+          <b-form ref="myForm" action="{{url_for('visualrepresentation2024.handle_feedback')}}" method="POST">
             <input type="hidden" name="csrf_token" value="{{csrf_token()}}"/>
-            <b-button :disabled="selected.length == 0" variant="primary" id="mySubmitButton" type="submit">Continue</b-button>
+            
+            <b-overlay
+                :show="busy"
+                rounded
+                opacity="0.6"
+                spinner-small
+                spinner-variant="primary"
+                class="d-inline-block"
+            >
+                <b-button @click="submitForm" :disabled="selected.length == 0" variant="primary" id="mySubmitButton" type="submit">Continue</b-button>
+            </b-overlay>
           </b-form>
         </b-row>
       
@@ -190,7 +200,8 @@
                 imageSize: 300,
                 imageKey: 1,
                 colsPerRow: 7,
-                pathToItem: {}
+                pathToItem: {},
+                busy: false
             }
         },
         methods: {
@@ -240,7 +251,10 @@
               this.updateImageSize();
               this.imageKey++;
             },
-            async submitForm() {
+            async submitForm(event) {
+              event.preventDefault();
+
+              this.busy = true;
               // Convert study data to JSON
               var jsonData = JSON.stringify(this.selected.map(x => this.pathToItem[x]));
 
@@ -256,7 +270,7 @@
                   console.error("Error submitting data:", error);
                 });
 
-                this.$refs.myForm.submit();
+              this.$refs.myForm.submit();
             }
         },
         async mounted() {
@@ -305,19 +319,6 @@
                 });
             });
             
-
-            // let elem = document.getElementById("sourceDiv");
-            // if (elem != null) {
-            //   elem.innerHTML = await fetch(`{{url_for('visualrepresentation2024.table_data_example')}}?name=${data.example.name}`).then(resp => resp.text()).catch(err => null);
-            // }
-            // for (idx in data.shown_classes) {
-            //   let d = data.shown_classes[idx];
-            //   let elem = document.getElementById(data.method + '_' + data.dataset + '_' + d.name + '_table');
-            //   if (elem == null) {
-            //     continue;
-            //   }
-            //   elem.innerHTML = await fetch(`{{url_for('visualrepresentation2024.table_data')}}?name=${d.name}`).then(resp => resp.text()).catch(err => null);
-            // }
 
             this.instructionBullets = await fetch("{{url_for('visualrepresentation2024.get_instruction_bullets', page='compare-visualizations')}}")
                             .then(response => {
