@@ -227,7 +227,7 @@ class MLDataLoader:
             TARGET_WIDTH = 200
             coef = TARGET_WIDTH / width
             new_height = int(height * coef)
-            img = img.resize((TARGET_WIDTH, new_height),Image.ANTIALIAS).convert('RGB')
+            img = img.resize((TARGET_WIDTH, new_height), Image.LANCZOS).convert('RGB')
             img.save(os.path.join(self.img_dir_path, f'{movie_id}.jpg'), quality=90)
 
             i += 1
@@ -254,7 +254,7 @@ class MLDataLoader:
                     TARGET_WIDTH = 200
                     coef = TARGET_WIDTH / width
                     new_height = int(height * coef)
-                    img = img.resize((TARGET_WIDTH, new_height),Image.ANTIALIAS).convert('RGB')
+                    img = img.resize((TARGET_WIDTH, new_height), Image.LANCZOS).convert('RGB')
                     img.save(os.path.join(self.img_dir_path, f'{movie_id}.jpg'), quality=90)
 
             # Use local version of images

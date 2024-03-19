@@ -21,7 +21,7 @@ RUN pip install tensorflow-recommenders
 RUN pip install python3-discogs-client
 RUN pip install lenskit
 
-EXPOSE 5555
+EXPOSE 5000
 
 ENTRYPOINT [ "python" ]
-CMD ["-m", "gunicorn", "-w", "4", "--bind", "0.0.0.0:5555", "app:create_app()"]
+CMD ["-m", "gunicorn", "-w", "4", "--bind", "0.0.0.0:5000", "app:create_app()"]

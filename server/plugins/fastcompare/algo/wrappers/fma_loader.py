@@ -261,6 +261,14 @@ class FMADataLoader(DataLoaderBase):
     def get_item_id_description(self, item_id):
         return self.get_item_index_description(self.get_item_index(item_id))
 
+    # For a given item index, return list of its categories
+    def get_item_index_categories(self, item_index):
+        assert False, "Not implemented"
+
+    # Return all available categories in the dataset
+    def get_all_categories(self):
+        assert False, "Not implemented"
+
     @classmethod
     def name(self):
         return "FMA songs dataset"
