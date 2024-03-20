@@ -17,7 +17,8 @@ RUN pip install is-safe-url
 RUN pip install tensorflow
 RUN pip install tensorflow-recommenders
 RUN pip install python3-discogs-client
-RUN pip install lenskit
+RUN pip install cachelib
+#RUN pip install lenskit
 
 EXPOSE 5000
 
