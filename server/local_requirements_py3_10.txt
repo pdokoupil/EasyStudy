@@ -1,0 +1,22 @@
+# For Python 3.10.x
+Flask==2.3.2
+matplotlib==3.7.1
+pandas==1.5.3
+numpy==1.23.5
+scikit-learn==1.3.0
+scipy==1.9.3
+Flask-Login==0.6.3
+Flask-SQLAlchemy==3.1.1
+bcrypt==4.0.1
+Flask-WTF==1.2.1
+Pillow==9.5.0
+gunicorn==21.2.0
+cinemagoer @ git+https://github.com/cinemagoer/cinemagoer@7c7960aae4ac733144fc8725cbc6a50176a8b572
+boto3==1.34.15
+Flask-PluginKit==3.7.2
+Flask-Session==0.5.0
+is-safe-url==1.0
+tensorflow==2.10.0
+tensorflow-recommenders==0.7.3
+python3-discogs-client==2.6
+Werkzeug==3.0.0
