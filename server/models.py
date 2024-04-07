@@ -42,6 +42,7 @@ class UserStudy(db.Model):
     time_created = db.Column(db.DateTime) # Date and time where the user study was created
     active = db.Column(db.Boolean)
     initialized = db.Column(db.Boolean)
+    initialization_error = db.Column(db.String, default=None) # Initialization may stop due to an error
 
     def __str__(self):
         return f"id={self.id},creator={self.creator},guid={self.guid},time_created={self.time_created},settings={self.settings}"
