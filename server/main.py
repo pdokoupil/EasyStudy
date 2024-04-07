@@ -86,7 +86,8 @@ def existing_user_studies():
             "join_url": gen_user_study_invitation_url(x.parent_plugin, x.guid),
             "active": x.active,
             "initialized": x.initialized,
-            "results": gen_user_study_results_url(x.parent_plugin, x.guid)
+            "results": gen_user_study_results_url(x.parent_plugin, x.guid),
+            "error": x.initialization_error
         } for x, c in result if filter_cond(x)])
 
 def gen_user_study_url(guid):
@@ -232,7 +233,8 @@ def create_user_study():
         settings = json.dumps(json_data["config"]),
         time_created = datetime.datetime.utcnow(),
         active=False, # Activation is responsibility of the plugin!,
-        initialized=False
+        initialized=False,
+        initialization_error=None
     )
     
     db.session.add(study)
