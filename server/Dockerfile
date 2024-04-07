@@ -19,6 +19,7 @@ RUN pip install tensorflow-recommenders
 RUN pip install python3-discogs-client
 RUN pip install cachelib
 #RUN pip install lenskit
+RUN pip install pytest
 
 EXPOSE 5000
 
