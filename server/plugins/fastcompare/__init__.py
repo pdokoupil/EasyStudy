@@ -6,6 +6,7 @@
 
 import json
 from pathlib import Path
+import shutil
 import sys
 
 
@@ -631,6 +632,15 @@ def initialize():
     heavy_process.start()
     print("Going to redirect back")
     return redirect(request.args.get("continuation_url"))
+
+# Plugin specific disposal procedure
+@bp.route("/dispose", methods=["DELETE"])
+def dispose():
+    guid = request.args.get("guid")
+    p = get_cache_path(guid)
+    if os.path.exists(p):
+        shutil.rmtree(p)
+    return "OK"
 
 @bp.route("/finish-user-study")
 @multi_lang

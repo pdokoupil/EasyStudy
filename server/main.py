@@ -109,9 +109,13 @@ def get_user_study():
 
 @main.route("/user-study/<id>", methods=["DELETE"])
 def delete_user_study(id):
-    UserStudy.query.filter(UserStudy.id == id).delete()
+    x = UserStudy.query.filter(UserStudy.id == id)
+    guid = x.first().guid
+    parent_plugin = x.first().parent_plugin
+    x.delete()
     db.session.commit()
-    return "OK"
+    # Trigger plugin-specific disposal procedure 
+    return flask.redirect(flask.url_for(f"{parent_plugin}.dispose", guid=guid))
 
 @main.route("/user-study-active", methods=["POST"])
 def set_user_study_active():
