@@ -6,8 +6,9 @@
 
 import json
 from pathlib import Path
+import shutil
 import sys
-
+import traceback
 
 import numpy as np
 [sys.path.append(i) for i in ['.', '..']]
@@ -574,46 +575,49 @@ def long_initialization(guid):
     engine = create_engine('sqlite:///instance/db.sqlite')
     session = Session(engine)
     q = session.query(UserStudy).filter(UserStudy.guid == guid).first()
-    
-    conf = json.loads(q.settings)
+    try:
+        conf = json.loads(q.settings)
 
-    # Ensure cache directory exists
-    Path(get_cache_path(guid)).mkdir(parents=True, exist_ok=True)
-    
-    # Prepare data loader first
-    loader_factory = load_data_loaders()[conf["selected_data_loader"]]
-    loader = loader_factory(**filter_params(conf["data_loader_parameters"], loader_factory))
-    loader.load_data() # Actually load the data
-    loader.save(get_cache_path(guid, loader.name()), get_cache_path("", loader.name())) # Save the data loader itself to the cache
-
-    # Then preference elicitation
-    elicitation_factory = load_preference_elicitations()[conf["selected_preference_elicitation"]]
-    elicitation = elicitation_factory(
-        loader=loader, # Pass in the loader
-        **filter_params(conf["preference_elicitation_parameters"], elicitation_factory)
-    )
-    elicitation.fit()
-    elicitation.save(get_cache_path(guid, elicitation.name()), get_cache_path("", elicitation.name()))
-
-    # Prepare algorithms
-    algorithms = conf["selected_algorithms"]
-    algorithm_factories = load_algorithms()
-    for algorithm_idx, algorithm_name in enumerate(algorithms):
-        # Construct the algorithm with parameters from config
-        # And construct the algorithm
-        factory = algorithm_factories[algorithm_name]
-        algorithm = factory(loader, **filter_params(conf["algorithm_parameters"][algorithm_idx], factory))
-        algorithm_displayed_name = conf["algorithm_parameters"][algorithm_idx]["displayed_name"]
+        # Ensure cache directory exists
+        Path(get_cache_path(guid)).mkdir(parents=True, exist_ok=True)
         
-        print(f"Training algorithm: {algorithm_displayed_name}")
-        algorithm.fit()
-        print(f"Done training algorithm: {algorithm_displayed_name}")
+        # Prepare data loader first
+        loader_factory = load_data_loaders()[conf["selected_data_loader"]]
+        loader = loader_factory(**filter_params(conf["data_loader_parameters"], loader_factory))
+        loader.load_data() # Actually load the data
+        loader.save(get_cache_path(guid, loader.name()), get_cache_path("", loader.name())) # Save the data loader itself to the cache
 
-        # Save the algorithm
-        algorithm.save(get_cache_path(guid, algorithm_displayed_name), get_cache_path("", algorithm_displayed_name))
+        # Then preference elicitation
+        elicitation_factory = load_preference_elicitations()[conf["selected_preference_elicitation"]]
+        elicitation = elicitation_factory(
+            loader=loader, # Pass in the loader
+            **filter_params(conf["preference_elicitation_parameters"], elicitation_factory)
+        )
+        elicitation.fit()
+        elicitation.save(get_cache_path(guid, elicitation.name()), get_cache_path("", elicitation.name()))
 
-    q.initialized = True
-    q.active = True
+        # Prepare algorithms
+        algorithms = conf["selected_algorithms"]
+        algorithm_factories = load_algorithms()
+        for algorithm_idx, algorithm_name in enumerate(algorithms):
+            # Construct the algorithm with parameters from config
+            # And construct the algorithm
+            factory = algorithm_factories[algorithm_name]
+            algorithm = factory(loader, **filter_params(conf["algorithm_parameters"][algorithm_idx], factory))
+            algorithm_displayed_name = conf["algorithm_parameters"][algorithm_idx]["displayed_name"]
+            
+            print(f"Training algorithm: {algorithm_displayed_name}")
+            algorithm.fit()
+            print(f"Done training algorithm: {algorithm_displayed_name}")
+
+            # Save the algorithm
+            algorithm.save(get_cache_path(guid, algorithm_displayed_name), get_cache_path("", algorithm_displayed_name))
+
+        q.initialized = True
+        q.active = True
+    except Exception as e:
+        q.initialization_error = traceback.format_exc()
+
     session.commit()
     session.expunge_all()
     session.close()
@@ -631,6 +635,15 @@ def initialize():
     heavy_process.start()
     print("Going to redirect back")
     return redirect(request.args.get("continuation_url"))
+
+# Plugin specific disposal procedure
+@bp.route("/dispose", methods=["DELETE"])
+def dispose():
+    guid = request.args.get("guid")
+    p = get_cache_path(guid)
+    if os.path.exists(p):
+        shutil.rmtree(p)
+    return "OK"
 
 @bp.route("/finish-user-study")
 @multi_lang

@@ -42,7 +42,6 @@ def login_post():
 
 @auth.route('/login')
 def login():
-    print("Login html is called")
     return flask.render_template('login.html', authenticated=current_user.is_authenticated)
 
 @auth.route("/logout")
@@ -65,9 +64,7 @@ def signup():
 def signup_post():
 
     form = SignupForm()
-    print(f"fm={form.email.data}, f={form.password.data}")
     if form.validate_on_submit():
-        print("Passed")
         user = User.query.filter_by(email=form.email.data).first() # if this returns a user, then the email already exists in database
 
         if user: # if a user is found, we want to redirect back to signup page so user can try again  
@@ -76,7 +73,7 @@ def signup_post():
             return "The user already exists" #flask.redirect(flask.url_for('auth.signup'))
 
         # create new user with the form data. Hash the password so plaintext version isn't saved.
-        new_user = User(email=form.email.data, password=generate_password_hash(form.password.data, method='sha256'))
+        new_user = User(email=form.email.data, password=generate_password_hash(form.password.data))
 
         # add the new user to the database
         db.session.add(new_user)
@@ -84,6 +81,5 @@ def signup_post():
 
         return flask.redirect(flask.url_for('auth.login'))
     else:
-        print("Not passed")
         print(form.errors)
         return "The password is too short"

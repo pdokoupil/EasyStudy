@@ -59,6 +59,11 @@ class MLDataLoaderWrapper(DataLoaderBase):
         self._ratings_df.loc[:, "item"] = self._ratings_df.item_id.map(lambda x: self.loader.movie_id_to_index[x])
         # TODO remove "movie" in column names to "item"
 
+        self.all_categories = set()
+        for cats in self.loader.movies_df.genres.unique():
+            self.all_categories.update(cats.split("|"))
+        self.all_categories.remove("(no genres listed)")
+
     # Returns dataframe with the interactions/ratings (be aware that implicit feedback is now considered)
     # There should be "user" and "item" columns in the dataframe
     @property
@@ -90,6 +95,14 @@ class MLDataLoaderWrapper(DataLoaderBase):
 
     def get_item_id_description(self, item_id):
         return self.get_item_index_description(self.get_item_index(item_id))
+
+    # For a given item index, return list of its categories
+    def get_item_index_categories(self, item_index):
+        return self.items_df_indexed.loc[self.get_item_id(item_index)].genres.split("|")
+
+    # Return all available categories in the dataset
+    def get_all_categories(self):
+        return self.all_categories
 
     @classmethod
     def name(self):
@@ -206,7 +219,7 @@ class GoodbooksDataLoader(DataLoaderBase):
                     TARGET_WIDTH = 200
                     coef = TARGET_WIDTH / width
                     new_height = int(height * coef)
-                    img = img.resize((TARGET_WIDTH, new_height), Image.ANTIALIAS).convert('RGB')
+                    img = img.resize((TARGET_WIDTH, new_height), Image.LANCZOS).convert('RGB')
                     img.save(os.path.join(self.img_dir_path, f'{book_id}.jpg'), quality=90)
 
             # Use local version of images
@@ -226,6 +239,14 @@ class GoodbooksDataLoader(DataLoaderBase):
 
     def get_item_id_description(self, item_id):
         return self.get_item_index_description(self.get_item_index(item_id))
+
+    # For a given item index, return list of its categories
+    def get_item_index_categories(self, item_index):
+        assert False, "Not implemented"
+
+    # Return all available categories in the dataset
+    def get_all_categories(self):
+        assert False, "Not implemented"
 
     @classmethod
     def name(self):

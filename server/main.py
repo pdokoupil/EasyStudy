@@ -85,7 +85,8 @@ def existing_user_studies():
             "participants": c,
             "join_url": gen_user_study_invitation_url(x.parent_plugin, x.guid),
             "active": x.active,
-            "initialized": x.initialized
+            "initialized": x.initialized,
+            "error": x.initialization_error
         } for x, c in result if filter_cond(x)])
 
 def gen_user_study_url(guid):
@@ -109,9 +110,13 @@ def get_user_study():
 
 @main.route("/user-study/<id>", methods=["DELETE"])
 def delete_user_study(id):
-    UserStudy.query.filter(UserStudy.id == id).delete()
+    x = UserStudy.query.filter(UserStudy.id == id)
+    guid = x.first().guid
+    parent_plugin = x.first().parent_plugin
+    x.delete()
     db.session.commit()
-    return "OK"
+    # Trigger plugin-specific disposal procedure 
+    return flask.redirect(flask.url_for(f"{parent_plugin}.dispose", guid=guid))
 
 @main.route("/user-study-active", methods=["POST"])
 def set_user_study_active():
@@ -215,7 +220,8 @@ def create_user_study():
         settings = json.dumps(json_data["config"]),
         time_created = datetime.datetime.utcnow(),
         active=False, # Activation is responsibility of the plugin!,
-        initialized=False
+        initialized=False,
+        initialization_error=None
     )
     
     db.session.add(study)

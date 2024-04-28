@@ -198,6 +198,16 @@ class DataLoaderBase(ABC):
     def get_item_id_description(item_id):
         pass
     
+    # For a given item index, return list of its categories
+    @abstractmethod
+    def get_item_index_categories(item_index):
+        pass
+
+    # Return all available categories in the dataset
+    @abstractmethod
+    def get_all_categories():
+        pass
+
     # Names have to be unique! Return data loader name that will be displayed to the user when creating user study using fastcompare plugin
     @classmethod
     @abstractmethod
