@@ -65,3 +65,26 @@ Adding new plugin is done by adding new folder under server/plugins directory. T
 - `/join` will be called when user attempts to join the user study, by following the generated URL link. This is where full control is passed to the plugin and plugin should decide future steps.
 
 We have prepared a [minimal working plugin template](./server/plugins/empty_template) that you can use as a starting point when developing new plugins.
+
+## Git clone
+In the case that git clone fails with the message similar to the following:
+
+*Error downloading object: server/static/datasets/goodbooks-10k/goodbooks_img.zip (1e41bd5): Smudge error: Error downloading server/static/datasets/goodbooks-10k/goodbooks_img.zip (1e41bd5bd92d60a0ca122c987ba6535d14ecc535a369dbb89c7858fdcfb64124): batch response: This repository is over its data quota. Account responsible for LFS bandwidth should purchase more data packs to restore access.*
+
+you can use the following command to suppress the error.
+
+On Mac/Linux use:
+```
+GIT_LFS_SKIP_SMUDGE=1 git clone https://github.com/pdokoupil/EasyStudy.git
+```
+On Windows use:
+```
+cmd /C "$env:GIT_LFS_SKIP_SMUDGE='1' & git clone https://github.com/pdokoupil/EasyStudy.git"
+```
+
+In either case, you will not receive dataset images that are tracked by git-lfs and therefore you have to download them manually from the following links:
+
+- [ml_latest_img.zip](http://herkules.ms.mff.cuni.cz/ligan/easystudy/ml_latest_img.zip)
+- [goodbooks_img.zip](http://herkules.ms.mff.cuni.cz/ligan/easystudy/goodbooks_img.zip)
+
+These .zip archives should then be extracted at right place: expected structure is ```server/static/datasets/ml-latest/img/*.jpg``` for the Movielens dataset (and similarly for the goodbooks).
