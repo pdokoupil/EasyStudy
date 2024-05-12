@@ -14,8 +14,8 @@ RUN pip install --upgrade pip
 RUN pip install Flask-PluginKit
 RUN pip install Flask-Session
 RUN pip install is-safe-url
-RUN pip install tensorflow
-RUN pip install tensorflow-recommenders
+RUN pip install tensorflow==2.15.0
+RUN pip install tensorflow-recommenders==0.7.3
 RUN pip install python3-discogs-client
 RUN pip install cachelib
 #RUN pip install lenskit
