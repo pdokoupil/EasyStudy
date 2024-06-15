@@ -1,12 +1,14 @@
 import flask
 from flask_pluginkit import PluginManager
 from flask_sqlalchemy import SQLAlchemy
+from flask_migrate import Migrate
 from flask_login import LoginManager
 from flask_wtf.csrf import CSRFProtect
 
 from flask_session import Session
 
 db = SQLAlchemy()
+migrate = Migrate()
 pm = PluginManager(plugins_folder="plugins")
 csrf = CSRFProtect()
 
@@ -61,6 +63,8 @@ def create_app():
     sess.init_app(app)
 
     db.init_app(app)
+
+    migrate.init_app(app, db)
 
     csrf.init_app(app)
 
