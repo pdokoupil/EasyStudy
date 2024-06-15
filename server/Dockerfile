@@ -13,6 +13,7 @@ RUN conda update conda --yes \
 RUN pip install --upgrade pip
 RUN pip install Flask-PluginKit
 RUN pip install Flask-Session
+RUN pip install Flask-Migrate
 RUN pip install is-safe-url
 RUN pip install tensorflow==2.15.0
 RUN pip install tensorflow-recommenders==0.7.3

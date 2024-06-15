@@ -6,6 +6,7 @@ scikit-learn==1.0.1
 scipy==1.9.3
 Flask-Login==0.6.3
 Flask-SQLAlchemy==3.1.1
+Flask-Migrate==4.0.7
 bcrypt==4.0.1
 #lenskit==0.14.2
 Flask-WTF==1.2.1
