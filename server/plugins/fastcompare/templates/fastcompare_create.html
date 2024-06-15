@@ -482,7 +482,7 @@
                       let pVal = this.selectedAlgorithmsParameters[i][j].value;
                       let algoIdx = this.availableAlgorithmNames.indexOf(this.selectedAlgorithms[i]);
                       let algoParams = this.availableAlgorithmsData[algoIdx]["parameters"];
-                      result = result && pVal != null && pVal != '';
+                      result = result && pVal != null && pVal !== '';
                       if (result) {
                         let pType = this.findParamType(algoParams, j);
                         if (pType == "int") {
