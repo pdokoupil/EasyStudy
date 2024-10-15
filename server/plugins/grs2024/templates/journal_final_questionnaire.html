@@ -1,0 +1,165 @@
+{% include 'header.html' %}
+
+<div id="app">
+    <b-container fluid>
+        <!-- <b-jumbotron class="smallJumbotron" header="{{header}}" lead="">
+            {{hint}}
+        </b-jumbotron> -->
+        <b-jumbotron style="max-height: 7vh;" class="smallJumbotron" header-level="8">
+            <!-- <template #header>
+                <h1 style="font-size: 1.0rem; margin-bottom: -0.5em; padding: 0;">{{header}}</h1>
+            </template> -->
+            <b-row>
+                <b-col cols="auto" style="text-align: left;">
+                    <h1 style="font-size: 1.0rem; margin-bottom: -0.1em; padding: 0;">{{header}}</h1>
+                    <p style="margin-top: 0px;">
+                        {{hint}}
+                    </p>
+                </b-col>
+                <b-col style="text-align: right;">
+                    <b-button size="lg" name="instructionsBtn" variant="info" class="mb-2" v-b-toggle.sidebar-1>
+                        Instructions <b-icon icon="question-square-fill" aria-hidden="true"></b-icon>
+                      </b-button>
+                </b-col>
+            </b-row>
+            
+        </b-jumbotron>
+
+        <template>
+            <div>
+              <b-sidebar id="sidebar-1" title="Instructions" shadow>
+                <div class="px-3 py-2">
+                  <ol>
+                    <li v-for="bulletText in instructionBullets">
+                        [[bulletText]]
+                    </li>
+                  </ol>
+                </div>
+              </b-sidebar>
+            </div>
+        </template>
+    
+        <b-form method="POST" action="{{ continuation_url }}">
+            <b-row class="mb-3" align-h="center">
+                <b-col cols="auto" >
+                    
+                    <b-row class="mt-5" align-v="center" v-for="(q, index) in questions" :key="index">
+                        <b-col v-if="q.icon == 'grid'" class="mt-2" cols="auto">
+                            <b-row>
+                                <b-col>
+                                    <b-icon class="h1" icon="grid"></b-icon>
+                                </b-col>
+                            </b-row>
+                            <b-row>
+                                <b-col>
+                                    <b-icon class="h1" icon="grid"></b-icon>
+                                </b-col>
+                            </b-row>
+                        </b-col>
+                        <b-col v-else class="mt-2" cols="auto">
+                            <b-icon class="h1" :icon="q.icon"></b-icon>
+                        </b-col>
+                        <b-col>
+                            <b-form-group :name="q.name + 'g'" id="q.name + 'g'">
+                                <b-label :for="q.name">
+                                    <strong>[[index + 1]]. [[q.text]]</strong>
+                                    <br v-if="q.text2"><strong class="ml-3" v-if="q.text2">[[q.text2]]</strong>
+                                </b-label>
+                                <b-form-radio-group :name="q.name" required>
+                                    <b-form-radio value="-3">Strongly Disagree</b-form-radio>
+                                    <b-form-radio value="-2">Disagree</b-form-radio>
+                                    <b-form-radio value="-1">Slightly Disagree</b-form-radio>
+                                    <b-form-radio value="1">Slightly Agree</b-form-radio>
+                                    <b-form-radio value="2">Agree</b-form-radio>
+                                    <b-form-radio value="3" class="mr-5">Strongly Agree</b-form-radio>
+                                    <b-form-radio value="4" class="ml-5">I don't understand</b-form-radio>
+                                </b-form-radio-group>
+                            </b-form-group>
+                        </b-col>
+                    </b-row>
+
+                </b-col>
+            </b-row>
+
+            <b-row align-h="center">
+                <b-col class="text-center">
+                    <!-- <b-form method="POST" action="{{continuation_url}}"> -->
+                        <input type="hidden" name="csrf_token" value="{{csrf_token()}}"/>
+                        <!-- <input type="hidden" name="final_questionnaire_data" value="final_questionnaire_data"/> -->
+                        <b-button variant="success" name="finishBtn" type="submit">{{finish}}</b-button>
+                    <!-- </b-form> -->
+                </b-col>
+            </b-row>
+        </b-form>
+        
+        
+
+    </b-container>
+</div>
+
+<script src="{{url_for('static', filename='message_reporting.js')}}"></script>
+<script src="{{url_for('static', filename='resolution_handling.js')}}"></script>
+<script src="{{url_for('static', filename='interaction_reporting.js')}}"></script>
+<script>
+
+    var csrfToken = "{{csrf_token()}}";
+
+    window.app = new Vue({
+    el: '#app',
+    delimiters: ['[[',']]'], // Used to replace double { escaping with double [ escaping (to prevent jinja vs vue inference)
+    data: function() {
+        
+        return {
+            questions: null,
+            instructionBullets: []
+        };
+    },
+    methods: {
+        
+    },
+    async mounted() {
+        const btns = document.querySelectorAll("button");
+        const checkboxes = document.querySelectorAll("input[type=checkbox]");
+        const textboxes = document.querySelectorAll("input[type=text]");
+        const selects = document.querySelectorAll("select");
+        
+        this.questions = await fetch("{{url_for('journal.get_final_questions')}}")
+                            .then(response => {
+                                if (!response.ok) {
+                                    console.log("Erorr");
+                                }
+                                return response.json();
+                            });
+
+        this.instructionBullets = await fetch("{{url_for('journal.get_instruction_bullets', page='final-questionnaire')}}")
+                            .then(response => {
+                                if (!response.ok) {
+                                    console.log("Erorr");
+                                }
+                                return response.json();
+                            });
+        
+        this.$nextTick(() => {
+            const radios = document.querySelectorAll("input[type=radio]");
+            // Register the handlers for event reporting
+            startViewportChangeReportingWithLimit(`/utils/changed-viewport`, csrfToken, 1.0, true);
+            startScrollReportingWithLimit(`/utils/changed-viewport`, csrfToken, 1.0, document.getElementsByName("scrollableDiv"));
+            registerClickedButtonReporting(`/utils/on-input`, csrfToken, btns);
+            registerClickedRadioReporting("/utils/on-input", csrfToken, radios);
+            registerClickedCheckboxReporting("/utils/on-input", csrfToken, checkboxes);
+            registerChangedSelectionReporting("/utils/on-input", csrfToken, selects);
+            reportLoadedPage(`/utils/loaded-page`, csrfToken, "final_questionnaire");
+        });
+    }
+})
+</script>
+
+<!-- {% if footer_override is defined and footer_override is not none %}
+  <div class="footerDiv mt-3">
+    {{ footer_override | safe}}
+  </div>
+</body>
+</html>
+{% else %}
+{% include 'footer.html' %}
+{% endif %} -->

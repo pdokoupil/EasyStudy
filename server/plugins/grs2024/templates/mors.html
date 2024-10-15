@@ -1,0 +1,933 @@
+{% include 'header.html' %}
+<style>
+    .verticalSeparator {
+        border-left: 10px solid red;
+    }
+
+    .footerDiv {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        height: 30px;
+        max-height: 3vh;
+    }
+
+    div.selected {
+        outline: 5px solid greenyellow;
+        outline-offset: -5px;
+    }
+</style>
+<div id="app">
+    <b-container fluid>
+        <b-jumbotron  class="smallJumbotron" header-level="8">
+            <!-- <template #header>
+                <h1 style="font-size: 1.0rem; margin-bottom: -0.5em; padding: 0;">{{header}} (block: {{block}}/{{n_blocks}}, iteration: {{iteration}}/{{n_iterations}})</h1>
+            </template>
+            <p style="margin-top: 0px;">
+                {{hint}}
+            </p> -->
+            <b-row>
+                <b-col cols="auto" style="text-align: left;">
+                    <h1 style="font-size: 1.0rem; margin-bottom: -0.1em; padding: 0;">{{header}} (block: {{block}}/{{n_blocks}}, iteration: {{iteration}}/{{n_iterations}})</h1>
+                    <p style="margin-top: 0px;">
+                        {{hint}}
+                    </p>
+                </b-col>
+                <b-col style="text-align: right;">
+                    <b-button size="lg" name="instructionsBtn" variant="info" class="mb-2" v-b-toggle.sidebar-1>
+                        Instructions <b-icon icon="question-square-fill" aria-hidden="true"></b-icon>
+                      </b-button>
+                </b-col>
+            </b-row>
+        </b-jumbotron>
+
+        <template>
+            <div>
+              <b-sidebar id="sidebar-1" title="Instructions" shadow>
+                <div class="px-3 py-2">
+                  <ol>
+                    <li v-for="bulletText in instructionBullets">
+                        [[bulletText]]
+                    </li>
+                  </ol>
+                  <!-- <b-img src="https://picsum.photos/500/500/?image=54" fluid thumbnail></b-img> -->
+                </div>
+              </b-sidebar>
+            </div>
+        </template>
+
+        <div>
+            <b-modal id="bv-modal-block-start" hide-footer>
+              <template #modal-title>
+                {{block_start_header}}
+              </template>
+              <div class="d-block text-center">
+                <p>{{block_start_detail}}</p>
+              </div>
+              <b-button variant="primary" name="modalOkBtn" class="mt-3" block @click="$bvModal.hide('bv-modal-block-start')">OK</b-button>
+            </b-modal>
+        </div>
+    
+        <b-col align-h="center">
+            <b-row align-h="center" v-for="variantResults in variantsResults" :set="algoIdx = variantsResults.indexOf(variantResults)">
+                <b-col class="text-center" align-h="center">
+                    <h5>{{algorithm}} [[ variantNames[algoIdx] ]]</h5>
+                    <b-row align-h="center" class="mb-1 mt-1" v-for="row in variantResults">
+                        <b-col class="col" xl="auto" class="align-middle" v-for="col in row">
+                        
+                        <div>
+                            <b-popover @show="popoverShown" @hidden="popoverHidden" :target="variantNames[algoIdx] + '_' + col.movie_idx" triggers="hover" placement="right">
+                                <template #title>[[col.movie]]</template>
+                                <div v-if="col.genres">
+                                    <strong>Genres: </strong>
+                                    <i>[[col.genres.join(', ')]]</i>
+                                </div>
+                                <div v-if="col.plot">
+                                    <strong>Plot: </strong>
+                                    [[col.plot]]
+                                </div>
+                                 <div v-if="col.trailer_url" class="mt-1 text-center">
+                                    <b-button target="_blank" @click="onTrailerWatch(col)" :href="col.trailer_url" size="sm" variant="primary">IMDb trailer</b-button>
+                                 </div>
+                                 
+                            </b-popover>
+                            <b-img @mouseenter="itemMouseEnter" @mouseleave="itemMouseLeave" :id="variantNames[algoIdx] + '_' + col.movie_idx" style="width: 175px; height: 260px;" block center :src="col.url" v-on:click="onSelectMovie($event, col, variantsResults.indexOf(variantResults))" :name="col.movie_idx" :alt="col.movie" />
+                            
+                            
+                        </div>
+                        </b-col>
+                    </b-row>
+                    <!-- <b-row align-h="center">
+                        <b-col cols="4">
+                            <label for="rating-sm" class="mt-1">{{algorithm_satisfaction}}</label>
+                            <b-form-rating :variant="algorithmRatingVariant(variantsResults.indexOf(variantResults))" v-on:change="onAlgorithmRatingChanged($event, variantsResults.indexOf(variantResults))" show-value show-value-max id="rating-sm" size="sm"></b-form-rating>
+                        </b-col>
+                    </b-row>
+                     -->
+                    <!-- Separator (except for after last one) -->
+                    <b-row v-if="algoIdx < variantsResults.length - 1" class="mt-1 mb-1">
+                        <b-container fluid>
+                            <div style="height: 10px; background-color: red;"></div>
+                        </b-container>
+                    </b-row>
+                </b-col>
+            </b-row>
+        </b-col>
+
+        <!-- <b-row align-h="center">
+            <b-col class="text-center">
+                <b-form method="POST" action="{{continuation_url}}">
+                    <input type="hidden" name="csrf_token" value="{{csrf_token()}}"/>
+                    <input type="hidden" name="final_questionnaire_data" value="final_questionnaire_data"/>
+                    
+                    <b-button variant="success" type="submit">{{finish}}</b-button>
+                </b-form>
+            </b-col>
+        </b-row> -->
+        <!-- <b-row align-h="center">
+            <b-col class="text-center">
+                {{continuation_url}}
+            </b-col>
+        </b-row>
+        
+        <b-row align-h="center">
+            <b-col class="text-center">
+                {{iteration}}
+            </b-col>
+        </b-row> -->
+
+        <b-row v-if="!selected.length" class="mt-2" align-h="center">
+            <b-form-checkbox
+                :state="dontLikeAnythingState"    
+                v-model="dontLikeAnythingValue"
+            >
+                {{like_nothing}}
+            </b-form-checkbox>
+        </b-row>
+
+        <b-row class="mt-4 mb-4">
+            <b-col center class="align-middle"></b-col>
+            <b-col center class="align-middle text-center">
+                <b-button
+                    @click="showAndScroll"
+                    :disabled="showRefinement || !allValidated"
+                    block
+                    name="continue1Btn"
+                    variant="primary"
+                    :class="showRefinement ? null : 'collapsed'"
+                    :aria-expanded="showRefinement ? 'true' : 'false'"
+                    aria-controls="collapse-1">Continue</b-button>
+            </b-col>
+            <b-col center class="align-middle"></b-col>
+        </b-row>
+
+        <b-collapse id="collapse-1" v-model="showRefinement" class="mt-2">
+            <b-card>
+                <b-row v-if="canFineTune" class="mb-3">
+                    <b-col class="text-center">You can tweak the recommendation algorithm by fine-tuning the amount of attention it pays to different objectives. This will affect recommendations in the next step. Descriptions of individual objectives are shown if you hover the mouse over the questionmark icons. <strong>How much of the specified quality should be present in the next recommendation iteration?</strong></b-col>
+                </b-row>
+                <b-row v-else class="mb-3">
+                    <b-col class="text-center">This algorithm cannot be fine-tuned.</strong></b-col>
+                </b-row>
+                <!-- Two way version of the sliders -->
+                <b-row v-if="canFineTune" align-v="center">
+                    <b-col v-if="sliderVersion == 'TWO-WAY'">
+                        <b-form method="GET" action="{{ url_for('journal.mors_feedback') }}">
+                            <b-row class="mb-2" align-v="center" style="vertical-align: middle;">
+                                <b-col align-v="center" class="text-right">
+                                    <b-row align-h="end">
+                                        <b-col cols="auto" align-v="center" class="text-left" style="display: table;">
+                                            <b-form-checkbox
+                                                v-model="ignoreRelevance"
+                                                style="display: table-cell; vertical-align: middle;"
+                                            >
+                                                Ignore objective
+                                            </b-form-checkbox>
+                                        </b-col>
+                                        <b-col cols="auto" align-v="center" class="text-right">
+                                            <b-icon class="h3" style="height: 100%;" id="less-relevant-help" icon="question-circle-fill" variant="primary"></b-icon>
+                                            <b-tooltip target="less-relevant-help" triggers="hover">{{less_relevant_help}}</b-tooltip>
+                                        </b-col>
+                                        <b-col cols="auto" align-v="center" class="text-right" style="display: table;">
+                                            <p style="display: table-cell; vertical-align: middle;">
+                                                Less Relevant
+                                            </p>
+                                        </b-col>
+                                    </b-row>
+                                </b-col>
+                                <b-col class="text-center">
+                                    <!-- <b-icon class="mr-1 h3" id="relevance-help" icon="question-circle-fill" variant="primary"></b-icon>
+                                    <b-tooltip target="relevance-help" triggers="hover">{{relevance_explanation}}</b-tooltip> -->
+                                    <b-form-input style="height: 100%;" id="range-relevance" :formatter="onRelevanceDeltaChange" v-model="sliderRelevance" type="range" step="0.1" min="0" max="1" :disabled="ignoreRelevance"></b-form-input>
+                                </b-col>
+                                <b-col>
+                                    <b-row align-h="start">
+                                        <b-col cols="auto" align-v="center" class="text-center" style="display: table;">
+                                            <p style="display: table-cell; vertical-align: middle;">
+                                                More Relevant
+                                            </p>
+                                        </b-col>
+                                        <b-col cols="auto" align-v="center" class="text-left">
+                                            <b-icon class="h3" style="height: 100%;" id="more-relevant-help" icon="question-circle-fill" variant="primary"></b-icon>
+                                            <b-tooltip target="more-relevant-help" triggers="hover">{{more_relevant_help}}</b-tooltip>
+                                        </b-col>
+                                    </b-row>
+                                </b-col>
+                            </b-row>
+                            <b-row class="mb-2" align-v="center">
+                                <b-col align-v="center" class="text-right">
+                                    <b-row align-h="end">
+                                        <b-col cols="auto" align-v="center" class="text-left" style="display: table;">
+                                            <b-form-checkbox
+                                                v-model="ignoreUniformityDiversity"
+                                                style="display: table-cell; vertical-align: middle;"
+                                            >
+                                                Ignore objective
+                                            </b-form-checkbox>
+                                        </b-col>
+                                        <b-col cols="auto" align-v="center" class="text-left">
+                                            <b-icon class="h3" style="height: 100%;" id="highly-uniform-help" icon="question-circle-fill" variant="primary"></b-icon>
+                                            <b-tooltip target="highly-uniform-help" triggers="hover">{{highly_uniform_help}}</b-tooltip>
+                                        </b-col>
+                                        <b-col cols="auto" align-v="center" class="text-center" style="display: table;">
+                                            <p style="display: table-cell; vertical-align: middle;">
+                                                Highly Uniform
+                                            </p>
+                                        </b-col>
+                                    </b-row>
+                                </b-col>
+                                <b-col align-v="center" class="text-center" style="vertical-align: middle; text-align: center;">
+                                    <!-- <b-icon class="mr-1 h3" id="relevance-help" icon="question-circle-fill" variant="primary"></b-icon>
+                                    <b-tooltip target="relevance-help" triggers="hover">{{relevance_explanation}}</b-tooltip> -->
+                                    <b-form-input style="height: 100%;" id="range-uniformity-diversity" :formatter="onDiversityDeltaChange" v-model="sliderUniformityDiversity" type="range" step="0.1" min="0" max="1" :disabled="ignoreUniformityDiversity"></b-form-input>
+                                </b-col>
+                                <b-col align-v="center" class="text-left">
+                                    <b-row align-h="start">
+                                        <b-col cols="auto" align-v="center" class="text-right" style="display: table;">
+                                            <p style="display: table-cell; vertical-align: middle;">
+                                                Highly Diverse
+                                            </p>
+                                        </b-col>
+                                        <b-col cols="auto" align-v="center" class="text-right">
+                                            <b-icon class="h3" style="height: 100%;" id="highly-diverse-help" icon="question-circle-fill" variant="primary"></b-icon>
+                                            <b-tooltip target="highly-diverse-help" triggers="hover">{{highly_diverse_help}}</b-tooltip>
+                                        </b-col>
+                                        
+                                    </b-row>
+                                </b-col>
+                            </b-row>
+                            <b-row class="mb-2" align-v="center">
+                                <b-col class="text-right">
+                                    <b-row align-h="end">
+                                        <b-col cols="auto" align-v="center" class="text-left" style="display: table;">
+                                            <b-form-checkbox
+                                                v-model="ignorePopularityNovelty"
+                                                style="display: table-cell; vertical-align: middle;"
+                                            >
+                                                Ignore objective
+                                            </b-form-checkbox>
+                                        </b-col>
+                                        <b-col cols="auto" align-v="center" class="text-left">
+                                            <b-icon class="h3" style="height: 100%;" id="highly-popular-help" icon="question-circle-fill" variant="primary"></b-icon>
+                                            <b-tooltip target="highly-popular-help" triggers="hover">{{highly_popular_help}}</b-tooltip>
+                                        </b-col>
+                                        <b-col cols="auto" align-v="center" class="text-center" style="display: table;">
+                                            <p style="display: table-cell; vertical-align: middle;">
+                                                Highly Popular
+                                            </p>
+                                        </b-col>
+                                    </b-row>
+                                </b-col>
+                                <b-col class="text-center">
+                                    <!-- <b-icon class="mr-1 h3" id="relevance-help" icon="question-circle-fill" variant="primary"></b-icon>
+                                    <b-tooltip target="relevance-help" triggers="hover">{{relevance_explanation}}</b-tooltip> -->
+                                    <b-form-input style="height: 100%;" id="range-popularity-novelty" :formatter="onNoveltyDeltaChange" v-model="sliderPopularityNovelty" type="range" step="0.1" min="0" max="1" :disabled="ignorePopularityNovelty"></b-form-input>
+                                </b-col>
+                                <b-col class="text-left">
+                                    <b-row align-h="start">
+                                        <b-col cols="auto" align-v="center" class="text-right" style="display: table;">
+                                            <p style="display: table-cell; vertical-align: middle;">
+                                                Highly Novel
+                                            </p>
+                                        </b-col>
+                                        <b-col cols="auto" align-v="center" class="text-right">
+                                            <b-icon class="h3" style="height: 100%;" id="highly-novel-help" icon="question-circle-fill" variant="primary"></b-icon>
+                                            <b-tooltip target="highly-novel-help" triggers="hover">{{highly_novel_help}}</b-tooltip>
+                                        </b-col>
+                                    </b-row>
+                                </b-col>
+                            </b-row>
+                            <b-row class="mb-2" align-v="center">
+                                <b-col class="text-right">
+                                    <b-row align-h="end">
+                                        <b-col cols="auto" align-v="center" class="text-left" style="display: table;">
+                                            <b-form-checkbox
+                                                v-model="ignoreExploitationExploration"
+                                                style="display: table-cell; vertical-align: middle;"
+                                            >
+                                                Ignore objective
+                                            </b-form-checkbox>
+                                        </b-col>
+                                        <b-col cols="auto" align-v="center" class="text-left">
+                                            <b-icon class="h3" style="height: 100%;" id="highly-exploitative-help" icon="question-circle-fill" variant="primary"></b-icon>
+                                            <b-tooltip target="highly-exploitative-help" triggers="hover">{{highly_exploitative_help}}</b-tooltip>
+                                        </b-col>
+                                        <b-col cols="auto" align-v="center" class="text-center" style="display: table;">
+                                            <p style="display: table-cell; vertical-align: middle;">
+                                                Highly Exploitative
+                                            </p>
+                                            <!-- TODO Or exploitative? -->
+                                        </b-col>
+                                    </b-row>
+                                </b-col>
+                                <b-col class="text-center">
+                                    <!-- <b-icon class="mr-1 h3" id="relevance-help" icon="question-circle-fill" variant="primary"></b-icon>
+                                    <b-tooltip target="relevance-help" triggers="hover">{{relevance_explanation}}</b-tooltip> -->
+                                    <b-form-input style="height: 100%;" id="range-exploitation-exploration" :formatter="onExplorationDeltaChange" v-model="sliderExploitationExploration" type="range" step="0.1" min="0" max="1" :disabled="ignoreExploitationExploration"></b-form-input>
+                                </b-col>
+                                <b-col class="text-left">
+                                    <b-row align-h="start">
+                                        <b-col cols="auto" align-v="center" class="text-right" style="display: table;">
+                                            <p style="display: table-cell; vertical-align: middle;">
+                                                Highly Explorative
+                                            </p>
+                                        </b-col>
+                                        <b-col cols="auto" align-v="center" class="text-right">
+                                            <b-icon class="h3" style="height: 100%;" id="highly-explorative-help" icon="question-circle-fill" variant="primary"></b-icon>
+                                            <b-tooltip target="highly-explorative-help" triggers="hover">{{highly_explorative_help}}</b-tooltip>
+                                        </b-col>
+                                    </b-row>
+                                </b-col>
+                            </b-row>
+                        </b-form>
+                    </b-col>
+                    <!-- One-way version of the sliders -->
+                    <b-col v-else>
+                        <b-form method="GET" action="{{ url_for('journal.mors_feedback') }}">
+                            <b-row class="mb-2" align-v="center" style="vertical-align: middle;">
+                                <b-col align-v="center" class="text-right">
+                                    <b-row align-h="end">
+                                        <b-col cols="auto" align-v="center" class="text-left" style="display: table;">
+                                            <b-form-checkbox
+                                                v-model="ignoreRelevance"
+                                                style="display: table-cell; vertical-align: middle;"
+                                            >
+                                                Ignore objective
+                                            </b-form-checkbox>
+                                        </b-col>
+                                        <b-col cols="auto" align-v="center" class="text-right">
+                                            <b-icon class="h3" style="height: 100%;" id="less-relevant-help" icon="question-circle-fill" variant="primary"></b-icon>
+                                            <b-tooltip target="less-relevant-help" triggers="hover">{{less_relevant_help}}</b-tooltip>
+                                        </b-col>
+                                        <b-col cols="auto" align-v="center" class="text-right" style="display: table;">
+                                            <p style="display: table-cell; vertical-align: middle;">
+                                                Less Relevant
+                                            </p>
+                                        </b-col>
+                                    </b-row>
+                                </b-col>
+                                <b-col class="text-center">
+                                    <!-- <b-icon class="mr-1 h3" id="relevance-help" icon="question-circle-fill" variant="primary"></b-icon>
+                                    <b-tooltip target="relevance-help" triggers="hover">{{relevance_explanation}}</b-tooltip> -->
+                                    <b-form-input style="height: 100%;" id="range-relevance-1w" :formatter="onRelevanceDeltaChange" v-model="sliderRelevance" type="range" step="0.1" min="0" max="1" :disabled="ignoreRelevance"></b-form-input>
+                                </b-col>
+                                <b-col>
+                                    <b-row align-h="start">
+                                        <b-col cols="auto" align-v="center" class="text-center" style="display: table;">
+                                            <p style="display: table-cell; vertical-align: middle;">
+                                                More Relevant
+                                            </p>
+                                        </b-col>
+                                        <b-col cols="auto" align-v="center" class="text-left">
+                                            <b-icon class="h3" style="height: 100%;" id="more-relevant-help" icon="question-circle-fill" variant="primary"></b-icon>
+                                            <b-tooltip target="more-relevant-help" triggers="hover">{{more_relevant_help}}</b-tooltip>
+                                        </b-col>
+                                    </b-row>
+                                </b-col>
+                            </b-row>
+                            <b-row class="mb-2" align-v="center">
+                                <b-col align-v="center" class="text-right">
+                                    <b-row align-h="end">
+                                        <b-col cols="auto" align-v="center" class="text-left" style="display: table;">
+                                            <b-form-checkbox
+                                                v-model="ignoreUniformityDiversity"
+                                                style="display: table-cell; vertical-align: middle;"
+                                            >
+                                                Ignore objective
+                                            </b-form-checkbox>
+                                        </b-col>
+                                        <b-col cols="auto" align-v="center" class="text-right">
+                                            <b-icon class="h3" style="height: 100%;" id="less-diverse-help" icon="question-circle-fill" variant="primary"></b-icon>
+                                            <b-tooltip target="less-diverse-help" triggers="hover">{{less_diverse_help}}</b-tooltip>
+                                        </b-col>
+                                        <b-col cols="auto" align-v="center" class="text-right" style="display: table;">
+                                            <p style="display: table-cell; vertical-align: middle;">
+                                                Less Diverse
+                                            </p>
+                                        </b-col>
+                                    </b-row>
+                                </b-col>
+                                <b-col align-v="center" class="text-center" style="vertical-align: middle; text-align: center;">
+                                    <!-- <b-icon class="mr-1 h3" id="relevance-help" icon="question-circle-fill" variant="primary"></b-icon>
+                                    <b-tooltip target="relevance-help" triggers="hover">{{relevance_explanation}}</b-tooltip> -->
+                                    <b-form-input style="height: 100%;" id="range-diversity" :formatter="onDiversityDeltaChange" v-model="sliderUniformityDiversity" type="range" step="0.1" min="0" max="1" :disabled="ignoreUniformityDiversity"></b-form-input>
+                                </b-col>
+                                <b-col align-v="center" class="text-left">
+                                    <b-row align-h="start">
+                                        <b-col cols="auto" align-v="center" class="text-center" style="display: table;">
+                                            <p style="display: table-cell; vertical-align: middle;">
+                                                More Diverse
+                                            </p>
+                                        </b-col>
+                                        <b-col cols="auto" align-v="center" class="text-left">
+                                            <b-icon class="h3" style="height: 100%;" id="more-diverse-help" icon="question-circle-fill" variant="primary"></b-icon>
+                                            <b-tooltip target="more-diverse-help" triggers="hover">{{more_diverse_help}}</b-tooltip>
+                                        </b-col>
+                                    </b-row>
+                                </b-col>
+                            </b-row>
+                            <b-row class="mb-2" align-v="center">
+                                <b-col class="text-right">
+                                    <b-row align-h="end">
+                                        <b-col cols="auto" align-v="center" class="text-left" style="display: table;">
+                                            <b-form-checkbox
+                                                v-model="ignorePopularityNovelty"
+                                                style="display: table-cell; vertical-align: middle;"
+                                            >
+                                                Ignore objective
+                                            </b-form-checkbox>
+                                        </b-col>
+                                        <b-col cols="auto" align-v="center" class="text-right">
+                                            <b-icon class="h3" style="height: 100%;" id="less-novel-help" icon="question-circle-fill" variant="primary"></b-icon>
+                                            <b-tooltip target="less-novel-help" triggers="hover">{{less_novel_help}}</b-tooltip>
+                                        </b-col>
+                                        <b-col cols="auto" align-v="center" class="text-right" style="display: table;">
+                                            <p style="display: table-cell; vertical-align: middle;">
+                                                Less Novel
+                                            </p>
+                                        </b-col>
+                                    </b-row>
+                                </b-col>
+                                <b-col class="text-center">
+                                    <!-- <b-icon class="mr-1 h3" id="relevance-help" icon="question-circle-fill" variant="primary"></b-icon>
+                                    <b-tooltip target="relevance-help" triggers="hover">{{relevance_explanation}}</b-tooltip> -->
+                                    <b-form-input style="height: 100%;" id="range-novelty" v-model="sliderPopularityNovelty" :formatter="onNoveltyDeltaChange" type="range" step="0.1" min="0" max="1" :disabled="ignorePopularityNovelty"></b-form-input>
+                                </b-col>
+                                <b-col class="text-left">
+                                    <b-row align-h="start">
+                                        <b-col cols="auto" align-v="center" class="text-center" style="display: table;">
+                                            <p style="display: table-cell; vertical-align: middle;">
+                                                More Novel
+                                            </p>
+                                        </b-col>
+                                        <b-col cols="auto" align-v="center" class="text-left">
+                                            <b-icon class="h3" style="height: 100%;" id="more-novel-help" icon="question-circle-fill" variant="primary"></b-icon>
+                                            <b-tooltip target="more-novel-help" triggers="hover">{{more_novel_help}}</b-tooltip>
+                                        </b-col>
+                                    </b-row>
+                                </b-col>
+                            </b-row>
+                            <b-row class="mb-2" align-v="center">
+                                <b-col class="text-right">
+                                    <b-row align-h="end">
+                                        <b-col cols="auto" align-v="center" class="text-left" style="display: table;">
+                                            <b-form-checkbox
+                                                v-model="ignoreExploitationExploration"
+                                                style="display: table-cell; vertical-align: middle;"
+                                            >
+                                                Ignore objective
+                                            </b-form-checkbox>
+                                        </b-col>
+                                        <b-col cols="auto" align-v="center" class="text-right">
+                                            <b-icon class="h3" style="height: 100%;" id="less-explorative-help" icon="question-circle-fill" variant="primary"></b-icon>
+                                            <b-tooltip target="less-explorative-help" triggers="hover">{{less_explorative_help}}</b-tooltip>
+                                        </b-col>
+                                        <b-col cols="auto" align-v="center" class="text-right" style="display: table;">
+                                            <p style="display: table-cell; vertical-align: middle;">
+                                                Less Explorative
+                                            </p>
+                                        </b-col>
+                                    </b-row>
+                                </b-col>
+                                <b-col class="text-center">
+                                    <!-- <b-icon class="mr-1 h3" id="relevance-help" icon="question-circle-fill" variant="primary"></b-icon>
+                                    <b-tooltip target="relevance-help" triggers="hover">{{relevance_explanation}}</b-tooltip> -->
+                                    <b-form-input style="height: 100%;" id="range-exploration" :formatter="onExplorationDeltaChange" v-model="sliderExploitationExploration" type="range" step="0.1" min="0" max="1" :disabled="ignoreExploitationExploration"></b-form-input>
+                                </b-col>
+                                <b-col class="text-left">
+                                    <b-row align-h="start">
+                                        <b-col cols="auto" align-v="center" class="text-center" style="display: table;">
+                                            <p style="display: table-cell; vertical-align: middle;">
+                                                More Explorative
+                                            </p>
+                                            <!-- TODO Or exploitative? -->
+                                        </b-col>
+                                        <b-col cols="auto" align-v="center" class="text-left">
+                                            <b-icon class="h3" style="height: 100%;" id="more-explorative-help" icon="question-circle-fill" variant="primary"></b-icon>
+                                            <b-tooltip target="more-explorative-help" triggers="hover">{{more_explorative_help}}</b-tooltip>
+                                        </b-col>
+                                    </b-row>
+                                </b-col>
+                            </b-row>
+                        </b-form>
+                    </b-col>
+                </b-row>
+                <b-row align-h="center">
+                    <b-col>
+                        
+                    </b-col>
+                    <b-col>
+                        <b-col class="text-center">
+                            <b-form method="POST" ref="myForm" @submit.prevent="onSubmit" action="{{continuation_url}}">
+                                <input type="hidden" name="csrf_token" value="{{csrf_token()}}"/>
+                                <input type="hidden" name="selected_items" :value="selectedMovieIndices"/>
+                                <input type="hidden" name="slider_relevance" :value="sliderRelevance"/>
+                                <input type="hidden" name="slider_popularity_novelty" :value="sliderPopularityNovelty"/>
+                                <input type="hidden" name="slider_uniformity_diversity" :value="sliderUniformityDiversity"/>
+                                <input type="hidden" name="slider_exploitation_exploration" :value="sliderExploitationExploration"/>
+                                <input type="hidden" name="ignore_relevance" :value="ignoreRelevance"/>
+                                <input type="hidden" name="ignore_popularity_novelty" :value="ignorePopularityNovelty"/>
+                                <input type="hidden" name="ignore_uniformity_diversity" :value="ignoreUniformityDiversity"/>
+                                <input type="hidden" name="ignore_exploitation_exploration" :value="ignoreExploitationExploration"/>
+                                <b-overlay
+                                    :show="busy"
+                                    rounded
+                                    opacity="0.6"
+                                    spinner-small
+                                    spinner-variant="primary"
+                                    class="d-inline-block"
+                                >
+                                    <b-button :disabled="!allValidated" variant="success" name="continue2Btn" block type="submit">Continue</b-button>
+                                </b-overlay>
+                            </b-form>
+                        </b-col>
+                    </b-col>
+                    <b-col>
+
+                    </b-col>
+                </b-row>
+            </b-card>
+        </b-collapse>
+
+        
+
+        <hr>
+
+    </b-container>
+</div>
+
+<script type='text/javascript'>
+    // Capture JINJA stuff here
+    var movies = {{movies | tojson | safe}};
+    var resultLayout = "{{result_layout}}";
+    var iteration = "{{iteration}}";
+    var minIterationToCancel = "{{MIN_ITERATION_TO_CANCEL}}";
+    var csrfToken = "{{csrf_token()}}";
+    var canFineTune = "{{can_fine_tune}}" == "True" ? true : false;
+    var sliderVersion = "{{slider_version}}";
+    var showModal = "{{show_modal}}" == "True" ? true : false;
+
+    var ignoreRelevanceRaw = "{{ignore_relevance}}" == "True" ? true : false;
+    var ignoreExploitationExplorationRaw = "{{ignore_exploitation_exploration}}" == "True" ? true : false;
+    var ignoreUniformityDiversityRaw = "{{ignore_uniformity_diversity}}" == "True" ? true : false;
+    var ignorePopularityNoveltyRaw = "{{ignore_popularity_novelty}}" == "True" ? true : false;
+
+    var defaultComparisonValue = "{{disable_relative_comparison}}";
+    var defaultComparisonValidation = defaultComparisonValue == "True" ? true : false;
+    defaultComparisonValue = defaultComparisonValue == "True" ? 0 : null;
+
+    var refinementLayout = "{{refinement_layout}}";
+    var defaultRefinementValidated = refinementLayout != "4";
+    
+    var itemsPerRow = 5; // Two columns per recommendation list
+
+    
+
+    function compare_ctx_lambda() {
+        return {
+            "items": Array.from(document.getElementsByTagName("img")).map(x => {
+                return {
+                    "id": x.id, // Corresponds to movie idx
+                    "name": x.name,
+                    "url": x.src,
+                    "title": x.title,
+                    "viewport": getElementBoundingBox(x)
+                };
+            }),
+            "movie_scroll": true
+        };
+    }
+
+
+    var sliderState = 0;
+    console.log(sliderState);
+    //var refinementLayout = "{{version}}";
+
+
+</script>
+<script src="{{url_for('static', filename='resolution_handling.js')}}"></script>
+<script src="{{url_for('static', filename='interaction_reporting.js')}}"></script>
+<script src="{{url_for('static', filename='message_reporting.js')}}"></script>
+<script>
+
+    var csrfToken = "{{csrf_token()}}";
+
+    window.app = new Vue({
+    el: '#app',
+    delimiters: ['[[',']]'], // Used to replace double { escaping with double [ escaping (to prevent jinja vs vue inference)
+    data: function() {
+
+        const colsPerRow = itemsPerRow;
+
+        var numAlgorithms = Object.keys(movies).length;
+        var variantNames = new Array(numAlgorithms);
+        let moviesColumnified = new Array(numAlgorithms);
+
+        for (variantIdx in movies) {
+            let variantResults = movies[variantIdx]["movies"];
+            let order = parseInt(movies[variantIdx]["order"]);
+            variantNames[order] = variantIdx.toUpperCase();
+            console.log(variantIdx);
+            console.log(variantResults);
+            console.log(order);
+            let variantResultsColumnified = [];
+            let row = [];
+            for (idx in variantResults) {
+                let movie = variantResults[idx];
+                row.push(movie);
+                if (row.length >= colsPerRow) {
+                    variantResultsColumnified.push(row);
+                    row = [];
+                }
+            }
+            if (row.length > 0) {
+                variantResultsColumnified.push(row);
+            }
+            moviesColumnified[order] = variantResultsColumnified;
+        }
+        
+        return {
+            selected: [],
+            dontLikeAnythingValue: false,
+            variantsResults: moviesColumnified,
+            variantNames: variantNames,
+            algorithmRatingsValidated: [false, false],
+            selectedMetric: null,
+            selectedMovieIndices: "",
+            showRefinement: false,
+            sliderRelevance: parseFloat("{{slider_relevance}}"),
+            sliderPopularityNovelty: parseFloat("{{slider_popularity_novelty}}"),
+            sliderUniformityDiversity: parseFloat("{{slider_uniformity_diversity}}"),
+            sliderExploitationExploration: parseFloat("{{slider_exploitation_exploration}}"),
+            ignoreRelevance: ignoreRelevanceRaw,
+            ignorePopularityNovelty: ignorePopularityNoveltyRaw,
+            ignoreUniformityDiversity: ignoreUniformityDiversityRaw,
+            ignoreExploitationExploration: ignoreExploitationExplorationRaw,
+            canFineTune: canFineTune,
+            sliderVersion: sliderVersion,
+            busy: false,
+            instructionBullets: []
+        };
+    },
+    computed: {
+        algorithmComparisonState() {
+            this.algorithmComparisonValidated = this.algorithmComparisonValue != null;
+            return this.algorithmComparisonValue != null;
+        },
+        dontLikeAnythingState() {
+            return this.dontLikeAnythingValue;
+        },
+        allValidated() {
+            let dontLikeAnythingValidated = this.selected.length > 0 || this.dontLikeAnythingValue;
+            // return this.algorithmComparisonValidated &&
+            //        this.allAlgorithmRatingsValidated && // All algorithms have their outputs rated
+            //        dontLikeAnythingValidated;
+            return dontLikeAnythingValidated;
+        }
+    },
+    methods: {
+        onClickContinue() {
+            this.showRefinement = true;
+        },
+        showAndScroll() {
+            this.showRefinement = true;
+            this.$nextTick(() => {
+                window.setTimeout(function(){
+                    window.scrollTo(0, document.body.scrollHeight);
+                }, 150);
+            });
+        },
+        setRowHeights() {
+            const containers = this.$el.querySelectorAll('.row-container');
+            for (let containerIdx = 0; containerIdx < containers.length; ++containerIdx) {
+                let container = containers[containerIdx];
+                const rows = container.querySelectorAll('.custom-row');
+                const numRows = rows.length;
+                const rowHeight = 100 / numRows; // Calculate height per row
+
+                rows.forEach(row => {
+                    row.style.height = `${rowHeight}%`; // Set the height for each row
+                });
+            }
+        },
+        onTrailerWatch(movieData) {
+            reportOnInput("/utils/on-input", csrfToken, "link", movieData);
+        },
+
+        checkRefinementValidation() {
+            console.log(refinementLayout);
+            if (refinementLayout == REFINEMENT_LAYOUT_OPTIONS) {
+                this.refinementValidated = this.relevanceValue.some(x => x != null) && this.diversityValue.some(x => x != null) && this.noveltyValue.some(x => x != null);
+            }
+        },
+
+        onRelevanceDeltaChange(newVal, event) {
+            reportOnInput("/utils/on-input", csrfToken, "range", {
+                "old_value": this.sliderRelevance,
+                "new_value": newVal,
+                "metric": "relevance",
+                "id": event.target.id,
+                "name": event.target.name
+            });
+            return newVal;
+        },
+        onDiversityDeltaChange(newVal, event) {
+            reportOnInput("/utils/on-input", csrfToken, "range", {
+                "old_value": this.sliderUniformityDiversity,
+                "new_value": newVal,
+                "metric": "diversity",
+                "id": event.target.id,
+                "name": event.target.name
+            });
+            return newVal;
+        },
+        onNoveltyDeltaChange(newVal, event) {
+            reportOnInput("/utils/on-input", csrfToken, "range", {
+                "old_value": this.sliderPopularityNovelty,
+                "new_value": newVal,
+                "metric": "novelty",
+                "id": event.target.id,
+                "name": event.target.name
+            });
+            return newVal;
+        },
+        onExplorationDeltaChange(newVal, event) {
+            reportOnInput("/utils/on-input", csrfToken, "range", {
+                "old_value": this.sliderExploitationExploration,
+                "new_value": newVal,
+                "metric": "exploration",
+                "id": event.target.id,
+                "name": event.target.name
+            });
+            return newVal;
+        },
+
+        // Custom (movie specific) implementation of indexOf operator
+        // Considers only movie's properties
+        movieIndexOf(arr, item) {
+            for (let idx in arr) {
+                let arrItem = arr[idx];
+                if (arrItem.movie_idx === item.movie_idx
+                    && arrItem.movie === item.movie
+                    && arrItem.url === item.url) {
+                        return idx;
+                    }
+            }
+            return -1;
+        },
+        onSelectMovie(event, item, variant) {
+            let variantName = this.variantNames[variant];
+            item['variant'] = variant;
+            item['variant_name'] = variantName;
+            let index = this.movieIndexOf(this.selected, item);
+            if (index > -1) {
+                // Already there, remove it
+                var copies = document.getElementsByName(event.srcElement.name);
+                for (let j = 0; j < copies.length; ++j) {
+                    copies[j].classList.remove("selected");
+                }
+                this.selected.splice(index, 1);
+                reportDeselectedItem(`/utils/deselected-item`, csrfToken, item, this.selected, ()=>{ 
+                    return {
+                        "variant": variant,
+                        "variant_name": variantName
+                    }; 
+                });
+            } else {
+                // Not there, insert
+                var copies = document.getElementsByName(event.srcElement.name);
+                for (let j = 0; j < copies.length; ++j) {
+                    copies[j].classList.add("selected");
+                }
+                this.selected.push(item);
+                reportSelectedItem(`/utils/selected-item`, csrfToken, item, this.selected, ()=>{
+                    return {
+                        "variant": variant,
+                        "variant_name": variantName
+                    };
+                });
+            }
+            this.selectedMovieIndices = this.selected.map((x) => x.movie_idx).join(",");
+            this.selectedMovieVariants = this.selected.map((x) => x.variant).join(",");
+        },
+        onAlgorithmRatingChanged(newRating, algorithmIndex) {
+            let oldRating = this.algorithmRatings[algorithmIndex];
+            this.algorithmRatingsValidated[algorithmIndex] = true;
+            this.algorithmRatings[algorithmIndex] = newRating;
+            this.allAlgorithmRatingsValidated = this.algorithmRatingsValidated.reduce((partialSum, a) => partialSum + a, 0) == this.numAlgorithms;
+            reportOnInput("/utils/on-input", csrfToken, "rating", {
+                "variant": algorithmIndex,
+                "variant_name": this.variantNames[algorithmIndex],
+                "old_rating": oldRating,
+                "new_rating": newRating
+            });
+            this.$forceUpdate(); // Make sure it propagates to UI (some issues with modifying list via direct access)
+        },
+        algorithmRatingVariant(algorithmIndex) {
+            if (this.algorithmRatingsValidated[algorithmIndex]) {
+                return "success";
+            }
+            return "danger";
+        },
+        popoverShown(event) {
+            reportOnInput("/utils/on-input", csrfToken, "popover-shown", {
+                "target": {
+                    "id": event.target.id,
+                    "name": event.target.name,
+                    "alt": event.target.alt,
+                    "title": event.target.title
+                }
+            });
+        },
+        popoverHidden(event) {
+            reportOnInput("/utils/on-input", csrfToken, "popover-hidden", {
+                "target": {
+                    "id": event.target.id,
+                    "name": event.target.name,
+                    "alt": event.target.alt,
+                    "title": event.target.title
+                }
+            });
+        },
+        itemMouseEnter(event) {
+            reportOnInput("/utils/on-input", csrfToken, "mouse-enter", {
+                "target": {
+                    "id": event.target.id,
+                    "name": event.target.name,
+                    "alt": event.target.alt,
+                    "title": event.target.title
+                }
+            });
+        },
+        itemMouseLeave(event) {
+            reportOnInput("/utils/on-input", csrfToken, "mouse-leave", {
+                "target": {
+                    "id": event.target.id,
+                    "name": event.target.name,
+                    "alt": event.target.alt,
+                    "title": event.target.title
+                }
+            });
+        },
+        onSubmit() {
+            this.busy = true;
+            this.$refs.myForm.submit();
+        }
+    },
+    async mounted() {
+        const btns = document.querySelectorAll("button");
+        const radios = document.querySelectorAll("input[type=radio]");
+        const checkboxes = document.querySelectorAll("input[type=checkbox]");
+        const textboxes = document.querySelectorAll("input[type=text]");
+        const selects = document.querySelectorAll("select");
+
+        this.instructionBullets = await fetch("{{url_for('journal.get_instruction_bullets', page='mors')}}")
+                            .then(response => {
+                                if (!response.ok) {
+                                    console.log("Erorr");
+                                }
+                                return response.json();
+                            });
+        
+        // Register the handlers for event reporting
+        startViewportChangeReportingWithLimit(`/utils/changed-viewport`, csrfToken, 1.0, true);
+        startScrollReportingWithLimit(`/utils/changed-viewport`, csrfToken, 1.0, document.getElementsByName("scrollableDiv"));
+        registerClickedButtonReporting(`/utils/on-input`, csrfToken, btns);
+        registerClickedRadioReporting("/utils/on-input", csrfToken, radios);
+        registerClickedCheckboxReporting("/utils/on-input", csrfToken, checkboxes);
+        registerChangedSelectionReporting("/utils/on-input", csrfToken, selects);
+        reportLoadedPage(`/utils/loaded-page`, csrfToken, "mors");
+
+        this.setRowHeights();
+        window.addEventListener('resize', this.setRowHeights);
+
+        history.pushState(null, document.title, location.href);
+        window.addEventListener('popstate', function (event)
+        {
+            history.pushState(null, document.title, location.href);
+            reportError("/utils/on-message", csrfToken, window.location.href, "Attempt to navigate back", ()=> {
+                return {"type": "Navigate back", "iteration": iteration};
+            });
+        });
+
+        if (showModal) {
+            this.$nextTick(() => {
+                this.$bvModal.show('bv-modal-block-start');
+            })
+        }
+    },
+    beforeDestroy() {
+        window.removeEventListener('resize', this.setRowHeights); // Remove event listener on component destroy
+    }
+})
+</script>
+
+<!-- {% if footer_override is defined and footer_override is not none %}
+  <div class="footerDiv mt-3">
+    {{ footer_override | safe}}
+  </div>
+</body>
+</html>
+{% else %}
+{% include 'footer.html' %}
+{% endif %} -->

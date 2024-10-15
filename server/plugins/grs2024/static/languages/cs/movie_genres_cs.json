@@ -1,0 +1,21 @@
+{
+    "genre_fantasy": "Fantasy",
+    "genre_imax": "IMAX",
+    "genre_comedy": "Komedie",
+    "genre_drama": "Drama",
+    "genre_sci-fi": "Sci-Fi",
+    "genre_action": "Akční",
+    "genre_documentary": "Dokumentární",
+    "genre_adventure": "Dobrodružný",
+    "genre_romance": "Romantický",
+    "genre_crime": "Krimi",
+    "genre_musical": "Muzikál",
+    "genre_western": "Western",
+    "genre_war" : "Válečný",
+    "genre_animation" : "Animovaný",
+    "genre_film-noir": "Film-Noir",
+    "genre_horror": "Horor",
+    "genre_children": "Pro děti",
+    "genre_mystery": "Mysteriózní",
+    "genre_thriller": "Thriller"
+}

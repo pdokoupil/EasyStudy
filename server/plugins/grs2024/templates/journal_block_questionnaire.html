@@ -1,0 +1,591 @@
+{% include 'header.html' %}
+
+<div id="app">
+    <b-container fluid>
+        <!-- <b-jumbotron class="smallJumbotron" header="{{header}}" lead="">
+            {{hint}}
+        </b-jumbotron> -->
+        <b-jumbotron style="max-height: 7vh;" class="smallJumbotron" header-level="8">
+            <!-- <template #header>
+                <h1 style="font-size: 1.0rem; margin-bottom: -0.5em; padding: 0;">{{header}}</h1>
+            </template>
+            <p style="margin-top: 0px;">
+                {{hint}}
+            </p> -->
+            <b-row>
+                <b-col cols="auto" style="text-align: left;">
+                    <h1 style="font-size: 1.0rem; margin-bottom: -0.1em; padding: 0;">{{header}}</h1>
+                    <p style="margin-top: 0px;">
+                        {{hint}}
+                    </p>
+                </b-col>
+                <b-col style="text-align: right;">
+                    <b-button size="lg" name="instructionsBtn" variant="info" class="mb-2" v-b-toggle.sidebar-1>
+                        Instructions <b-icon icon="question-square-fill" aria-hidden="true"></b-icon>
+                      </b-button>
+                </b-col>
+            </b-row>
+        </b-jumbotron>
+
+        <template>
+            <div>
+              <b-sidebar id="sidebar-1" title="Instructions" shadow>
+                <div class="px-3 py-2">
+                  <ol>
+                    <li v-for="bulletText in instructionBullets">
+                        [[bulletText]]
+                    </li>
+                  </ol>
+                </div>
+              </b-sidebar>
+            </div>
+        </template>
+    
+        <b-form method="POST" ref="myForm" @submit.prevent="onSubmit" action="{{ continuation_url }}">
+            <b-row class="mb-3" align-h="center">
+                <b-col cols="auto" >
+
+
+                    <!-- <b-row align-v="center">
+                        <b-col class="mt-2" cols="auto">
+                            <b-row>
+                                <b-col>
+                                    <b-icon class="h1" icon="grid"></b-icon>
+                                </b-col>
+                            </b-row>
+                            <b-row>
+                                <b-col>
+                                    <b-icon class="h1" icon="grid"></b-icon>
+                                </b-col>
+                            </b-row>
+                        </b-col>
+                        <b-col>
+                            <b-form-group name="q1" id="q1">
+                                <b-label for="q1">
+                                    <strong>1. TODO Q1</strong>
+                                </b-label>
+                                <b-form-radio-group name="q1" required>
+                                    <b-form-radio value="-2">Strongly Disagree</b-form-radio>
+                                    <b-form-radio value="-1">Disagree</b-form-radio>
+                                    <b-form-radio value="0">Neutral</b-form-radio>
+                                    <b-form-radio value="1">Agree</b-form-radio>
+                                    <b-form-radio value="2" class="mr-5">Strongly Agree</b-form-radio>
+                                    <b-form-radio value="3" class="ml-5">I don't understand</b-form-radio>
+                                </b-form-radio-group>
+                            </b-form-group>
+                        </b-col>
+                    </b-row> -->
+
+                    <b-row class="mt-5" align-v="center" v-for="(q, index) in questions" :key="index">
+                        <b-col v-if="q.icon == 'grid'" class="mt-2" cols="auto">
+                            <b-row>
+                                <b-col>
+                                    <b-icon class="h1" icon="grid"></b-icon>
+                                </b-col>
+                            </b-row>
+                            <b-row>
+                                <b-col>
+                                    <b-icon class="h1" icon="grid"></b-icon>
+                                </b-col>
+                            </b-row>
+                        </b-col>
+                        <b-col v-else class="mt-2" cols="auto">
+                            <b-icon class="h1" :icon="q.icon"></b-icon>
+                        </b-col>
+                        <b-col>
+                            <b-form-group :name="q.name + 'g'" id="q.name + 'g'">
+                                <b-label :for="q.name">
+                                    <strong>[[index + 1]]. [[q.text]]</strong>
+                                    <br v-if="q.text2"><strong class="ml-3" v-if="q.text2">[[q.text2]]</strong>
+                                </b-label>
+                                <b-form-radio-group :name="q.name" required>
+                                    <b-form-radio value="-3">Strongly Disagree</b-form-radio>
+                                    <b-form-radio value="-2">Disagree</b-form-radio>
+                                    <b-form-radio value="-1">Slightly Disagree</b-form-radio>
+                                    <b-form-radio value="1">Slightly Agree</b-form-radio>
+                                    <b-form-radio value="2">Agree</b-form-radio>
+                                    <b-form-radio value="3" class="mr-5">Strongly Agree</b-form-radio>
+                                    <b-form-radio v-if="q.atn == undefined" value="4" class="ml-5">I don't understand</b-form-radio>
+                                </b-form-radio-group>
+                            </b-form-group>
+                        </b-col>
+                    </b-row>
+
+                    <!-- <b-row class="mt-5" align-v="center">
+                        <b-col class="mt-2" cols="auto">
+                            <b-icon class="h1" icon="people"></b-icon>
+                        </b-col>        
+                        <b-col>
+                            <b-form-group name="qg1" id="qg1">
+                                <b-label for="q1">
+                                    <strong>1. The movies recommended to me matched my interests.</strong>
+                                </b-label>
+                                <b-form-radio-group name="q1" required>
+                                    <b-form-radio value="-2">Strongly Disagree</b-form-radio>
+                                    <b-form-radio value="-1">Disagree</b-form-radio>
+                                    <b-form-radio value="0">Neutral</b-form-radio>
+                                    <b-form-radio value="1">Agree</b-form-radio>
+                                    <b-form-radio value="2" class="mr-5">Strongly Agree</b-form-radio>
+                                    <b-form-radio value="3" class="ml-5">I don't understand</b-form-radio>
+                                </b-form-radio-group>
+                            </b-form-group>
+                        </b-col>
+                    </b-row>
+
+                    <b-row class="mt-5" align-v="center">
+                        <b-col class="mt-2" cols="auto">
+                            <b-icon class="h1" icon="people"></b-icon>
+                        </b-col>        
+                        <b-col>
+                            <b-form-group name="qg2" id="qg2">
+                                <b-label for="q2">
+                                    <strong>2. The recommended movies were mostly novel to me.</strong>
+                                </b-label>
+                                <b-form-radio-group name="q2" required>
+                                    <b-form-radio value="-2">Strongly Disagree</b-form-radio>
+                                    <b-form-radio value="-1">Disagree</b-form-radio>
+                                    <b-form-radio value="0">Neutral</b-form-radio>
+                                    <b-form-radio value="1">Agree</b-form-radio>
+                                    <b-form-radio value="2" class="mr-5">Strongly Agree</b-form-radio>
+                                    <b-form-radio value="3" class="ml-5">I don't understand</b-form-radio>
+                                </b-form-radio-group>
+                            </b-form-group>
+                        </b-col>
+                    </b-row>
+
+                    <b-row class="mt-5" align-v="center">
+                        <b-col class="mt-2" cols="auto">
+                            <b-icon class="h1" icon="people"></b-icon>
+                        </b-col>        
+                        <b-col>
+                            <b-form-group name="qg3" id="qg3">
+                                <b-label for="q3">
+                                    <strong>3. The recommended movies were highly different from each other.</strong>
+                                </b-label>
+                                <b-form-radio-group name="q3" required>
+                                    <b-form-radio value="-2">Strongly Disagree</b-form-radio>
+                                    <b-form-radio value="-1">Disagree</b-form-radio>
+                                    <b-form-radio value="0">Neutral</b-form-radio>
+                                    <b-form-radio value="1">Agree</b-form-radio>
+                                    <b-form-radio value="2" class="mr-5">Strongly Agree</b-form-radio>
+                                    <b-form-radio value="3" class="ml-5">I don't understand</b-form-radio>
+                                </b-form-radio-group>
+                            </b-form-group>
+                        </b-col>
+                    </b-row>
+
+                    <b-row class="mt-5" align-v="center">
+                        <b-col class="mt-2" cols="auto">
+                            <b-icon class="h1" icon="people"></b-icon>
+                        </b-col>        
+                        <b-col>
+                            <b-form-group name="qg4" id="qg4">
+                                <b-label for="q4">
+                                    <strong>4. The recommended movies were unexpected yet interesting to me.</strong>
+                                </b-label>
+                                <b-form-radio-group name="q4" required>
+                                    <b-form-radio value="-2">Strongly Disagree</b-form-radio>
+                                    <b-form-radio value="-1">Disagree</b-form-radio>
+                                    <b-form-radio value="0">Neutral</b-form-radio>
+                                    <b-form-radio value="1">Agree</b-form-radio>
+                                    <b-form-radio value="2" class="mr-5">Strongly Agree</b-form-radio>
+                                    <b-form-radio value="3" class="ml-5">I don't understand</b-form-radio>
+                                </b-form-radio-group>
+                            </b-form-group>
+                        </b-col>
+                    </b-row>
+
+                    <b-row class="mt-5" align-v="center">
+                        <b-col class="mt-2" cols="auto">
+                            <b-icon class="h1" icon="people"></b-icon>
+                        </b-col>        
+                        <b-col>
+                            <b-form-group name="qg5" id="qg5">
+                                <b-label for="q5">
+                                    <strong>5. The recommended movies were mostly different from what I usually watch.</strong>
+                                </b-label>
+                                <b-form-radio-group name="q5" required>
+                                    <b-form-radio value="-2">Strongly Disagree</b-form-radio>
+                                    <b-form-radio value="-1">Disagree</b-form-radio>
+                                    <b-form-radio value="0">Neutral</b-form-radio>
+                                    <b-form-radio value="1">Agree</b-form-radio>
+                                    <b-form-radio value="2" class="mr-5">Strongly Agree</b-form-radio>
+                                    <b-form-radio value="3" class="ml-5">I don't understand</b-form-radio>
+                                </b-form-radio-group>
+                            </b-form-group>
+                        </b-col>
+                    </b-row>
+
+                    <b-row class="mt-5" align-v="center">
+                        <b-col class="mt-2" cols="auto">
+                            <b-icon class="h1" icon="people"></b-icon>
+                        </b-col>        
+                        <b-col>
+                            <b-form-group name="qg6" id="qg6">
+                                <b-label for="q6">
+                                    <strong>6. The recommended movies were mostly similar to what I usually watch.</strong>
+                                </b-label>
+                                <b-form-radio-group name="q6" required>
+                                    <b-form-radio value="-2">Strongly Disagree</b-form-radio>
+                                    <b-form-radio value="-1">Disagree</b-form-radio>
+                                    <b-form-radio value="0">Neutral</b-form-radio>
+                                    <b-form-radio value="1">Agree</b-form-radio>
+                                    <b-form-radio value="2" class="mr-5">Strongly Agree</b-form-radio>
+                                    <b-form-radio value="3" class="ml-5">I don't understand</b-form-radio>
+                                </b-form-radio-group>
+                            </b-form-group>
+                        </b-col>
+                    </b-row>
+
+                    <b-row class="mt-5" align-v="center">
+                        <b-col class="mt-2" cols="auto">
+                            <b-icon class="h1" icon="people"></b-icon>
+                        </b-col>        
+                        <b-col>
+                            <b-form-group name="qsg1" id="qsg1">
+                                <b-label for="qs1">
+                                    <strong>10. I believe recommender systems can be very useful to people. To answer <br> this attention check question correctly, you must select "Agree"</strong>
+                                </b-label>
+                                <b-form-radio-group name="qs1" required>
+                                    <b-form-radio value="-2">Strongly Disagree</b-form-radio>
+                                    <b-form-radio value="-1">Disagree</b-form-radio>
+                                    <b-form-radio value="0">Neutral</b-form-radio>
+                                    <b-form-radio value="1">Agree</b-form-radio>
+                                    <b-form-radio value="2" class="mr-5">Strongly Agree</b-form-radio>
+                                    <b-form-radio value="3" class="ml-5">I don't understand</b-form-radio>
+                                </b-form-radio-group>
+                            </b-form-group>
+                        </b-col>
+                    </b-row>
+
+                    <b-row class="mt-5" align-v="center">
+                        <b-col class="mt-2" cols="auto">
+                            <b-icon class="h1" icon="people"></b-icon>
+                        </b-col>        
+                        <b-col>
+                            <b-form-group name="qs1" id="qs1">
+                                <b-label for="qs1">
+                                    <strong>7. The recommended movies were mostly popular (i.e., blockbusters).</strong>
+                                </b-label>
+                                <b-form-radio-group name="qs1" required>
+                                    <b-form-radio value="-2">Strongly Disagree</b-form-radio>
+                                    <b-form-radio value="-1">Disagree</b-form-radio>
+                                    <b-form-radio value="0">Neutral</b-form-radio>
+                                    <b-form-radio value="1">Agree</b-form-radio>
+                                    <b-form-radio value="2" class="mr-5">Strongly Agree</b-form-radio>
+                                    <b-form-radio value="3" class="ml-5">I don't understand</b-form-radio>
+                                </b-form-radio-group>
+                            </b-form-group>
+                        </b-col>
+                    </b-row>
+
+                    <b-row class="mt-5" align-v="center">
+                        <b-col class="mt-2" cols="auto">
+                            <b-icon class="h1" icon="people"></b-icon>
+                        </b-col>        
+                        <b-col>
+                            <b-form-group name="qs1" id="qs1">
+                                <b-label for="qs1">
+                                    <strong>8. The recommended movies were mostly similar to each other.</strong>
+                                </b-label>
+                                <b-form-radio-group name="qs1" required>
+                                    <b-form-radio value="-2">Strongly Disagree</b-form-radio>
+                                    <b-form-radio value="-1">Disagree</b-form-radio>
+                                    <b-form-radio value="0">Neutral</b-form-radio>
+                                    <b-form-radio value="1">Agree</b-form-radio>
+                                    <b-form-radio value="2" class="mr-5">Strongly Agree</b-form-radio>
+                                    <b-form-radio value="3" class="ml-5">I don't understand</b-form-radio>
+                                </b-form-radio-group>
+                            </b-form-group>
+                        </b-col>
+                    </b-row>
+
+                    <b-row class="mt-5" align-v="center">
+                        <b-col class="mt-2" cols="auto">
+                            <b-icon class="h1" icon="people"></b-icon>
+                        </b-col>        
+                        <b-col>
+                            <b-form-group name="qs1" id="qs1">
+                                <b-label for="qs1">
+                                    <strong>9. Overall, I am satisfied with the recommended movies.</strong>
+                                </b-label>
+                                <b-form-radio-group name="qs1" required>
+                                    <b-form-radio value="-2">Strongly Disagree</b-form-radio>
+                                    <b-form-radio value="-1">Disagree</b-form-radio>
+                                    <b-form-radio value="0">Neutral</b-form-radio>
+                                    <b-form-radio value="1">Agree</b-form-radio>
+                                    <b-form-radio value="2" class="mr-5">Strongly Agree</b-form-radio>
+                                    <b-form-radio value="3" class="ml-5">I don't understand</b-form-radio>
+                                </b-form-radio-group>
+                            </b-form-group>
+                        </b-col>
+                    </b-row>
+
+                    <b-row class="mt-5" align-v="center">
+                        <b-col class="mt-2" cols="auto">
+                            <b-icon class="h1" icon="people"></b-icon>
+                        </b-col>        
+                        <b-col>
+                            <b-form-group name="qs1" id="qs1">
+                                <b-label for="qs1">
+                                    <strong>10. The initial values of sliders already provided good recommendations.</strong>
+                                </b-label>
+                                <b-form-radio-group name="qs1" required>
+                                    <b-form-radio value="-2">Strongly Disagree</b-form-radio>
+                                    <b-form-radio value="-1">Disagree</b-form-radio>
+                                    <b-form-radio value="0">Neutral</b-form-radio>
+                                    <b-form-radio value="1">Agree</b-form-radio>
+                                    <b-form-radio value="2" class="mr-5">Strongly Agree</b-form-radio>
+                                    <b-form-radio value="3" class="ml-5">I don't understand</b-form-radio>
+                                </b-form-radio-group>
+                            </b-form-group>
+                        </b-col>
+                    </b-row>
+
+                    <b-row class="mt-5" align-v="center">
+                        <b-col class="mt-2" cols="auto">
+                            <b-icon class="h1" icon="people"></b-icon>
+                        </b-col>        
+                        <b-col>
+                            <b-form-group name="qs1" id="qs1">
+                                <b-label for="qs1">
+                                    <strong>11. Being able to change objective criteria (relevance, diversity, etc.) was useful for me.</strong>
+                                </b-label>
+                                <b-form-radio-group name="qs1" required>
+                                    <b-form-radio value="-2">Strongly Disagree</b-form-radio>
+                                    <b-form-radio value="-1">Disagree</b-form-radio>
+                                    <b-form-radio value="0">Neutral</b-form-radio>
+                                    <b-form-radio value="1">Agree</b-form-radio>
+                                    <b-form-radio value="2" class="mr-5">Strongly Agree</b-form-radio>
+                                    <b-form-radio value="3" class="ml-5">I don't understand</b-form-radio>
+                                </b-form-radio-group>
+                            </b-form-group>
+                        </b-col>
+                    </b-row>
+
+                    <b-row class="mt-5" align-v="center">
+                        <b-col class="mt-2" cols="auto">
+                            <b-icon class="h1" icon="people"></b-icon>
+                        </b-col>        
+                        <b-col>
+                            <b-form-group name="qs2" id="qs2">
+                                <b-label for="qs2">
+                                    <strong>19. Using this recommender system was entertaining and I would recommend it to my friends. To answer <br> this attention check question correctly, you must select "Strongly Disagree".</strong>
+                                </b-label>
+                                <b-form-radio-group name="qs2" required>
+                                    <b-form-radio value="-2">Strongly Disagree</b-form-radio>
+                                    <b-form-radio value="-1">Disagree</b-form-radio>
+                                    <b-form-radio value="0">Neutral</b-form-radio>
+                                    <b-form-radio value="1">Agree</b-form-radio>
+                                    <b-form-radio value="2" class="mr-5">Strongly Agree</b-form-radio>
+                                    <b-form-radio value="3" class="ml-5">I don't understand</b-form-radio>
+                                </b-form-radio-group>
+                            </b-form-group>
+                        </b-col>
+                    </b-row>
+
+                    <b-row class="mt-5" align-v="center">
+                        <b-col class="mt-2" cols="auto">
+                            <b-icon class="h1" icon="people"></b-icon>
+                        </b-col>        
+                        <b-col>
+                            <b-form-group name="qs1" id="qs1">
+                                <b-label for="qs1">
+                                    <strong>12. Overall, after modifying the objective criteria, recommendations improved.</strong>
+                                </b-label>
+                                <b-form-radio-group name="qs1" required>
+                                    <b-form-radio value="-2">Strongly Disagree</b-form-radio>
+                                    <b-form-radio value="-1">Disagree</b-form-radio>
+                                    <b-form-radio value="0">Neutral</b-form-radio>
+                                    <b-form-radio value="1">Agree</b-form-radio>
+                                    <b-form-radio value="2" class="mr-5">Strongly Agree</b-form-radio>
+                                    <b-form-radio value="3" class="ml-5">I don't understand</b-form-radio>
+                                </b-form-radio-group>
+                            </b-form-group>
+                        </b-col>
+                    </b-row>
+
+                    <b-row class="mt-5" align-v="center">
+                        <b-col class="mt-2" cols="auto">
+                            <b-icon class="h1" icon="people"></b-icon>
+                        </b-col>        
+                        <b-col>
+                            <b-form-group name="qs1" id="qs1">
+                                <b-label for="qs1">
+                                    <strong>13. The mechanism (slider) was sufficient to tell the system what recommendations I wanted.</strong>
+                                </b-label>
+                                <b-form-radio-group name="qs1" required>
+                                    <b-form-radio value="-2">Strongly Disagree</b-form-radio>
+                                    <b-form-radio value="-1">Disagree</b-form-radio>
+                                    <b-form-radio value="0">Neutral</b-form-radio>
+                                    <b-form-radio value="1">Agree</b-form-radio>
+                                    <b-form-radio value="2" class="mr-5">Strongly Agree</b-form-radio>
+                                    <b-form-radio value="3" class="ml-5">I don't understand</b-form-radio>
+                                </b-form-radio-group>
+                            </b-form-group>
+                        </b-col>
+                    </b-row>
+
+                    <b-row class="mt-5" align-v="center">
+                        <b-col class="mt-2" cols="auto">
+                            <b-icon class="h1" icon="people"></b-icon>
+                        </b-col>        
+                        <b-col>
+                            <b-form-group name="qs1" id="qs1">
+                                <b-label for="qs1">
+                                    <strong>14. I was not able to describe my preferences w.r.t. supported objective criteria.</strong>
+                                </b-label>
+                                <b-form-radio-group name="qs1" required>
+                                    <b-form-radio value="-2">Strongly Disagree</b-form-radio>
+                                    <b-form-radio value="-1">Disagree</b-form-radio>
+                                    <b-form-radio value="0">Neutral</b-form-radio>
+                                    <b-form-radio value="1">Agree</b-form-radio>
+                                    <b-form-radio value="2" class="mr-5">Strongly Agree</b-form-radio>
+                                    <b-form-radio value="3" class="ml-5">I don't understand</b-form-radio>
+                                </b-form-radio-group>
+                            </b-form-group>
+                        </b-col>
+                    </b-row>
+
+                    <b-row class="mt-5" align-v="center">
+                        <b-col class="mt-2" cols="auto">
+                            <b-icon class="h1" icon="people"></b-icon>
+                        </b-col>        
+                        <b-col>
+                            <b-form-group name="qs1" id="qs1">
+                                <b-label for="qs1">
+                                    <strong>15. Appropriate values of the objective criteria were easy to set."</strong>
+                                </b-label>
+                                <b-form-radio-group name="qs1" required>
+                                    <b-form-radio value="-2">Strongly Disagree</b-form-radio>
+                                    <b-form-radio value="-1">Disagree</b-form-radio>
+                                    <b-form-radio value="0">Neutral</b-form-radio>
+                                    <b-form-radio value="1">Agree</b-form-radio>
+                                    <b-form-radio value="2" class="mr-5">Strongly Agree</b-form-radio>
+                                    <b-form-radio value="3" class="ml-5">I don't understand</b-form-radio>
+                                </b-form-radio-group>
+                            </b-form-group>
+                        </b-col>
+                    </b-row>
+
+                    <b-row class="mt-5" align-v="center">
+                        <b-col class="mt-2" cols="auto">
+                            <b-icon class="h1" icon="controller"></b-icon>
+                        </b-col>
+                        <b-col>
+                            <b-form-group name="qs3" id="qs3">
+                                <b-label for="qs3">
+                                    <strong>25. This recommender system provided me with many tips for interesting computer games.</strong>
+                                </b-label>
+                                <b-form-radio-group name="qs3" required>
+                                    <b-form-radio value="-2">Strongly Disagree</b-form-radio>
+                                    <b-form-radio value="-1">Disagree</b-form-radio>
+                                    <b-form-radio value="1">Agree</b-form-radio>
+                                    <b-form-radio value="2" class="mr-5">Strongly Agree</b-form-radio>
+                                </b-form-radio-group>
+                            </b-form-group>
+                        </b-col>
+                    </b-row> -->
+
+
+                </b-col>
+            </b-row>
+
+            <b-row align-h="center">
+                <b-col class="text-center">
+                    <!-- <b-form method="POST" action="{{continuation_url}}"> -->
+                        <input type="hidden" name="csrf_token" value="{{csrf_token()}}"/>
+                        <!-- <input type="hidden" name="final_questionnaire_data" value="final_questionnaire_data"/> -->
+                        <b-overlay
+                            :show="busy"
+                            rounded
+                            opacity="0.6"
+                            spinner-small
+                            spinner-variant="primary"
+                            class="d-inline-block"
+                        >
+                            <b-button class="mb-3" variant="success" type="submit" name="finishBtn">{{finish}}</b-button>
+                        </b-overlay>
+                    <!-- </b-form> -->
+                </b-col>
+            </b-row>
+
+        </b-form>
+
+        
+        
+        
+
+    </b-container>
+</div>
+
+<script src="{{url_for('static', filename='message_reporting.js')}}"></script>
+<script src="{{url_for('static', filename='resolution_handling.js')}}"></script>
+<script src="{{url_for('static', filename='interaction_reporting.js')}}"></script>
+<script>
+
+    var csrfToken = "{{csrf_token()}}";
+
+    window.app = new Vue({
+    el: '#app',
+    delimiters: ['[[',']]'], // Used to replace double { escaping with double [ escaping (to prevent jinja vs vue inference)
+    data: function() {
+        
+        return {
+            questions: null,
+            instructionBullets: [],
+            busy: false
+        };
+    },
+    methods: {
+        onSubmit() {
+            this.busy = true;
+            this.$refs.myForm.submit();
+        }
+    },
+    async mounted() {
+        const btns = document.querySelectorAll("button");
+        const checkboxes = document.querySelectorAll("input[type=checkbox]");
+        const textboxes = document.querySelectorAll("input[type=text]");
+        const selects = document.querySelectorAll("select");
+        
+        this.questions = await fetch("{{url_for('journal.get_block_questions')}}")
+                            .then(response => {
+                                if (!response.ok) {
+                                    console.log("Erorr");
+                                }
+                                return response.json();
+                            });
+
+        this.instructionBullets = await fetch("{{url_for('journal.get_instruction_bullets', page='block-questionnaire')}}")
+                            .then(response => {
+                                if (!response.ok) {
+                                    console.log("Erorr");
+                                }
+                                return response.json();
+                            });
+        
+        this.$nextTick(() => {
+            const radios = document.querySelectorAll("input[type=radio]");
+            // Register the handlers for event reporting
+            startViewportChangeReportingWithLimit(`/utils/changed-viewport`, csrfToken, 1.0, true);
+            startScrollReportingWithLimit(`/utils/changed-viewport`, csrfToken, 1.0, document.getElementsByName("scrollableDiv"));
+            registerClickedButtonReporting(`/utils/on-input`, csrfToken, btns);
+            registerClickedRadioReporting("/utils/on-input", csrfToken, radios);
+            registerClickedCheckboxReporting("/utils/on-input", csrfToken, checkboxes);
+            registerChangedSelectionReporting("/utils/on-input", csrfToken, selects);
+            reportLoadedPage(`/utils/loaded-page`, csrfToken, "after_block_questionnaire");
+        });
+    }
+})
+</script>
+
+<!-- {% if footer_override is defined and footer_override is not none %}
+  <div class="footerDiv mt-3">
+    {{ footer_override | safe}}
+  </div>
+</body>
+</html>
+{% else %}
+{% include 'footer.html' %}
+{% endif %} -->
