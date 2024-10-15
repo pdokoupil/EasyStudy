@@ -1,12 +1,26 @@
 # About
-This is a repository with sources that were used for running the study described in the paper *Comparing User Interfaces for Fine-Tuning Multi-Objective Recommender Systems*.
+This is a repository with sources that were used for running the study described in the paper *Comparing User Interfaces for Customizing Multi-Objective Recommender Systems*.
 The development was done in the ecosystem of the EasyStudy framework where we implemented a new plugin providing custom functionality tailored for our user study.
-We are sharing the link to this snapshot of a branch with the state from when the study was running for peer-review purposes.
 
 All code that is related to this paper can be found in [slidershuffling](./server/plugins/slidershuffling/) (mainly) and [multiobjective](./server/plugins/multiobjective/)
 
+# Abstract
+
+The goal of Multi-Objective Recommender Systems (MORSs) is to adapt to the needs and preferences of the users
+from different beyond-accuracy perspectives. When a MORS operates at the local level, it tailors its results to
+the needs of each individual user. Recent studies have highlighted that, however, the self-declared propensity
+of the users towards the different objectives does not always match with the characteristics of the accepted
+recommendations. Therefore, in this study, we delve into different ways for users to express their preference
+toward multi-objective goals and observe whether they have some impact on declared propensities and overall
+user satisfaction. In particular, we explore four different user interface (UI) designs and perform a user study
+focused on the interactions with both the UI and the recommendations. Results show that multiple UIs lead
+to similar results w.r.t. usage statistics, but users’ perceptions of these UIs often differ. These results highlight
+the importance of examining MORSs from multiple perspectives to accommodate the users’ actual needs when
+producing recommendations. Study data and detailed results are available from https://osf.io/pbd54/.
+
 # Contact
-Anonymized for peer-review
+- [Patrik Dokoupil](mailto:patrik.dokoupil@matfyz.cuni.cz)
+- [Ladislav Peska](mailto:ladislav.peska@matfyz.cuni.cz)
 
 # Running the study
 Even though our contribution (in terms of source code) lies in mainly in the [slidershuffling](./server/plugins/slidershuffling/) plugin we still want to make it easier to run the study. Therefore instead of only providing the plugins, this repository provides the whole EasyStudy Fork, including the plugins.
