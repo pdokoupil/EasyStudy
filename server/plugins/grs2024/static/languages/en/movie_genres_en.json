@@ -1,0 +1,21 @@
+{
+    "genre_fantasy": "Fantasy",
+    "genre_imax": "IMAX",
+    "genre_comedy": "Comedy",
+    "genre_drama": "Drama",
+    "genre_sci-fi": "Sci-Fi",
+    "genre_action": "Action",
+    "genre_documentary": "Documentary",
+    "genre_adventure": "Adventure",
+    "genre_romance": "Romance",
+    "genre_crime": "Crime",
+    "genre_musical": "Musical",
+    "genre_western": "Western",
+    "genre_war" : "War",
+    "genre_animation" : "Animation",
+    "genre_film-noir": "Film-Noir",
+    "genre_horror": "Horror",
+    "genre_children": "Children",
+    "genre_mystery": "Mystery",
+    "genre_thriller": "Thriller"
+}
