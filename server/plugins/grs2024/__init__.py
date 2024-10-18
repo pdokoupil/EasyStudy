@@ -24,77 +24,61 @@ from common import get_tr, load_languages, multi_lang, load_user_study_config
 from flask import Blueprint, jsonify, make_response, request, redirect, render_template, url_for, session
 
 from plugins.utils.interaction_logging import log_interaction
+from plugins.utils.helpers import stable_unique, cos_sim_np
 from plugins.fastcompare.loading import load_data_loaders
 from plugins.fastcompare import elicitation_ended, filter_params, load_data_loader_cached, search_for_item
 
 from plugins.fastcompare import get_semi_local_cache_name, get_cache_path
-from plugins.journal.metrics import binomial_diversity, intra_list_diversity, item_popularity, popularity_based_novelty, exploration, exploitation
 
 #from memory_profiler import profile
 
-from plugins.journal.algorithms import NEG_INF, evolutionary_exact, evolutionary_max, greedy_exact, greedy_max, item_wise_exact, item_wise_max, unit_normalized_diversification
 
 from app import rds
 
 # Load available language mutations
 languages = load_languages(os.path.dirname(__file__))
 
-##### Global variables block #####
-N_BLOCKS = 3
-N_ITERATIONS = 6 # 6 iterations per block
 
-# Algorithm matrix
-# Algorithms are divided in two dimensions: [MAX, EXACT] x [ITEM-WISE, GREEDY, EVOLUTIONARY]
-# We always select one row per user, so each user gets either ITEM-WISE, GREEDY or EVOLUTIONARY (in both MAX and EXACT variants) + Relevance baseline
-ALGORITHMS = [
-    "ITEM-WISE-MAX-1W", "ITEM-WISE-MAX-2W", "ITEM-WISE-EXACT-1W",
-    "GREEDY-MAX-1W", "GREEDY-MAX-2W", "GREEDY-EXACT-1W",
-    "EVOLUTIONARY-MAX-1W", "EVOLUTIONARY-MAX-2W", "EVOLUTIONARY-EXACT-1W",
-    "RELEVANCE-BASED"
-]
+BASIC_ALGORITHMS = ["MP", "LM", "MUL"]
 
-# What kind of optimization should the algorithm apply
-# "MAX" means that we maximize the objectives while ensuring proportionality w.r.t. given weights
-# "EXACT" means we do not care about maximization and only care about proportionality w.r.t. given weights
-OPTIMIZATION_TYPE = ["MAX", "EXACT"]
+##### USER STUDY VARIABLES ######
 
-# Different algorithm families
-ALGORITHM_FAMILY = [
-    "ITEM-WISE",
-    "GREEDY",
-    "EVOLUTIONARY"
-]
+### BETWEEN USER ################
 
-# "Backend slider" used for "MAX" variants of the algorithms
-# Note that for EXACT, these two are essentially same, se we ignore this (and always use 1W)
-BACKEND_SLIDER = [
-    "1W", # 1-way slider -> we use 4 objectives for the algorithm
-    "2W"  # 2-way slider -> we use all 7 objectives for the algorithm
-]
+# Each user can either be or not be part of the groups used in the experiments
+USER_PART_OF_GROUP = [True, False]
+
+# Join these two groups together into one group [Extra explanations ON/OFF]
+# SHOW_MEMBERS_PREFERENCES = [True, False]
+# SHOW_HISTORICAL_RECOMMENDATIONS = [True, False]
+EXTENDED_EXPLANATIONS = [True, False]
+
+THIRD_ALGORITHM = BASIC_ALGORITHMS
+
+# So that in total we would have just 2 x 2 x 3 variables = 12 groups
+
+### WITHIN USER #################
+
+# Group types per iteration (is shuffled later on)
+GROUP_TYPES = ["similar", "divergent", "random", "outlier"]
+# We have 3 iterations (consecutive) for each group type so that users can observe "long-term" effects
+# but at the same time, we want to avoid putting too much cognitive burnden on the users
+ITERS_PER_GROUP_TYPE = 3
+
+#################################
+
+# Possible GRS Algorithms
+ALGORITHMS = {
+    "BETA": "RLProp",
+    "GAMMA": "GFAR",
+    "DELTA": GROUP_TYPES
+}
+
+
 
 # The mapping is not fixed between users
-ALGORITHM_ANON_NAMES = ["ALPHA", "BETA", "GAMMA"]
+ALGORITHM_ANON_NAMES = ["BETA", "GAMMA", "DELTA"]
 
-# Possible alpha values to use during metric assessment
-# Since we have two steps, comparing 3 alphas in each, we sample 6 alphas randomly
-
-POSSIBLE_ALPHAS = [0.0, 0.01, 0.1, 0.25, 0.5, 0.75, 0.9, 0.99, 1.0]
-# one-way means there is single objective per slider, going from 0 to 1
-# two-way means there are two objectives, one at each side of the slider
-SLIDER_VERSIONS = ["TWO-WAY", "ONE-WAY"]
-
-# Number of alpha iterations
-N_ALPHA_ITERS = 2
-
-METRIC_ASSESSMENT_ALPHA = 0.1
-
-N_ITEMS_SUBSET=500
-
-# Given algorithm family, optimization type and backend slider, generate unique algorithm name
-def algo_name(family, optim_type, backend_slider):
-    name = f"{family}-{optim_type}-{backend_slider}"
-    assert name in ALGORITHMS, f"name={name} not in {ALGORITHMS}"
-    return name
 
 # Implementation of this function can differ among plugins
 def get_lang():
@@ -104,11 +88,11 @@ def get_lang():
     return default_lang
 
 # Global, plugin related stuff
-__plugin_name__ = "journal"
+__plugin_name__ = "grs2024"
 __version__ = "0.1.0"
 __author__ = "Patrik Dokoupil"
 __author_contact__ = "Patrik.Dokoupil@matfyz.cuni.cz"
-__description__ = "Complex plugin for a very customized user study that we have used for journal paper"
+__description__ = "Complex plugin for a very customized user study that we have used for GRS user study concerned with fairness perception"
 
 bp = Blueprint(__plugin_name__, __plugin_name__, url_prefix=f"/{__plugin_name__}")
 
@@ -143,10 +127,6 @@ def get_all(name):
 def incr(key):
     x = get_val(key)
     set_val(key, x + 1)
-
-# Helper that checks if the user study is configured with Books dataset
-def is_books(conf):
-    return "Goodbooks" in conf["selected_data_loader"]
 
 # Plugin specific version of enrich_results (transforming list of item indices into structured dict with additional item metadata)
 # Here we are sure that we are inside this particular plugin
@@ -404,6 +384,191 @@ class ObjectiveWrapper:
     def name(self):
         return self.obj_name
 
+
+# @cached(cache={}, key=lambda loader: loader.name())
+# def get_user_similarity_matrix(loader):
+#     return cos_sim_np(loader.rating_matrix)
+
+@cached(cache={}, key=lambda loader: loader.name())
+def get_normalized_rating_matrix(loader):
+    # We use the same thresholds on which the EASE was pretrained
+    rm = np.where(loader.rating_matrix >= 3.0, 1, 0)
+
+    # The latter code assumes that there are no duplicate rows in the rating matrix
+
+    rows_as_tuples = [tuple(row) for row in matrix]
+    if len(rows_as_tuples) == len(set(rows_as_tuples)):
+        print("All rows are unique.")
+    else:
+        print("There are duplicate rows.")
+
+    return rm
+
+# User embedding is vector of shape (n_items,) (if specified)
+# Each element being either 0 or 1 (implicit feedback)
+# The loader.rating_matrix may not be normalized to [0, 1] so we do it here
+def generate_similar_group(loader, group_size, user_embedding, filt_out):
+    rm_normed = get_normalized_rating_matrix(loader)
+    n_users, n_items = rm_normed.shape
+    # Do it incrementally, start with a embedding user (either random, or the real user)
+    if user_embedding:
+        assert user_embedding.shape == (n_items, ), f"user_embedding.shape={user_embedding.shape}"
+        prefix_embeddings = user_embedding
+    else:
+        rnd_idx = np.random.randint(0, n_users)
+        prefix_embeddings = rm_normed[rnd_idx]
+        filt_out.append(rnd_idx)
+
+    assert prefix_embeddings.shape == (n_items, ), f"shape={prefix_embeddings.shape}"
+    prefix_embeddings = prefix_embeddings[np.newaxis, :]
+
+    for i in range(group_size - 1):
+        # These newaxis are here to ensure proper broadcasting
+        # Basically, prefix_embeddings are converted from (i+1, N) to (i+1, 1, N) and rm_normed is from (M, N) to (1, M, N)
+        # Therefore i+1 broadcasts (thanks to 1 in first dimension of rating matrix) and same for M in the rating matrix
+        # Effectively we end up with (i+1, M) which means for each prefix embedding and each candidate we have a distance between the two
+        # distances = np.linalg.norm(prefix_embeddings[:, np.newaxis, :] - rm_normed[np.newaxis, :, :], axis=2, )
+        # For cosine distance it is slightly different
+        distances = 1.0 - np.dot(prefix_embeddings / np.linalg.norm(prefix_embeddings, axis=1, keepdims=True), (rm_normed / np.linalg.norm(rm_normed, axis=1, keepdims=True)).T)
+        assert distances.shape == (i + 1, n_users), f"distances.shape={distances.shape}"
+        # Then we need to aggregate this to have one distance for each candidate user
+        # What we do here is to simply take random users whose mean similarity to the rest of the (partially generated) group
+        # is above certain threshold
+        # We also mask already selected users
+        if filt_out:
+            distances[:, filt_out] = distances.max() + 1
+        
+        distances = distances.mean(axis=0)
+        assert distances.shape == (n_users, ), f"distances.shape after mean = {distances.shape}"
+
+        # We take 20th percentile as a threshold (we go <= not >=)
+        threshold = np.percentile(distances, 20)
+        candidates = np.where(distances <= threshold)[0]
+        selected_candidate = np.random.choice(candidates)
+        # Mask it out
+        filt_out.append(selected_candidate)
+        # Append it to current group
+        prefix_embeddings = np.concatenate([prefix_embeddings, rm_normed[selected_candidate][np.newaxis, :]], axis=0)
+    
+    assert prefix_embeddings.shape == (group_size, n_items), f"prefix_embeddings.shape={prefix_embeddings.shape}"
+    return prefix_embeddings
+
+def generate_divergent_group(loader, group_size, user_embedding, filt_out):
+    rm_normed = get_normalized_rating_matrix(loader)
+    n_users, n_items = rm_normed.shape
+    # Do it incrementally, start with a embedding user (either random, or the real user)
+    if user_embedding:
+        prefix_embeddings = user_embedding
+    else:
+        rnd_idx = np.random.randint(0, n_users)
+        prefix_embeddings = rm_normed[rnd_idx]
+        filt_out.append(rnd_idx)
+
+    assert prefix_embeddings.shape == (n_items, ), f"shape={prefix_embeddings.shape}"
+    prefix_embeddings = prefix_embeddings[np.newaxis, :]
+
+    for i in range(group_size - 1):
+        # These newaxis are here to ensure proper broadcasting
+        # Basically, prefix_embeddings are converted from (i+1, N) to (i+1, 1, N) and rm_normed is from (M, N) to (1, M, N)
+        # Therefore i+1 broadcasts (thanks to 1 in first dimension of rating matrix) and same for M in the rating matrix
+        # Effectively we end up with (i+1, M) which means for each prefix embedding and each candidate we have a distance between the two
+        # distances = np.linalg.norm(prefix_embeddings[:, np.newaxis, :] - loader.rm_normed[np.newaxis, :, :], axis=2)
+        # For cosine distance it is slightly different
+        distances = 1.0 - np.dot(prefix_embeddings / np.linalg.norm(prefix_embeddings, axis=1, keepdims=True), (rm_normed / np.linalg.norm(rm_normed, axis=1, keepdims=True)).T)
+        assert distances.shape == (i + 1, n_users), f"distances.shape={distances.shape}"
+        # Then we need to aggregate this to have one distance for each candidate user
+        # What we do here is to simply take random users whose mean similarity to the rest of the (partially generated) group
+        # is above certain threshold
+        # We also mask already selected users
+        if filt_out:
+            distances[:, filt_out] = distances.min() - 1
+        
+        distances = distances.mean(axis=0)
+        assert distances.shape == (n_users, ), f"distances.shape after mean = {distances.shape}"
+
+        # We take 80th percentile as a threshold (we go >= not <=)
+        threshold = np.percentile(distances, 80)
+        candidates = np.where(distances >= threshold)[0]
+        selected_candidate = np.random.choice(candidates)
+        # Mask it out
+        filt_out.append(selected_candidate)
+        # Append it to current group
+        prefix_embeddings = np.concatenate([prefix_embeddings, rm_normed[selected_candidate][np.newaxis, :]], axis=0)
+    
+    assert prefix_embeddings.shape == (group_size, n_items), f"prefix_embeddings.shape={prefix_embeddings.shape}"
+    return prefix_embeddings
+
+def generate_outlier_group(loader, group_size, user_embedding = None):
+    rm_normed = get_normalized_rating_matrix(loader)
+    n_users, n_items = rm_normed.shape
+    # Outlier embedding is either the user, or randomly sampled vector from the rating matrix
+    # Depending on the study variables
+    if user_embedding:
+        prefix_embeddings = user_embedding
+        filt_out = []
+    else:
+        rnd_idx = np.random.randint(0, n_users)
+        prefix_embeddings = rm_normed[rnd_idx]
+        filt_out = [rnd_idx]
+
+    assert prefix_embeddings.shape == (n_items, ), f"shape={prefix_embeddings.shape}"
+    prefix_embeddings = prefix_embeddings[np.newaxis, :]
+
+    outlier_index = 0
+
+    # Once we have the outlier, we essentially generate divergent group of size 2 (including the outlier)
+    # Around that outlier. This basically means -> find single, divergent group member for the outlier
+    # Once we have it, we basically just generate similar group around the divergent member, this time, of size group_size - 1
+    # We pass filt out so that it does not happen that second selected member is the same as the randomly generated outlier
+    # Although this should never happen given that we generate divergent group and similarity of user to itself is 0
+    div_group = generate_divergent_group(loader, 2, prefix_embeddings[outlier_index], filt_out=filt_out)
+    assert div_group.shape == (2, n_items), f"div_group.shape={div_group.shape}"
+    if group_size > 2:
+        # We still need group_size - 1 to be >= 2 that is why the "if" above
+        # Now we generate similar group so it is much more important to properly pass filt_out
+        # so that we do not include a user twice
+        sim_group = generate_similar_group(loader, group_size - 1, div_group[1], filt_out=filt_out)
+        outlier_group = np.concatenate([prefix_embeddings, sim_group], axis=0)
+        assert outlier_group == (group_size, n_items), f"outlier_group.shape={outlier_group.shape}"
+        return outlier_group
+    else:
+        return div_group
+
+
+
+
+# What is outcome of group generation
+# Basically a list of |G| vectors each of size N (number of items)
+# Corresponding to "user" embeddings. The term user here is vague, we do not deal
+# with user IDs and instead, only care about the embeddings
+
+def generate_groups(loader, group_types_permutation, group_size, user_embedding = None):
+    assert group_size >= 2, f"group_size={group_size}"
+    rm_normed = get_normalized_rating_matrix(loader)
+    n_users, n_items = rm_normed.shape
+
+    #similarity_matrix = get_user_similarity_matrix(loader)
+
+    resulting_groups = []
+
+    for gtype in group_types_permutation:
+        assert gtype in GROUP_TYPES, f"gtype={gtype}"
+        if gtype == "similar":
+            resulting_groups.append(generate_similar_group(loader, group_size, user_embedding))
+        elif gtype == "divergent":
+            resulting_groups.append(generate_divergent_group(loader, group_size, user_embedding))
+        elif gtype == "random":
+            # Random is so simple that we do it inline here
+            if user_embedding:
+                # We have group_size - 1 users and combine it with input user embedding (the real user doing the study)
+                resulting_groups.append(np.concatenate([rm_normed[np.random.choice(n_users, group_size - 1, replace=False)], user_embedding], axis=0))
+            else:
+                # We just sample all the embeddings
+                resulting_groups.append(rm_normed[np.random.choice(n_users, group_size, replace=False)])
+        elif gtype == "outlier":
+            resulting_groups.append(generate_outlier_group(loader, group_size, user_embedding))
+    return resulting_groups
+
 ##### End of algorithms #####
 
 
@@ -412,7 +577,7 @@ class ObjectiveWrapper:
 #################################################################################
 
 
-# Render journal plugin study creation page
+# Render grs2024 plugin study creation page
 @bp.route("/create")
 @multi_lang
 def create():
@@ -435,34 +600,35 @@ def create():
     params["informed_consent_placeholder"] = tr("fastcompare_create_informed_consent_placeholder")
 
     # TODO add tr(...) to make it translatable
-    params["disable_relative_comparison"] = "Disable relative comparison"
     params["disable_demographics"] = "Disable demographics"
-    params["separate_training_data"] = "Separate training data"
+    params["extended_explanations"] = "Extended explanations"
+    params["user_part_of_group"] = "User part of group"
+    params["basic_grs"] = "Please select basic GRS algorithm"
 
-    return render_template("journal_create.html", **params)
+    return render_template("grs_create.html", **params)
 
 # Public facing endpoint
 @bp.route("/join", methods=["GET"])
 def join():
     assert "guid" in request.args, "guid must be available in arguments"
-    return redirect(url_for("utils.join", continuation_url=url_for("journal.on_joined"), **request.args))
+    return redirect(url_for("utils.join", continuation_url=url_for("grs2024.on_joined"), **request.args))
 
 # Callback once user has joined we forward to pre-study questionnaire
 @bp.route("/on-joined", methods=["GET", "POST"])
 def on_joined():
-    return redirect(url_for("journal.pre_study_questionnaire"))
+    return redirect(url_for("grs2024.pre_study_questionnaire"))
 
 # Endpoint for pre-study questionnaire
 @bp.route("/pre-study-questionnaire", methods=["GET", "POST"])
 def pre_study_questionnaire():
     params = {
-        "continuation_url": url_for("journal.pre_study_questionnaire_done"),
+        "continuation_url": url_for("grs2024.pre_study_questionnaire_done"),
         "header": "Pre-study questionnaire",
         "hint": "Please answer the questions below before starting the user study.",
         "finish": "Proceed to user study",
         "title": "Pre-study questionnaire"
     }
-    return render_template("journal_pre_study_questionnaire.html", **params)
+    return render_template("grs_pre_study_questionnaire.html", **params)
 
 # Endpoint that should be called once pre-study-questionnaire is done
 @bp.route("/pre-study-questionnaire-done", methods=["GET", "POST"])
@@ -474,10 +640,12 @@ def pre_study_questionnaire_done():
     # We just log the question answers as there is no other useful data gathered during pre-study-questionnaire
     log_interaction(session["participation_id"], "pre-study-questionnaire", **data)
 
-    return redirect(url_for("utils.preference_elicitation", continuation_url=url_for("journal.send_feedback"),
+    return redirect(url_for("utils.preference_elicitation", continuation_url=url_for("grs2024.send_feedback"),
             consuming_plugin=__plugin_name__,
             initial_data_url=url_for('fastcompare.get_initial_data'),
             search_item_url=url_for('journal.item_search')))
+
+
 
 # Receives arbitrary feedback (typically from preference elicitation) and generates recommendation
 @bp.route("/send-feedback", methods=["GET"])
@@ -501,6 +669,32 @@ def send_feedback():
 
     # Indices of items shown during preference elicitation
     elicitation_shown_items = stable_unique([int(movie["movie_idx"]) for movie in session['elicitation_movies']])
+
+    # Retrieve configuration
+    user_part_of_group = conf["user_part_of_group"]
+    extended_explanations = conf["extended_explanations"]
+    basic_grs = conf["basic_grs"]
+
+    assert user_part_of_group in (["Random", "true", "false"]), f"user_part_of_group={user_part_of_group}"
+    assert extended_explanations in (["Random", "true", "false"]), f"extended_explanations={extended_explanations}"
+    assert basic_grs in (["Random"] + BASIC_ALGORITHMS), f"basic_grs={basic_grs}"
+
+    selected_user_part_of_group = user_part_of_group if user_part_of_group != "Random" else np.random.choice(USER_PART_OF_GROUP)
+    selected_extended_explanations = extended_explanations if extended_explanations != "Random" else np.random.choice(EXTENDED_EXPLANATIONS)
+    selected_basic_grs = basic_grs if basic_grs != "Random" else np.random.choice(BASIC_ALGORITHMS)
+
+    # Build the configuration
+    # We know we have several group types, each of them gets repeated ITERS_PER_GROUP_TYPE times
+    # Order of blocks is random
+    selected_group_types = GROUP_TYPES[:]
+    np.random.shuffle(selected_group_types)
+    generated_iters = [[x] * ITERS_PER_GROUP_TYPE for x in selected_group_types]
+
+    # We generate groups, one for each type. The group is reused across iterations (from the same block)
+    if selected_user_part_of_group:
+        generated_groups = generate_groups_generic(selected_group_types)
+    else:
+        generated_groups = generate_groups_around_user(selected_group_types)
 
 
     # Proceed to weights estimation, use CF-ILD, popularity novelty, MER
@@ -1841,6 +2035,9 @@ def get_engagement_question():
     }
     return jsonify(question)
 
+def is_books(*args):
+    return False
+
 @bp.route("/get-instruction-bullets", methods=["GET"])
 def get_instruction_bullets():
     page = request.args.get("page")
@@ -1925,140 +2122,6 @@ def item_search():
     res = search_for_item(pattern, loader, tr=None)
 
     return jsonify(res)
-
-
-# Given list of shown_items and selected_items
-# train CDF for every objective
-# Shown_items are partitioned into N parts of length part_length
-# so when we iteratively calculate mgains, we always calculate it w.r.t. partition (to avoid mgain calculation against very long lists)
-def calculate_normalization(algo, objectives, shown_items, selected_items, part_length):
-
-    # n_parts = np.ceil(shown_items.size / part_length).astype(int)
-    parts = np.array_split(shown_items, np.arange(part_length, shown_items.size, part_length))
-    #print(f"Parts = {parts}")
-    user_vector_incremental = []
-    mgains = np.zeros(shape=(len(objectives), len(shown_items)), dtype=np.float32)
-    selected_mgains = [[] for _ in objectives]
-
-    items = algo.all_items
-    # items = np.arange(loader.rating_matrix.shape[1])
-    # algo = EASER_pretrained(items)
-    # algo = algo.load(os.path.join(get_cache_path(get_semi_local_cache_name(loader)), "item_item.npy"))
-
-    # To be consistent with exploration, that returns 0 when no user history is available
-    # we say items have 0 relevancy when we have no user history
-    relevances = np.zeros(shape=(items.size, ), dtype=np.float32)
-
-    for obj_idx, obj in enumerate(objectives):
-        for idx, item_idx in enumerate(shown_items):
-            # Get index of the part to which current item belongs to
-            cur_part = parts[idx // part_length]
-            within_part_idx = idx % cur_part.size
-
-            # Calculate objective of old list (before adding item_idx, thus using old relevances and old user_vector_incremental)
-            obj_old = obj(cur_part[:within_part_idx], user_vector_list=user_vector_incremental, relevances=relevances)
-
-            if item_idx in selected_items:
-                # We will end up in this place exactly len(objectives)-times, so we only append for the first time
-                if obj_idx == 0:
-                    print(f"Item idx = {item_idx}, idx = {idx} is selected, updating relevance")
-                    user_vector_incremental.append(item_idx)
-                    # Update relevance only prediction
-                    user_selections = np.array(user_vector_incremental)
-                    user_vector = np.zeros(shape=(items.size,), dtype=algo.item_item.dtype)
-                    user_vector[user_selections] = 1
-                    relevances = np.dot(user_vector, algo.item_item)
-                    print(f"Selected items: {user_selections} and their relevances: {relevances[user_selections]}")
-                    #relevances = (relevances - np.min(relevances)) / (np.max(relevances) - np.min(relevances))
-
-                # Since we added new item, we have to take updated user vector into an account
-                if obj_idx == 0:
-                    print(f"Selected 2 items: {user_selections} and their relevances: {relevances[user_selections]}")
-                obj_new = obj(cur_part[:within_part_idx+1], user_vector_list=user_vector_incremental, relevances=relevances)
-                mgains[obj_idx, idx] = obj_new - obj_old
-                if obj_idx == 0:
-                    print(f"obj_new -> {obj_new}, obj_old -> {obj_old}")
-                selected_mgains[obj_idx].append(mgains[obj_idx, idx])
-            else:
-                # We did not select anything, so user vector stays intact
-                mgains[obj_idx, idx] = obj(cur_part[:within_part_idx+1], user_vector_list=user_vector_incremental, relevances=relevances) - obj_old
-
-            if obj_idx == 0:
-                print(f"Mgains at index: obj={obj_idx}, idx={idx}, item_idx={item_idx}, within_part_idx={within_part_idx}, part_idx={idx // part_length}, cur_part={cur_part}: {mgains[obj_idx, idx]}")
-
-    # Default number of quantiles is 1000, however, if n_samples is smaller than n_quantiles, then n_samples is used and warning is raised
-    # to get rid of the warning, we calculates quantiles straight away
-    obj_cdf = QuantileTransformer(n_quantiles=min(1000, mgains.shape[1])).fit(mgains.T)
-    return obj_cdf, mgains, selected_mgains
-
-# Stable implementation of np.unique
-# meaning that elements are not sorted as in np.unique
-# but keep stable order of appearance
-def stable_unique(x):
-    if type(x) is not np.ndarray:
-        x = np.array(x)
-    _, index = np.unique(x, return_index=True)
-    return x[np.sort(index)]
-
-# If exact = True, then we are in "exact" algorithm world as apposed to "max", this also means that we do not normalize weights to sum to 1
-# selected_movies -> movies selected during elicitation
-# elicitation_movies -> movies displayed during elicitation
-# Note that we DO NOT NORMALIZE the WEIGHTS here
-def calculate_weight_estimate_generic(algo, objectives, selected_movies, elicitation_movies, return_supports=False):
-    
-    n_objectives = len(objectives)
-    if not selected_movies:
-        x = {
-            "vec": np.array([1.0] * n_objectives, dtype=np.float32),
-            "values": {
-                obj.name(): np.float32(1.0) for obj in objectives
-            }
-        }
-        if return_supports:
-            return x, {}
-        else:
-            return x
-
-    # If movies are selected after search, they are not correctly propagated through elicitation_movies
-    # therefore we append them here
-    # We need to keep order of appearance instead of sorted order as is done by np.unique alone
-    movie_indices = stable_unique(np.concatenate([elicitation_movies, selected_movies]))
-
-    obj_cdf, mgains, selected_mgains = calculate_normalization(algo, objectives, movie_indices, selected_movies, len(selected_movies))
-    selected_mgains = np.array(selected_mgains)
-    if selected_mgains.size == 0:
-        x = {
-            "vec": np.array([1.0] * n_objectives, dtype=np.float32),
-            "values": {
-                obj.name(): np.float32(1.0) for obj in objectives
-            }
-        }
-        if return_supports:
-            return x, {}
-        else:
-            return x
-
-
-    selected_mgains_normed = obj_cdf.transform(selected_mgains.T)
-    result_weight_vec = selected_mgains_normed.mean(axis=0)
-    result = {
-            "vec": result_weight_vec,
-            "values": {
-                obj.name(): result_weight_vec[obj_idx] for obj_idx, obj in enumerate(objectives)
-            }
-        }
-
-    if return_supports:
-        supports = {
-            "elicitation_movies": np.squeeze(movie_indices),
-            "selected_movies": np.array(selected_movies),
-            "selected_mgains": selected_mgains,
-            "selected_mgains_normed": selected_mgains_normed,
-            "mgains": mgains
-        }
-        return result, supports
-
-    return result
 
 # Plugin related functionality
 def register():
