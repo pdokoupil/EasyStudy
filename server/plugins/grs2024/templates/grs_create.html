@@ -74,38 +74,35 @@
           
           <b-row align-h="center" class="mb-3">
             <b-col cols="8">
-              <label for="k">Please select a refinement layout</label>
-              <b-form-select v-model="refinementLayout" :options="refinementLayoutOptions" required="True" type=""/>
+              <label for="k">{{basic_grs}}</label>
+              <b-form-select v-model="basicGrs" :options="basicGrsOptions" required="True" type=""/>
             </b-col>
           </b-row>
 
           <b-row align-h="center" class="mb-3">
             <b-col cols="8">
-              <label for="diversity-metric">Please select a diversity metric</label>
-              <b-form-select :state="diversityMetric != null" name="diversity-metric" v-model="diversityMetric" :options="diversityMetricOptions" required="True" type=""/>
+              <label for="k">{{user_part_of_group}}</label>
+              <b-form-select v-model="userPartOfGroup" :options="userPartOfGroupOptions" required="True" type=""/>
             </b-col>
           </b-row>
 
           <b-row align-h="center" class="mb-3">
             <b-col cols="8">
-              <label for="given-diversity-metric">Please select a diversity metric for compare-alphas</label>
-              <b-form-select :state="givenMetricName != null" name="given-diversity-metric" v-model="givenMetricName" :options="givenMetricOptions" required="True" type=""/>
+              <label for="k">{{extended_explanations}}</label>
+              <b-form-select v-model="extendedExplanations" :options="extendedExplanationsOptions" required="True" type=""/>
             </b-col>
           </b-row>
 
           <b-row align-h="center" class="mb-3">
-            <b-col class="text-center" cols="8">
-              <b-form-checkbox v-model="disableRelativeComparison">{{disable_relative_comparison}}</b-form-checkbox>
+            <b-col cols="8">
+              <label for="k">{{basic_grs}}</label>
+              <b-form-select v-model="basicGrs" :options="basicGrsOptions" required="True" type=""/>
             </b-col>
           </b-row>
+
           <b-row align-h="center" class="mb-3">
             <b-col class="text-center" cols="8">
               <b-form-checkbox v-model="disableDemographics">{{disable_demographics}}</b-form-checkbox>
-            </b-col>
-          </b-row>
-          <b-row align-h="center" class="mb-3">
-            <b-col class="text-center" cols="8">
-              <b-form-checkbox v-model="separateTrainingData">{{separate_training_data}}</b-form-checkbox>
             </b-col>
           </b-row>
 
@@ -189,31 +186,26 @@
               prolificCode: "",
               overrideComparisonHint: false,
               overrideFooter: false,
-              disableRelativeComparison: false,
               disableDemographics: false,
-              separateTrainingData: false,
-              refinementLayoutOptions: [
+              userPartOfGroup: false,
+              extendedExplanations: false,
+              basicGrsOptions: [
                 { value: "", text: "Random" },
-                { value: "default", text: "Default" },
-                { value: "default_shifted", text: "Default Shifted" },
-                { value: "buttons", text: "Buttons" },
-                { value: "options", text: "Options" },
+                { value: "LM", text: "LM" },
+                { value: "MP", text: "MP" },
+                { value: "MUL", text: "MUL" },
               ],
-              refinementLayout: "",
-              diversityMetricOptions: [
-                { value: null, text: "Please select diversity metric" },
-                { value: "CF-ILD", text: "CF-ILD" },
-                { value: "CB-ILD", text: "CB-ILD" }
+              extendedExplanationsOptions: [
+                { value: "", text: "Random" },
+                { value: true, text: "Yes" },
+                { value: false, text: "No" },
               ],
-              givenMetricOptions: [
-                { value: null, text: "Please select diversity metric for compare-alphas" },
-                { value: "CF-ILD", text: "CF-ILD" },
-                { value: "CB-ILD", text: "CB-ILD" },
-                { value: "BIN-DIV", text: "BIN-DIV" },
-                { value: "SELECTED", text: "SELECTED" }
+              userPartOfGroupOptions: [
+                { value: "", text: "Random" },
+                { value: true, text: "Yes" },
+                { value: false, text: "No" },
               ],
-              diversityMetric: null,
-              givenMetricName: null,
+              basicGrs: "",
               dataLoader: null,
               dataLoaders: [
                 { value: null, text: '{{select_loader}}' }
@@ -225,7 +217,7 @@
         },
         computed: {
           allValidated() {
-            return this.dataLoader != null && this.diversityMetric != null && this.givenMetricName != null;
+            return this.dataLoader != null && this.basicGrs != null;
           }
         },
         methods: {
@@ -262,20 +254,18 @@
                 let userStudyConfiguration = {
                     "k": parseInt(this.kValue),
                     "prolific_code": this.prolificCode,
-                    "refinement_layout": this.refinementLayout,
+                    "basic_grs": this.basicGrs,
                     "text_overrides": textOverrides,
-                    "disable_relative_comparison": this.disableRelativeComparison,
                     "disable_demographics": this.disableDemographics,
-                    "separate_training_data": this.separateTrainingData,
+                    "user_part_of_group": this.userPartOfGroup,
+                    "extended_explanations": this.extendedExplanations,
                     "selected_data_loader": this.dataLoader,
                     "selected_preference_elicitation": "Multi Objective Sampling from buckets",
                     "preference_elicitation_parameters": {"n_relevance_buckets": 1, "n_diversity_buckets": 1, "n_novelty_buckets": 1, "n_samples_per_bucket": 8},
                     "data_loader_parameters": dataLoaderParameters,
-                    "selected_algorithms": ["Most Popular Items Baseline", "Random Items Baseline"],
-                    "algorithm_parameters": [{"displayed_name": "BETA", "name": "Most Popular Items Baseline"}, {"displayed_name": "GAMMA", "name": "Random Items Baseline"}],
-                    "shuffle_recommendations": true,
-                    "mors_diversity_metric": this.diversityMetric,
-                    "given_metric": this.givenMetricName
+                    // "selected_algorithms": ["Most Popular Items Baseline", "Random Items Baseline"],
+                    // "algorithm_parameters": [{"displayed_name": "BETA", "name": "Most Popular Items Baseline"}, {"displayed_name": "GAMMA", "name": "Random Items Baseline"}],
+                    // "shuffle_recommendations": true,
                 };
 
                 let userStudyData = {
