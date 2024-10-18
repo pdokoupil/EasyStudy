@@ -15,3 +15,12 @@ def cos_sim_np(a):
     a = a / np.linalg.norm(a, axis=1, keepdims=True)        
     res = a @ a.T
     return res.astype(np.float32)
+
+# Stable implementation of np.unique
+# meaning that elements are not sorted as in np.unique
+# but keep stable order of appearance
+def stable_unique(x):
+    if type(x) is not np.ndarray:
+        x = np.array(x)
+    _, index = np.unique(x, return_index=True)
+    return x[np.sort(index)]
