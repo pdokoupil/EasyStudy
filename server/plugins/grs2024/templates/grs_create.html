@@ -66,9 +66,41 @@
               <div class="mb-2">Value: [[ kValue ]]</div>
             </b-col>
           </b-row>
+
+          <b-row align-h="center" class="mb-3">
+            <b-col cols="8">
+              <label for="k">Group size</label>
+              <b-form-input v-model="groupSize" type="range" min="2" max="5"></b-form-input>
+              <div class="mb-2">Value: [[ groupSize ]]</div>
+            </b-col>
+          </b-row>
+
+          <b-row align-h="center" class="mb-3">
+            <b-col cols="8">
+              <label for="k">Iters per group type</label>
+              <b-form-input v-model="itersPerGroupType" type="range" min="1" max="5"></b-form-input>
+              <div class="mb-2">Value: [[ itersPerGroupType ]]</div>
+            </b-col>
+          </b-row>
+
+          <b-row align-h="center" class="mb-3">
+            <b-col cols="8">
+              <label for="k">Displayed user history length</label>
+              <b-form-input v-model="userHistoryLength" type="range" min="1" max="5"></b-form-input>
+              <div class="mb-2">Value: [[ userHistoryLength ]]</div>
+            </b-col>
+          </b-row>
+
           <b-row align-h="center" class="mb-3">
             <b-col cols="8">
               <b-input type="text" id="prolific_code" v-model="prolificCode" name="prolific_code" placeholder="Please enter prolific code (if needed)"/>
+            </b-col>
+          </b-row>
+
+          <b-row align-h="center" class="mb-3">
+            <b-col cols="8">
+              <label for="k">{{choice_model}}</label>
+              <b-form-select v-model="choiceModel" :options="choiceModelOptions" required="True" type=""/>
             </b-col>
           </b-row>
           
@@ -93,12 +125,12 @@
             </b-col>
           </b-row>
 
-          <b-row align-h="center" class="mb-3">
+          <!-- <b-row align-h="center" class="mb-3">
             <b-col cols="8">
               <label for="k">{{basic_grs}}</label>
               <b-form-select v-model="basicGrs" :options="basicGrsOptions" required="True" type=""/>
             </b-col>
-          </b-row>
+          </b-row> -->
 
           <b-row align-h="center" class="mb-3">
             <b-col class="text-center" cols="8">
@@ -180,7 +212,10 @@
         delimiters: ['[[',']]'], // Used to replace double { escaping with double [ escaping (to prevent jinja vs vue inference)
         data: function() {
             return {
-              kValue: 10,
+              kValue: 5,
+              groupSize: 3,
+              itersPerGroupType: 3,
+              userHistoryLength: 5, // Show 5 items rated by each user
               overrideAbout: false,
               overrideInformedConsent: false,
               prolificCode: "",
@@ -190,22 +225,33 @@
               userPartOfGroup: false,
               extendedExplanations: false,
               basicGrsOptions: [
-                { value: "", text: "Random" },
-                { value: "LM", text: "LM" },
-                { value: "MP", text: "MP" },
+                { value: "Random", text: "Random" },
+                { value: "LMS", text: "LMS" },
+                { value: "MPL", text: "MPL" },
                 { value: "MUL", text: "MUL" },
               ],
+              choiceModelOptions: [
+                { value: "Random", text: "Random" }, // Select the choice model at random
+                { value: "Same", text: "Same" }, // Use the same model as the one used to generate top-k
+                { value: "LMS", text: "LMS" },
+                { value: "MPL", text: "MPL" },
+                { value: "MUL", text: "MUL" },
+                { value: "RandomChoice", text: "RandomChoice" }, // Model where the choice corresponds to random selection
+                { value: "GFAR", text: "GFAR" },
+                { value: "RLProp", text: "RLProp" },
+              ],
               extendedExplanationsOptions: [
-                { value: "", text: "Random" },
+                { value: "Random", text: "Random" },
                 { value: true, text: "Yes" },
                 { value: false, text: "No" },
               ],
               userPartOfGroupOptions: [
-                { value: "", text: "Random" },
+                { value: "Random", text: "Random" },
                 { value: true, text: "Yes" },
                 { value: false, text: "No" },
               ],
-              basicGrs: "",
+              basicGrs: "Random",
+              choiceModel: "Random",
               dataLoader: null,
               dataLoaders: [
                 { value: null, text: '{{select_loader}}' }
@@ -263,8 +309,13 @@
                     "selected_preference_elicitation": "Multi Objective Sampling from buckets",
                     "preference_elicitation_parameters": {"n_relevance_buckets": 1, "n_diversity_buckets": 1, "n_novelty_buckets": 1, "n_samples_per_bucket": 8},
                     "data_loader_parameters": dataLoaderParameters,
-                    // "selected_algorithms": ["Most Popular Items Baseline", "Random Items Baseline"],
-                    // "algorithm_parameters": [{"displayed_name": "BETA", "name": "Most Popular Items Baseline"}, {"displayed_name": "GAMMA", "name": "Random Items Baseline"}],
+                    "group_size": this.groupSize,
+                    "choice_model": this.choiceModel,
+                    "iters_per_group_type": this.itersPerGroupType,
+                    "user_history_length": this.userHistoryLength,
+                    // This are just needed by the fastcompare plugin, but we do not really use them in GRS
+                    "selected_algorithms": ["Most Popular Items Baseline", "Random Items Baseline"],
+                    "algorithm_parameters": [{"displayed_name": "BETA", "name": "Most Popular Items Baseline"}, {"displayed_name": "GAMMA", "name": "Random Items Baseline"}],
                     // "shuffle_recommendations": true,
                 };
 
