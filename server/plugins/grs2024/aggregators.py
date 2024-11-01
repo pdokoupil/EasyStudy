@@ -1252,6 +1252,125 @@ class RLPropAggregator(AggregationStrategy):
 
         #print(f"FAST Took: {time.perf_counter() - start_time}, part2: {time.perf_counter() - start_time_2}")
         return top_k
+    
+
+    # Same as v2 but works with raw numpy arrays instead of datafrmes
+    # the reason is that the v2 itself converts the input DF to numpy array anyway and for large datasets
+    # This becomes extremely slow
+    def fast_impl_v3(self, group_ratings_rm, recommendations_number, past_recommendations):
+
+        rec_list_history = list(itertools.chain(*past_recommendations))
+        group_size, n_items = group_ratings_rm.shape
+
+        weights = np.ones(shape=(group_size, ), dtype=np.float32)
+        #weights /= weights.sum()
+
+        # Already in the input, there could be some NEG_INF entries, these needs to be masked out before normalization
+        # since the normalization ranges would be affected
+        neg_infs = group_ratings_rm <= RLPropAggregator.NEG_INF
+        #neg_infs = neg_infs.sum(axis=0).astype(bool)
+        neg_infs = np.repeat(np.any(neg_infs, axis=0, keepdims=True), group_size, axis=0)
+        #assert np.all(neg_infs.sum(axis=1) == neg_infs.sum(axis=1).mean()) # Per user neg infs are same per all the users
+        group_ratings_rm[neg_infs] = 0.0 # This is done to mimick original pandas based implementation
+
+        if self.with_norm:
+            rating_matrix_scaled = QuantileTransformer().fit_transform(group_ratings_rm.T).T
+        else:
+            rating_matrix_scaled = group_ratings_rm
+
+        if self.with_norm:
+            assert np.all(rating_matrix_scaled >= 0.0), "We expect all mgains to be normalized to be greater than 0"
+
+        # Algorithm variables
+        TOT = 0.0
+        gm = np.zeros(shape=(group_size, ), dtype=np.float32)
+        tots = np.zeros(shape=(n_items, ), dtype=np.float32)
+
+        seen_items_mask = np.ones(shape=(rating_matrix_scaled.shape[1], ), dtype=np.float32)
+        # Already masked out by the input
+        seen_items_mask[neg_infs[0]] = 0
+
+        top_k = []
+        # Unlike V2, here we deal with indices themselves so no mapping is needed
+
+        start_time_2 = time.perf_counter()
+
+        # Precompute the masks outside of the loop
+        positive_gain_mask = rating_matrix_scaled >= 0.0
+        negative_gain_mask = rating_matrix_scaled < 0.0
+
+        #print(f"Rec list history: {rec_list_history}, len: {len(rec_list_history)}")
+        #print(f"Starting TOT and gm: {TOT}, {gm.mean()}, {gm}")
+        #print(f"Starting importance: {self.calc_importance(gm, weights)}")
+        
+
+        # We do this replay to ensure that TOT, gm and other algorithm state is properly updated
+        for it in rec_list_history:
+            # Added second dimension to enable broadcasting
+            gain_items = np.zeros_like(rating_matrix_scaled)
+
+            tots = np.maximum(TOT, TOT + rating_matrix_scaled.sum(axis=0)) # Old, original way
+            #tots = np.maximum(TOT, TOT + rating_matrix_scaled) # New way
+            remainder = tots * weights[:, np.newaxis] - gm[:, np.newaxis]
+            assert remainder.shape == (group_size, n_items), f"Need to ensure proper remainder size"
+
+            gain_items[positive_gain_mask] = np.maximum(0, np.minimum(rating_matrix_scaled, remainder)[positive_gain_mask])
+            gain_items[negative_gain_mask] = np.minimum(0, (rating_matrix_scaled - remainder)[negative_gain_mask])
+
+
+            i_best = it
+
+            gm = gm + rating_matrix_scaled[:, i_best]
+            TOT = np.clip(gm, 0.0, None).sum()
+
+        #print("APPLIED")
+        #print(f"Ending TOT and gm: {TOT}, {gm.mean()}, {gm}")
+        #print(f"Ending importance: {self.calc_importance(gm, weights)}")
+
+        # Mask out everything that is in group_ratings_full but missing in group_ratings
+        #items_to_mask_out = group_ratings_full[~group_ratings_full.item.isin(group_ratings.item.unique())].item.unique()
+        #items_to_mask_out = [item_to_index[it] for it in items_to_mask_out]
+        #seen_items_mask[items_to_mask_out] = 0
+        # FOR V3 this is already done above
+        
+
+        for _ in range(recommendations_number):
+
+            # Added second dimension to enable broadcasting
+            gain_items = np.zeros_like(rating_matrix_scaled)
+
+            importance = self.calc_importance(gm, weights)
+            #print(f"GM = {gm}, scaled gm: {gm / gm.sum()}, importances: {importance}")
+
+            tots = np.maximum(TOT, TOT + rating_matrix_scaled.sum(axis=0)) # Old, original way
+            #tots = np.maximum(TOT, TOT + (rating_matrix_scaled * importance[:, np.newaxis]).sum(axis=0)) # New Way V1
+            #print("TPOTS")
+            #print(tots)
+            remainder = tots * weights[:, np.newaxis] - gm[:, np.newaxis]
+            #print("REMAINDER")
+            #print(remainder)
+            assert remainder.shape == (group_size, n_items), f"Need to ensure proper remainder size"
+
+            gain_items[positive_gain_mask] = np.maximum(0, np.minimum(rating_matrix_scaled, remainder)[positive_gain_mask])
+            gain_items[negative_gain_mask] = np.minimum(0, (rating_matrix_scaled - remainder)[negative_gain_mask])
+
+            #print("GAONS")
+            #print(gain_items)
+            #print(f"Score inputs: {gain_items.sum(axis=0)}")
+            
+
+            # scores = self.mask_scores(gain_items.sum(axis=0), seen_items_mask) # Old WAY
+            scores = self.mask_scores((gain_items * importance[:, np.newaxis]).sum(axis=0), seen_items_mask) # NEW WAY V2
+            i_best = scores.argmax()
+            seen_items_mask[i_best] = 0
+
+            gm = gm + rating_matrix_scaled[:, i_best]
+            TOT = np.clip(gm, 0.0, None).sum()
+
+            top_k.append(i_best)
+
+        #print(f"FAST Took: {time.perf_counter() - start_time}, part2: {time.perf_counter() - start_time_2}")
+        return top_k
 
     # Returns single item recommended at a given time
     def generate_group_recommendations_for_group(self, group_ratings, recommendations_number, **kwargs):
@@ -1268,8 +1387,9 @@ class RLPropAggregator(AggregationStrategy):
 
         #res = self.fast_impl(group_ratings, recommendations_number, past_recommendations, df_test_pred_full)
         #res2 = self.fast_impl_without_history(group_ratings, recommendations_number, past_recommendations, df_test_pred_full)
-        res2 = self.fast_impl_v2(group_ratings, recommendations_number, past_recommendations, df_test_pred_full)
-
+        #res2 = self.fast_impl_v2(group_ratings, recommendations_number, past_recommendations, df_test_pred_full)
+        res3 = self.fast_impl_v3(kwargs["group_ratings_rm"], recommendations_number, past_recommendations)
+        #assert res2 == res3, f"res2 ({res2}) != res3 ({res3})"
         #assert set(res) == set(res2)
         
         #if set(res) != set(res2):
@@ -1282,4 +1402,4 @@ class RLPropAggregator(AggregationStrategy):
         #assert set(res) != set(res2)
 
 
-        return {"RLProp": res2}
+        return {"RLProp": res3}
