@@ -1,4 +1,5 @@
 import functools
+import itertools
 import json
 import pickle
 import random
@@ -62,8 +63,8 @@ THIRD_ALGORITHM = BASIC_ALGORITHMS
 ### WITHIN USER #################
 
 # Group types per iteration (is shuffled later on)
-GROUP_TYPES = ["similar", "divergent", "random", "outlier"]
-
+# GROUP_TYPES = ["similar", "divergent", "random", "outlier"]
+GROUP_TYPES = ["similar", "outlier"]
 
 #################################
 
@@ -74,6 +75,50 @@ NON_BASIC_ALGORITHMS = ["RLProp", "GFAR"]
 
 # The mapping is not fixed between users
 ALGORITHM_ANON_NAMES = ["BETA", "GAMMA", "DELTA"]
+
+# For each group member, we show 5 items they liked in the past
+# These items are sampled randomly from those items perceived positively
+# by the group members, where positivly means rating >= 3
+POSITIVE_RATING_THRESHOLD = 3.0
+PAST_HISTORY_LEN = 5
+
+
+
+###### STUDY SCHEMA #######
+
+# We have 3 algorithms and always show 2 which is 6 / 2 = 3 combinations
+# A A B
+# B C C
+# Then we have multiple groups, one per flavor (similar, outlier)
+# If we had 2 iterations per group and per algorithm combination
+# We would end up with 3 * 2 * 2 = 12 iterations
+# Do it in a way that we run
+# Randomly permutate order of flavors, say we have Group 1 and Group 2
+# Randomly permute order of algorithms, say we have C1, C2, and C3
+# Do:
+# 1. (Group 1, C1, 0)
+# 2. (Group 1, C1, 1)
+# 3, (Group 2, C1, 0) <---  intentionally switch group here so that participants immediately see it changed and do not include it in the ratings (we will ask about long-term fairness)
+# 4. (Group 2, C1, 1)
+# -> after block questionnaire
+# 5. (Group 1, C2, 0)
+# 6. (Group 1, C2, 1)
+# 7. (Group 2, C2, 0)
+# 8. (Group 2, C2, 1)
+# -> after block questionnaire
+# 9. (Group 1, C3, 0)
+# 10. (Group 1, C3, 1)
+# 11. (Group 2, C3, 0)
+# 12. (Group 2, C3, 1)
+# -> after block questionnaire
+
+
+
+######
+
+
+
+
 
 ## GRS Algorihm Implementations ##
 ##### Taken from GRS Tutorial ####
@@ -401,6 +446,15 @@ def get_normalized_rating_matrix_for_cos_sim(loader):
     # We need this for cosine similarity in group construction and need it to be as quick as possible
     return (x / np.linalg.norm(x, axis=1, keepdims=True)).T
 
+
+# Returns past positive history for a given user
+def get_past_positive_history(user_idx, rating_matrix):
+    if user_idx == -1:
+        return np.array([], dtype=np.int32)
+    positive_feedback = np.where(rating_matrix[user_idx] >= POSITIVE_RATING_THRESHOLD)[0]
+    np.random.shuffle(positive_feedback)
+    return positive_feedback[:PAST_HISTORY_LEN]
+
 # User embedding is vector of shape (n_items,) (if specified)
 # Each element being either 0 or 1 (implicit feedback)
 # The loader.rating_matrix may not be normalized to [0, 1] so we do it here
@@ -476,7 +530,8 @@ def generate_similar_group(loader, group_size, user_embedding, filt_out):
         "embeddings": prefix_embeddings,
         "indices": indices,
         "extra_data": {
-            "mean_sim": (group_sim[np.triu_indices(group_size, k=1)].sum() / ((group_size * (group_size - 1)) / 2)).item()
+            "mean_sim": (group_sim[np.triu_indices(group_size, k=1)].sum() / ((group_size * (group_size - 1)) / 2)).item(),
+            "past_positive_history": {user_idx : get_past_positive_history(user_idx, loader.rating_matrix).tolist() for user_idx in indices}
         }
     }
 
@@ -551,7 +606,8 @@ def generate_divergent_group(loader, group_size, user_embedding, filt_out):
         "embeddings": prefix_embeddings,
         "indices": indices,
         "extra_data": {
-            "mean_sim": (group_sim[np.triu_indices(group_size, k=1)].sum() / ((group_size * (group_size - 1)) / 2)).item()
+            "mean_sim": (group_sim[np.triu_indices(group_size, k=1)].sum() / ((group_size * (group_size - 1)) / 2)).item(),
+            "past_positive_history": {user_idx : get_past_positive_history(user_idx, loader.rating_matrix).tolist() for user_idx in indices}
         }
     }
 
@@ -622,13 +678,15 @@ def generate_outlier_group(loader, group_size, user_embedding = None):
             "indices": indices + sim_group['indices'],
             "extra_data": {
                 "mean_sim_homogeneous_part": (group_sim_homogeneous[np.triu_indices(group_size - 1, k=1)].sum() / (((group_size - 1) * (group_size - 2)) / 2)).item(),
-                "mean_outlier_sim": mean_outlier_sim.mean().item()
+                "mean_outlier_sim": mean_outlier_sim.mean().item(),
+                "past_positive_history": {user_idx : get_past_positive_history(user_idx, loader.rating_matrix).tolist() for user_idx in indices + sim_group['indices']}
             }}
     else:
         group_sim = cos_sim_np(div_group["embeddings"])
         assert group_sim.shape == (group_size, group_size), f"group_sim.shape={group_sim.shape}"
         div_group["extra_data"] = {
-            "mean_outlier_sim": (group_sim[np.triu_indices(group_size, k=1)].sum() / ((group_size * (group_size - 1)) / 2)).item()
+            "mean_outlier_sim": (group_sim[np.triu_indices(group_size, k=1)].sum() / ((group_size * (group_size - 1)) / 2)).item(),
+            "past_positive_history": {user_idx : get_past_positive_history(user_idx, loader.rating_matrix).tolist() for user_idx in div_group['indices']}
         }
         return div_group
 
@@ -667,7 +725,8 @@ def generate_groups(loader, group_types_permutation, group_size, user_embedding 
                     "embeddings": emb,
                     "indices": [-1] + members.tolist(),
                     "extra_data": {
-                        "mean_sim": group_sim[np.triu_indices(group_size, k=1)].sum() / ((group_size * (group_size - 1)) / 2)
+                        "mean_sim": group_sim[np.triu_indices(group_size, k=1)].sum() / ((group_size * (group_size - 1)) / 2),
+                        "past_positive_history": {user_idx : get_past_positive_history(user_idx, loader.rating_matrix).tolist() for user_idx in [-1] + members.tolist()}
                     }
                 })
             else:
@@ -680,11 +739,15 @@ def generate_groups(loader, group_types_permutation, group_size, user_embedding 
                     "embeddings": emb,
                     "indices": rnd_members.tolist(),
                     "extra_data": {
-                        "mean_sim": group_sim[np.triu_indices(group_size, k=1)].sum() / ((group_size * (group_size - 1)) / 2)
+                        "mean_sim": group_sim[np.triu_indices(group_size, k=1)].sum() / ((group_size * (group_size - 1)) / 2),
+                        "past_positive_history": {user_idx : get_past_positive_history(user_idx, loader.rating_matrix).tolist() for user_idx in rnd_members}
                     }
                 })
         elif gtype == "outlier":
             resulting_groups.append(generate_outlier_group(loader, group_size, user_embedding))
+
+        print(resulting_groups[-1]['extra_data']['past_positive_history'])
+        assert len(resulting_groups[-1]['indices']) == len(resulting_groups[-1]['extra_data']['past_positive_history'])
     return resulting_groups
 
 ##### End of algorithms #####
@@ -761,22 +824,47 @@ def on_joined():
     # For each iteration, capture the group type used in that iteration
     generated_iters = [{"group_type": x} for x in selected_group_types for _ in range(conf['iters_per_group_type'])]
 
+    ## Here we have e.g. (Group 1), (Group 1), (Group 2), (Group 2)
+
     # Also generate order of algorithms for the user
-    # We always fix that first column is BETA, second is GAMMA, third is DELTA
+    # We always fix that columns are sorted by alphabet, e.g.
+    # BETA, GAMMA
+    # BETA, DELTA
+    # GAMMA, DELTA
     # However, the assignment of actual algorithms to these labels is random for each user
     # After the random assignment is established for the user, it is used throughout whole study for him/her
     all_user_algorithms = NON_BASIC_ALGORITHMS + [selected_basic_grs]
     np.random.shuffle(all_user_algorithms)
+    # Here we have e.g. (AB), (AC), (BC)
+    # all_user_algorithms[0] is BETA
+    # all_user_algorithms[1] is GAMMA
+    # all_user_algorithms[2] is DELTA
+    algorithm_combinations = [
+        ('BETA', 'GAMMA'), #(all_user_algorithms[0], all_user_algorithms[1]),
+        ('BETA', 'DELTA'), #(all_user_algorithms[0], all_user_algorithms[2]),
+        ('GAMMA', 'DELTA'), #(all_user_algorithms[1], all_user_algorithms[2]),
+    ]
     algorithm_name_assignment = {
         key : algo for key, algo in zip(ALGORITHM_ANON_NAMES, all_user_algorithms)
     }
 
-    # Also capture algorithm used in that iteration
-    # We always have 3 algorithms per iteration
-    for i in range(len(generated_iters)):
-        generated_iters[i]["algorithms"] = algorithm_name_assignment
+    # Now for every algorithm combination, we enumerate all group, each of them for given number of iterations
+    # See the SCHEMA at the top of this file for details
+    final_iterations = []
+    for algo_1, algo_2 in algorithm_combinations:
+        for i in range(len(generated_iters)):
+            final_iterations.append({
+                "group_type": generated_iters[i]['group_type'],
+                "algorithms": {
+                    algo_1: algorithm_name_assignment[algo_1],
+                    algo_2: algorithm_name_assignment[algo_2]
+                }
+            })
+            #generated_iters[i]["algorithms"] = algorithm_name_assignment
+    expected_len = len(GROUP_TYPES) * conf['iters_per_group_type'] * len(algorithm_combinations)
+    assert len(final_iterations) == expected_len, f"{len(final_iterations)} != {expected_len}"
 
-
+    generated_iters = final_iterations
     # Store the configuration
     generated_config = {
         "selected_user_part_of_group": selected_user_part_of_group,
@@ -784,7 +872,7 @@ def on_joined():
         "selected_basic_grs": selected_basic_grs,
         "selected_group_types": selected_group_types,
         "generated_iters": generated_iters,
-        "algorithm_name_assignment": algorithm_name_assignment
+        "algorithm_name_assignment": algorithm_name_assignment,
     }
     
     set_mapping(get_uname(), generated_config)
@@ -1110,50 +1198,9 @@ def send_feedback():
     #return redirect(url_for("multiobjective.compare_and_refine"))
     return redirect(url_for("grs2024.group_gen"))
 
-@bp.route("/group-gen", methods=['GET'])
-def group_gen():
-    start_time = time.perf_counter()
+def generate_group_recommendations(conf, loader, iteration, shown_items):
     user_data = get_all(get_uname())
-
-    conf = load_user_study_config(session['user_study_id'])
-
-    is_user_part_of_group = user_data['selected_user_part_of_group']
-
-    # Get a loader
-    loader_factory = load_data_loaders()[conf["selected_data_loader"]]
-    loader = loader_factory(**filter_params(conf["data_loader_parameters"], loader_factory))
-    loader = load_data_loader_cached(loader, session['user_study_guid'], loader_factory.name(), get_semi_local_cache_name(loader))
-
-    print(f"Until we got the data loader it took: {time.perf_counter() - start_time}")
-
-    n_items = loader.rating_matrix.shape[1]
-
-    if is_user_part_of_group:
-        user_embedding = np.zeros(shape=(n_items, ), dtype=np.int8)
-        user_embedding[user_data['elicitation_selected_movies']] = 1
-        assert sum(user_embedding) > 0, f"{len(user_embedding)} <= 0, {user_data['elicitation_selected_movies']}"
-        groups = generate_groups(loader, user_data['selected_group_types'], conf['group_size'], user_embedding)
-    else:
-        groups = generate_groups(loader, user_data['selected_group_types'], conf['group_size'])
-
-    print(f"Until end of group generation it took: {time.perf_counter() - start_time}")
-
-    # We only store indices and no embeddings as these could be easily retrieved later
-    # from the pre-loaded rating matrix
-    groups_indices = [groups[idx]['indices'] for idx, _ in enumerate(user_data['selected_group_types'])]
-    groups_indices_named = {gtype: groups[idx]['indices'] for idx, gtype in enumerate(user_data['selected_group_types'])}
-    groups_extra_data = {gtype: groups[idx]['extra_data'] for idx, gtype in enumerate(user_data['selected_group_types'])}
-    initial_iteration = 0
-    new_data = {
-        "groups_indices": groups_indices,
-        "groups_indices": groups_indices_named,
-        "groups_extra_data": groups_extra_data,
-        "iteration": initial_iteration # Mark the beginning here
-    }
-
-    set_mapping(get_uname(), new_data)
-
-    log_interaction(session["participation_id"], "group-gen", **new_data)
+    start_time = time.perf_counter()
 
     # At the same time, we generate recommendations
     # Since this needs to be done in "hidden" endpoint
@@ -1174,8 +1221,10 @@ def group_gen():
     print(f"Until EASE got loaded it took: {time.perf_counter() - start_time}")
 
     # groups contains 1 group per group type
-    # the whole configuration looks like selected_group_types where each element is repeated 
-    current_group_type = generated_iters[initial_iteration]['group_type']
+    # the whole configuration looks like selected_group_types where each element is repeated
+    groups = get_val('groups')
+    current_group_type = generated_iters[iteration]['group_type']
+    print(f"current_group_type: {current_group_type}, selected_group_types: {selected_group_types}, groups: {groups}")
     current_group = groups[selected_group_types.index(current_group_type)]
 
     group_members = current_group['indices']
@@ -1217,7 +1266,16 @@ def group_gen():
     print(f"Until we get the predictions for group members: {time.perf_counter() - start_time}")
     group_ratings_rm = np.stack(ratings_lists, axis=0)
 
-    for order, (algo_anon, algo_name) in enumerate(generated_iters[initial_iteration]["algorithms"].items()):
+    # Recommendations from all available algorithms, not just those selected for current iteration
+    # Only used for logging purposes
+    # We do index by real name here
+    full_recs = dict()
+    full_recs_data = {
+        "iteration": iteration,
+        "iteration_data": generated_iters[iteration],
+    }
+
+    for order, (algo_anon, algo_name) in enumerate(generated_iters[iteration]["algorithms"].items()):
         
         if algo_name in BASIC_ALGORITHMS:
             # These are part of "BASE" aggregator
@@ -1231,9 +1289,10 @@ def group_gen():
             # We use precomputed rating matrix to save on time (since we would pivot inside RLProp and that would take unneccessary time)
             rec_list = algo.generate_group_recommendations_for_group(group_ratings,
                                                                      recommendations_number=conf['k'],
-                                                                     group_ratings_rm=group_ratings_rm)
+                                                                     group_ratings_rm=group_ratings_rm,
+                                                                     past_recommendations=shown_items[algo_anon])
         else:
-            rec_list = algo.generate_group_recommendations_for_group(group_ratings,
+            rec_list = algo.generate_group_recommendations_for_group(group_ratings[~group_ratings.item.isin(list(itertools.chain(*shown_items[algo_anon])))],
                                                                      recommendations_number=conf['k'])
         rec_list = rec_list[algo_name]
         rec_list = enrich_results(rec_list, loader)
@@ -1252,16 +1311,129 @@ def group_gen():
 
         group_recommendations[algo_anon] = {
             "movies": rec_list,
-            "order": order
+            "order": order,
+        }
+
+        full_recs[algo_name] = {
+            "movies": rec_list,
+            "order": order,
         }
 
         print(f"Until {algo_name} recommendations got generated it took: {time.perf_counter() - start_time}")
+
+    # Cover rest of the algorithms
+    for algo_name in NON_BASIC_ALGORITHMS + BASIC_ALGORITHMS:
+        if algo_name in full_recs:
+            continue
+        
+        if algo_name in BASIC_ALGORITHMS:
+            # These are part of "BASE" aggregator
+            algo = AggregationStrategy.getAggregator("BASE")
+        else:
+            algo = AggregationStrategy.getAggregator(algo_name)
+
+        # Build the group_ratings dataframe in the format that is expected
+        # by the algorithms, so basically DF with the following columns: [user, item, predicted_rating]
+        if algo_name == "RLProp":
+            # We use precomputed rating matrix to save on time (since we would pivot inside RLProp and that would take unneccessary time)
+            rec_list = algo.generate_group_recommendations_for_group(group_ratings,
+                                                                     recommendations_number=conf['k'],
+                                                                     group_ratings_rm=group_ratings_rm,
+                                                                     past_recommendations=shown_items[algo_anon])
+        else:
+            rec_list = algo.generate_group_recommendations_for_group(group_ratings[~group_ratings.item.isin(list(itertools.chain(*shown_items[algo_anon])))],
+                                                                     recommendations_number=conf['k'])
+        rec_list = rec_list[algo_name]
+        rec_list = enrich_results(rec_list, loader)
+
+        # Add information about predicted rating w.r.t. each of the group members
+        for idx in range(len(rec_list)):
+            movie_idx = int(rec_list[idx]["movie_idx"])
+            predicted_ratings = group_ratings[group_ratings.item == movie_idx].set_index("user")
+            assert len(predicted_ratings) == len(group_members), f"{len(predicted_ratings)} != {len(group_members)}"
+            rec_list[idx]["extra_data"] = {
+                "group_member_ratings": {
+                    g_uid: predicted_ratings.loc[g_uid].predicted_rating
+                    for g_uid in group_members
+                }
+            }
+
+        full_recs[algo_name] = {
+            "movies": rec_list,
+            "order": order,
+        }
+
+    full_recs_data["recommendations"] = full_recs
+
+    log_interaction(session["participation_id"], "generate-group-recommendations", **full_recs_data)
+
+    return group_recommendations
+
+@bp.route("/group-gen", methods=['GET'])
+def group_gen():
+    start_time = time.perf_counter()
+    user_data = get_all(get_uname())
+
+    conf = load_user_study_config(session['user_study_id'])
+
+    is_user_part_of_group = user_data['selected_user_part_of_group']
+
+    # Get a loader
+    loader_factory = load_data_loaders()[conf["selected_data_loader"]]
+    loader = loader_factory(**filter_params(conf["data_loader_parameters"], loader_factory))
+    loader = load_data_loader_cached(loader, session['user_study_guid'], loader_factory.name(), get_semi_local_cache_name(loader))
+
+    print(f"Until we got the data loader it took: {time.perf_counter() - start_time}")
+
+    n_items = loader.rating_matrix.shape[1]
+
+    if is_user_part_of_group:
+        user_embedding = np.zeros(shape=(n_items, ), dtype=np.int8)
+        user_embedding[user_data['elicitation_selected_movies']] = 1
+        assert sum(user_embedding) > 0, f"{len(user_embedding)} <= 0, {user_data['elicitation_selected_movies']}"
+        groups = generate_groups(loader, user_data['selected_group_types'], conf['group_size'], user_embedding)
+    else:
+        groups = generate_groups(loader, user_data['selected_group_types'], conf['group_size'])
+
+    print(f"Until end of group generation it took: {time.perf_counter() - start_time}")
+
+    # We only store indices and no embeddings as these could be easily retrieved later
+    # from the pre-loaded rating matrix
+    groups_indices = [groups[idx]['indices'] for idx, _ in enumerate(user_data['selected_group_types'])]
+    groups_indices_named = {gtype: groups[idx]['indices'] for idx, gtype in enumerate(user_data['selected_group_types'])}
+    groups_extra_data = {gtype: groups[idx]['extra_data'] for idx, gtype in enumerate(user_data['selected_group_types'])}
+    initial_iteration = 0
+    new_data = {
+        "groups_indices": groups_indices,
+        "groups_indices_named": groups_indices_named,
+        "groups_extra_data": groups_extra_data,
+        "iteration": initial_iteration # Mark the beginning here
+    }
+
+    set_mapping(get_uname(), new_data)
+    set_val('groups', groups)
+
+    log_interaction(session["participation_id"], "group-gen", **new_data)
+
+    # We are about to start the very first iteration, so no items were shown yet
+    shown_items = { algo_name: [] for algo_name in ALGORITHM_ANON_NAMES }
+    set_val('shown_items', shown_items)
+
+    group_recommendations = generate_group_recommendations(conf, loader, initial_iteration, shown_items)
+
+    print(f"## Shown before: {shown_items}")
+    for anon_name, recs in group_recommendations.items():
+        shown_items[anon_name].append([int(x['movie_idx']) for x in recs['movies']])
+    print(f"## Shown after: {shown_items}")
+    set_val('shown_items', shown_items)
 
     print(f"Until all recommendations got generated it took: {time.perf_counter() - start_time}")
 
     set_mapping(get_uname() + ":grs_movies", {
         "movies": group_recommendations
     })
+
+    print(f"Generated recommendations: {group_recommendations}")
 
     data = {
         "recommendations": group_recommendations,
@@ -1491,7 +1663,7 @@ def compare_grs():
     params["hint"] = tr("journal_compare_alphas_hint")
     params["header"] = tr("journal_compare_alphas_header")
     params["title"] = tr("journal_compare_alphas_title")
-    params["drag"] = tr("journal_compare_alphas_drag")
+    params["drag"] = tr("grs_compare_alphas_drag")
     params["n_iterations"] = len(user_data["generated_iters"]) # We have 1 iteration for actual metric assessment followed bz N_ALPHA_ITERS iterations for comparing alphas
     params["iteration"] = user_data["iteration"]
     # -1 to make it zero based, another -1 because we count 2 N_ALPHA_ITERS and one for metric-assessment, together we have -2
@@ -1501,12 +1673,87 @@ def compare_grs():
 @bp.route("/grs-feedback", methods=["GET", "POST"])
 def grs_feedback():
 
-    feedback_data = {
+    user_data = get_all(get_uname())
 
+    curr_iter = user_data["iteration"]
+    print(f"Finished with curr_iter = {curr_iter}")
+
+    drag_and_drop_positions = json.loads(request.form.get("drag_and_drop_positions"))
+    dropzone_position = json.loads(request.form.get("dropzone_position"))
+
+    feedback_data = {
+        'iteration': curr_iter,
+        'drag_and_drop_positions': drag_and_drop_positions,
+        'dropzone_position': dropzone_position
     }
+
+    print(f"Feedback data: {feedback_data}")
+
     log_interaction(session["participation_id"], "group-recommendation-ended", **feedback_data)
-    assert False, "TODO Implement"
-    pass
+
+
+    conf = load_user_study_config(session['user_study_id'])
+
+    # Get a loader
+    loader_factory = load_data_loaders()[conf["selected_data_loader"]]
+    loader = loader_factory(**filter_params(conf["data_loader_parameters"], loader_factory))
+    loader = load_data_loader_cached(loader, session['user_study_guid'], loader_factory.name(), get_semi_local_cache_name(loader))
+
+    shown_items = get_val('shown_items')
+    print(f"@@ Shown items before: {shown_items}")
+    
+
+    # Iterations are zero-based
+    # We have len(GROUP_TYPES) * conf['iters_per_group_type'] * len(algorithm_combinations)
+    # iterations and questionnaire is shown when changing algorithms (i.e. after len(GROUP_TYPES) * conf['iters_per_group_type'])
+    if (curr_iter + 1) % (len(GROUP_TYPES) * conf['iters_per_group_type']) == 0:
+        
+        if curr_iter + 1 >= len(user_data["generated_iters"]):
+            print("End of study soon")
+            pass # do not generate recommendations, its end of study now
+        else:
+            # generate recommendations that will be shown later, after finishing block questionnaire
+            group_recommendations = generate_group_recommendations(conf, loader, curr_iter + 1, shown_items)
+            print(f"## Generated recommendations: {group_recommendations}")
+            set_mapping(get_uname() + ":grs_movies", {
+                "movies": group_recommendations
+            })
+
+            for anon_name, recs in group_recommendations.items():
+                shown_items[anon_name].append([int(x['movie_idx']) for x in recs['movies']])
+
+
+        print("End of block")
+        # Redirect to after block questionnaire
+        next_page = "grs2024.block_questionnaire"
+    else:
+        # Redirect to next iteration
+        print(f"Not end of block")
+        # Generate group recommendations
+        group_recommendations = generate_group_recommendations(conf, loader, curr_iter + 1, shown_items)
+
+        for anon_name, recs in group_recommendations.items():
+                shown_items[anon_name].append([int(x['movie_idx']) for x in recs['movies']])
+
+        print(f"## Generated recommendations: {group_recommendations}")
+
+        set_mapping(get_uname() + ":grs_movies", {
+            "movies": group_recommendations
+        })
+
+        data = {
+            "recommendations": group_recommendations,
+            "iteration": curr_iter + 1
+        }
+
+        log_interaction(session["participation_id"], "group-recommendation-started", **data)
+        next_page = "grs2024.compare_grs"
+
+    print(f"@@ Shown items after: {shown_items}")
+    set_val('shown_items', shown_items)
+    incr("iteration")
+    continuation_url = url_for('grs2024.grs_feedback')
+    return redirect(url_for(next_page, continuation_url=continuation_url))
 
 # Called after every MORS step, taking feedback from user selections and fine-tuning during MORS
 @bp.route("/mors-feedback", methods=["GET", "POST"])
@@ -2088,12 +2335,16 @@ def mors():
 @bp.route("/block-questionnaire", methods=["GET", "POST"])
 def block_questionnaire():
     user_data = get_all(get_uname())
+    conf = load_user_study_config(session['user_study_id'])
+
     it = user_data["iteration"]
-    cur_block = (int(it) - 1) // N_ITERATIONS
+    n_iterations_per_block = (len(GROUP_TYPES) * conf['iters_per_group_type'])
+    n_blocks = len(user_data["generated_iters"]) // n_iterations_per_block
+    cur_block = (int(it) - 1) // n_iterations_per_block
     params = {
-        "continuation_url": url_for("journal.block_questionnaire_done"),
-        "header": f"After-recommendation block questionnaire for block: ({cur_block + 1}/{N_BLOCKS})",
-        "hint": "Before proceeding to the next step, please answer questions specific to the recent block (last 6 iterations) of recommendations.",
+        "continuation_url": url_for("grs2024.block_questionnaire_done"),
+        "header": f"After-recommendation block questionnaire for block: ({cur_block + 1}/{n_blocks})",
+        "hint": f"Before proceeding to the next step, please answer questions specific to the recent block (last {n_iterations_per_block} iterations) of recommendations.",
         "finish": "Continue",
         "title": "Questionnaire"
     }
@@ -2103,30 +2354,43 @@ def block_questionnaire():
 @bp.route("/block-questionnaire-done", methods=["GET", "POST"])
 def block_questionnaire_done():
     user_data = get_all(get_uname())
+    conf = load_user_study_config(session['user_study_id'])
+
     it = user_data["iteration"]
-    cur_block = (int(it) - 1) // N_ITERATIONS
-    cur_algorithm = user_data["selected_algorithms"][cur_block]
+    n_iterations_per_block = (len(GROUP_TYPES) * conf['iters_per_group_type'])
+    n_blocks = len(user_data["generated_iters"]) // n_iterations_per_block
+    cur_block = (int(it) - 1) // n_iterations_per_block
+    current_data = user_data["generated_iters"][it]
 
     # Log the iteration block, algorithm as well as responses to all the questions
     data = {
         "block": cur_block,
-        "algorithm": cur_algorithm,
+        "group_data": current_data,
         "iteration": it
     }
     data.update(**request.form)
 
-    if cur_block == N_BLOCKS - 1:
+    if cur_block == n_blocks - 1:
         # We are done, do not forget to mark last iteration as ended
-        log_interaction(session["participation_id"], "mors-recommendation-ended", iteration=it - 1)
         log_interaction(session["participation_id"], "after-block-questionnaire", **data)
-        return redirect(url_for("journal.done"))
+        return redirect(url_for("grs2024.done"))
     else:
         # Otherwise continue with next block
         log_interaction(session["participation_id"], "after-block-questionnaire", **data)
-        return redirect(url_for("journal.mors_feedback"))
+        # We already generated group recommendations, but have not logged the corresponding
+        # group-recommendation-started interaction, do it now
+        u_key = f"user:{session['uuid']}"
+        group_recommendations = get_all(u_key + ":grs_movies")
+        data_rec = {
+            "recommendations": group_recommendations,
+            "iteration": it
+        }
+        log_interaction(session["participation_id"], "group-recommendation-started", **data_rec)
+        return redirect(url_for("grs2024.compare_grs"))
 
 @bp.route("/done", methods=["GET", "POST"])
 def done():
+    return "DONE - TODO"
     return redirect(url_for("journal.final_questionnaire"))
 
 # Endpoint for final questionnaire
@@ -2386,6 +2650,45 @@ def get_engagement_question():
 def is_books(*args):
     return False
 
+@bp.route("/get-group-member-histories", methods=["GET"])
+def get_group_member_histories():
+    user_data = get_all(get_uname())
+
+    print("Getting group member histories")
+    g_data = user_data["groups_extra_data"]
+    #print(f"Got data: {g_data}")
+    #print(f"Got iteration: {get_val('iteration')}")
+    gen_iters = user_data["generated_iters"]
+    #print(f"Generated iters: {gen_iters}")
+
+    current_iter_data = gen_iters[user_data['iteration']]
+    #print(f"Current iter: {current_iter_data}")
+
+    current_group_type = current_iter_data['group_type']
+    #print(f"Current group type: {current_group_type} and histories: {g_data[current_group_type]}")
+    #print(f"Group indices: {get_val('groups_indices')}")
+    #print(f"Group indices named: {get_val('groups_indices_named')}")
+    
+    group_indices_named = user_data['groups_indices_named'] #get_val('groups_indices_named')
+
+    # Get a loader
+    conf = load_user_study_config(session['user_study_id'])
+    loader_factory = load_data_loaders()[conf["selected_data_loader"]]
+    loader = loader_factory(**filter_params(conf["data_loader_parameters"], loader_factory))
+    loader = load_data_loader_cached(loader, session['user_study_guid'], loader_factory.name(), get_semi_local_cache_name(loader))
+
+    result = []
+    for idx, member in enumerate(group_indices_named[current_group_type]):
+        #print(f"\tg_data={g_data}, current_group_type={current_group_type}")
+        #print(f"\tg_data[current_group_type]={g_data[current_group_type]}")
+        #print(f"\tg_data[current_group_type]['past_positive_history']={g_data[current_group_type]['past_positive_history']}")
+        #print(f"\tMember: {member}, type={type(member)}")
+        history_item_indices = g_data[current_group_type]['past_positive_history'][member]
+        result.append(enrich_results(history_item_indices, loader))
+
+    #print(f"Final result: {result}")
+    return jsonify(result)
+
 @bp.route("/get-instruction-bullets", methods=["GET"])
 def get_instruction_bullets():
     page = request.args.get("page")
@@ -2446,6 +2749,13 @@ def get_instruction_bullets():
             "To order them, drag and drop the colorful rectangles located at the bottom of this page into the adjacent gray area.",
             "The further right you position the lists, the more diversity you perceive in them.",
             f"If you want more information about the displayed {items_name}, simply hover your mouse cursor over it, and the description, genres, and name (including {extra_info}) will all appear."
+        ]
+    elif page == "compare-grs":
+        items_name = "books" if is_books(conf) else "movies"
+        extra_info = "authors" if is_books(conf) else "release year"
+        bullets = [
+            f"TODO1",
+            "TODO2",
         ]
     else:
         bullets = []

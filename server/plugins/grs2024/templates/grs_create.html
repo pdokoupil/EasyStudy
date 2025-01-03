@@ -309,10 +309,10 @@
                     "selected_preference_elicitation": "Multi Objective Sampling from buckets",
                     "preference_elicitation_parameters": {"n_relevance_buckets": 1, "n_diversity_buckets": 1, "n_novelty_buckets": 1, "n_samples_per_bucket": 8},
                     "data_loader_parameters": dataLoaderParameters,
-                    "group_size": this.groupSize,
+                    "group_size": parseInt(this.groupSize),
                     "choice_model": this.choiceModel,
-                    "iters_per_group_type": this.itersPerGroupType,
-                    "user_history_length": this.userHistoryLength,
+                    "iters_per_group_type": parseInt(this.itersPerGroupType),
+                    "user_history_length": parseInt(this.userHistoryLength),
                     // This are just needed by the fastcompare plugin, but we do not really use them in GRS
                     "selected_algorithms": ["Most Popular Items Baseline", "Random Items Baseline"],
                     "algorithm_parameters": [{"displayed_name": "BETA", "name": "Most Popular Items Baseline"}, {"displayed_name": "GAMMA", "name": "Random Items Baseline"}],

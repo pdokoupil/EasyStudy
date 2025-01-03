@@ -240,7 +240,7 @@ window.dragMoveListener = dragMoveListener;
             </p> -->
             <b-row>
                 <b-col cols="auto" style="text-align: left;">
-                    <h1 style="font-size: 1.0rem; margin-bottom: -0.1em; padding: 0;">{{header}} ({{iteration}}/{{n_iterations}})</h1>
+                    <h1 style="font-size: 1.0rem; margin-bottom: -0.1em; padding: 0;">{{header}} ({{iteration + 1}}/{{n_iterations}})</h1>
                     <p style="margin-top: 0px;">
                         {{hint}}
                     </p>
@@ -278,6 +278,76 @@ window.dragMoveListener = dragMoveListener;
             </b-col>
         </b-row> -->
 
+        <b-row align-v="center" class="mb-2">
+            <b-col class="text-right" align-v="center">
+                <strong>Input group -&gt;</strong>
+            </b-col>
+
+            <b-col>
+                <b-row>
+                    <b-col :name="'outerCol'" class="row-container" style="display: flex; flex-direction: column; overflow: hidden; height: 100%;">
+                
+                        <b-row align-v="center" :name="'innerRow' + userIdx" align-h="center" class="custom-row" v-for="(vals, userIdx) in groupMemberHistories" :key="'userRow' + userIdx">
+                            User [[userIdx + 1]]
+                            <b-col cols="auto" style="height: 100px; margin-left: 1px; margin-right: 1px; padding-left: 0; padding-right: 0;" class="align-middle" v-for="col in vals" :name="'innerCol_' + userIdx + '_' + col.movie_idx" :key="'userCol_' + userIdx + '_' + col.movie_idx">
+                                    <b-popover @show="popoverShown" @hidden="popoverHidden" :target="userIdx + '_' + col.movie_idx" triggers="hover" placement="right">
+                                        <template #title>[[col.movie]]</template>
+                                            <div v-if="col.genres">
+                                                <strong>Genres: </strong>
+                                                <i>[[col.genres.join(', ')]]</i>
+                                            </div>
+                                            <div v-if="col.plot">
+                                                <strong>Plot: </strong>
+                                                [[col.plot]]
+                                            </div>
+                                            <div v-if="col.trailer_url" class="mt-1 text-center">
+                                                <b-button target="_blank" @click="onTrailerWatch(col)" :href="col.trailer_url" size="sm" variant="primary">IMDb trailer</b-button>
+                                            </div>
+                                            
+                                    </b-popover>
+                                    <b-img
+                                        @mouseenter="itemMouseEnter" @mouseleave="itemMouseLeave"
+                                        :id="userIdx + '_' + col.movie_idx" style="height: 99%;"
+                                        block center :src="col.url"
+                                        :name="col.movie_idx" :alt="col.movie"
+                                    />
+                            </b-col>
+                        </b-row>
+                    </b-col>
+                </b-row>
+                <!-- <b-row v-for="(vals, userIdx) in groupMemberHistories" style="border-bottom: 1px solid black;">
+                    <b-col>
+                        <div v-for="item in vals">
+                            <b-popover @show="popoverShown" @hidden="popoverHidden" :target="userIdx + '_' + item.movie_idx" triggers="hover" placement="right">
+                                <template #title>[[item.movie]]</template>
+                                    <div v-if="item.genres">
+                                        <strong>Genres: </strong>
+                                        <i>[[item.genres.join(', ')]]</i>
+                                    </div>
+                                    <div v-if="item.plot">
+                                        <strong>Plot: </strong>
+                                        [[item.plot]]
+                                    </div>
+                                    <div v-if="item.trailer_url" class="mt-1 text-center">
+                                        <b-button target="_blank" @click="onTrailerWatch(item)" :href="item.trailer_url" size="sm" variant="primary">IMDb trailer</b-button>
+                                    </div>
+                                    
+                            </b-popover>
+                            <b-img
+                                @mouseenter="itemMouseEnter" @mouseleave="itemMouseLeave"
+                                :id="userIdx + '_' + item.movie_idx" style="height: 25%;"
+                                block center :src="item.url"
+                                :name="item.movie_idx" :alt="item.movie"
+                            />
+                        </div>
+                    </b-col>
+                </b-row> -->
+            </b-col>
+            <b-col class="text-left" align-v="center">
+                <strong> &lt;- Liked in the past:</strong>
+            </b-col>
+        </b-row>
+
         <b-row>
             <b-col v-for="variantResults in variantsResults" :set="algoIdx = variantsResults.indexOf(variantResults)">
                 <b-row style="flex: 1; display: flex; align-items: stretch;" align-h="center">
@@ -286,7 +356,7 @@ window.dragMoveListener = dragMoveListener;
             </b-col>
         </b-row>
 
-        <b-row class="ml-1 mr-1" style="height: 75vh;">
+        <b-row class="ml-1 mr-1" style="height: 40vh;">
             <!-- Prevent the column from overflow in vertical direction -->
             <b-col class="row-container" style="display: flex; flex-direction: column; overflow: hidden; height: 100%;" v-for="variantResults in variantsResults" :set="algoIdx = variantsResults.indexOf(variantResults)" :id="variantNames[algoIdx]" :class="variantsResults.indexOf(variantResults) != 0 ? 'verticalSeparator' : ''">
                 
@@ -342,8 +412,8 @@ window.dragMoveListener = dragMoveListener;
 
                             </div>
                             <div style="display: flex; flex-direction: row; justify-content: space-between; align-items: center; font-weight: bold;">
-                                <span class="ml-2"><b-icon class="mr-3" scale="2.5" icon="arrow-left"></b-icon>Least Diverse</span>
-                                <span class="mr-2">Most Diverse<b-icon class="ml-3" scale="2.5" icon="arrow-right"></b-icon></span>
+                                <span class="ml-2"><b-icon class="mr-3" scale="2.5" icon="arrow-left"></b-icon>Least Fair</span>
+                                <span class="mr-2">Most Fair<b-icon class="ml-3" scale="2.5" icon="arrow-right"></b-icon></span>
                             </div>
                         </div>
                     </div>
@@ -412,7 +482,7 @@ window.dragMoveListener = dragMoveListener;
     var refinementLayout = "{{refinement_layout}}";
     var defaultRefinementValidated = refinementLayout != "4";
     
-    var itemsPerRow = 2; // Two columns per recommendation list
+    var itemsPerRow = 3; // Three columns per recommendation list
 
     function compare_ctx_lambda() {
         return {
@@ -518,7 +588,8 @@ window.dragMoveListener = dragMoveListener;
             bgColor: "red",
             dropzonePosition: null,
             busy: false,
-            instructionBullets: []
+            instructionBullets: [],
+            groupMemberHistories: [],
         };
     },
     computed: {
@@ -708,10 +779,18 @@ window.dragMoveListener = dragMoveListener;
         
         this.dropzonePosition = getElementBoundingBox(document.getElementById("dropzone"));
 
-        this.instructionBullets = await fetch("{{url_for('journal.get_instruction_bullets', page='compare-alphas')}}")
+        this.instructionBullets = await fetch("{{url_for('grs2024.get_instruction_bullets', page='compare-grs')}}")
                             .then(response => {
                                 if (!response.ok) {
                                     console.log("Erorr");
+                                }
+                                return response.json();
+                            });
+
+        this.groupMemberHistories = await fetch("{{url_for('grs2024.get_group_member_histories')}}")
+                            .then(response => {
+                                if (!response.ok) {
+                                    console.log("Error getting group member histories");
                                 }
                                 return response.json();
                             });

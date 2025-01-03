@@ -182,7 +182,7 @@
     "journal_compare_alphas_title": "Metric assessment",
     "journal_compare_alphas_header": "Metric assessment",
     "journal_compare_alphas_finish": "Finish metric assessment",
-    "journal_compare_alphas_drag": "Drag the three lists into the gray area, organizing them based on diversity. Put the more diverse lists towards the right side and the less diverse ones towards the left side.",
+    "grs_compare_alphas_drag": "Drag the two lists into the gray area, organizing them based on fairness. Put the more fair lists towards the right side and the less fair ones towards the left side.",
 
     "journal_recommendation_hint_movies": "Select movies that you would add to your 'to watch' / 'watch later' lists.",
     "journal_recommendation_title_movies": "Recommended movies",

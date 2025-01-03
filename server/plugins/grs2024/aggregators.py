@@ -1380,10 +1380,10 @@ class RLPropAggregator(AggregationStrategy):
         #assert top_k_slow == top_k_fast
 
         past_recommendations = []
-        df_test_pred_full = group_ratings
+        #df_test_pred_full = group_ratings
         if "past_recommendations" in kwargs:
             past_recommendations = kwargs["past_recommendations"]
-            df_test_pred_full = kwargs["df_test_pred_full"]
+            #df_test_pred_full = kwargs["df_test_pred_full"]
 
         #res = self.fast_impl(group_ratings, recommendations_number, past_recommendations, df_test_pred_full)
         #res2 = self.fast_impl_without_history(group_ratings, recommendations_number, past_recommendations, df_test_pred_full)
