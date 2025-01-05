@@ -80,7 +80,6 @@ ALGORITHM_ANON_NAMES = ["BETA", "GAMMA", "DELTA"]
 # These items are sampled randomly from those items perceived positively
 # by the group members, where positivly means rating >= 3
 POSITIVE_RATING_THRESHOLD = 3.0
-PAST_HISTORY_LEN = 5
 
 
 
@@ -448,17 +447,17 @@ def get_normalized_rating_matrix_for_cos_sim(loader):
 
 
 # Returns past positive history for a given user
-def get_past_positive_history(user_idx, rating_matrix):
+def get_past_positive_history(user_idx, rating_matrix, history_length_limit):
     if user_idx == -1:
         return np.array([], dtype=np.int32)
     positive_feedback = np.where(rating_matrix[user_idx] >= POSITIVE_RATING_THRESHOLD)[0]
     np.random.shuffle(positive_feedback)
-    return positive_feedback[:PAST_HISTORY_LEN]
+    return positive_feedback[:history_length_limit]
 
 # User embedding is vector of shape (n_items,) (if specified)
 # Each element being either 0 or 1 (implicit feedback)
 # The loader.rating_matrix may not be normalized to [0, 1] so we do it here
-def generate_similar_group(loader, group_size, user_embedding, filt_out):
+def generate_similar_group(loader, group_size, user_embedding, filt_out, history_length_limit):
     start_time = time.perf_counter()
     rm_normed = get_normalized_rating_matrix(loader)
     per_user_ratings = rm_normed.sum(axis=1)
@@ -531,11 +530,11 @@ def generate_similar_group(loader, group_size, user_embedding, filt_out):
         "indices": indices,
         "extra_data": {
             "mean_sim": (group_sim[np.triu_indices(group_size, k=1)].sum() / ((group_size * (group_size - 1)) / 2)).item(),
-            "past_positive_history": {user_idx : get_past_positive_history(user_idx, loader.rating_matrix).tolist() for user_idx in indices}
+            "past_positive_history": {user_idx : get_past_positive_history(user_idx, loader.rating_matrix, history_length_limit).tolist() for user_idx in indices}
         }
     }
 
-def generate_divergent_group(loader, group_size, user_embedding, filt_out):
+def generate_divergent_group(loader, group_size, user_embedding, filt_out, history_length_limit):
     start_time = time.perf_counter()
     rm_normed = get_normalized_rating_matrix(loader)
     per_user_ratings = rm_normed.sum(axis=1)
@@ -607,11 +606,11 @@ def generate_divergent_group(loader, group_size, user_embedding, filt_out):
         "indices": indices,
         "extra_data": {
             "mean_sim": (group_sim[np.triu_indices(group_size, k=1)].sum() / ((group_size * (group_size - 1)) / 2)).item(),
-            "past_positive_history": {user_idx : get_past_positive_history(user_idx, loader.rating_matrix).tolist() for user_idx in indices}
+            "past_positive_history": {user_idx : get_past_positive_history(user_idx, loader.rating_matrix, history_length_limit).tolist() for user_idx in indices}
         }
     }
 
-def generate_outlier_group(loader, group_size, user_embedding = None):
+def generate_outlier_group(loader, group_size, user_embedding, history_length_limit):
     start_time = time.perf_counter()
     rm_normed = get_normalized_rating_matrix(loader)
     per_user_ratings = rm_normed.sum(axis=1)
@@ -640,7 +639,7 @@ def generate_outlier_group(loader, group_size, user_embedding = None):
     # Once we have it, we basically just generate similar group around the divergent member, this time, of size group_size - 1
     # We pass filt out so that it does not happen that second selected member is the same as the randomly generated outlier
     # Although this should never happen given that we generate divergent group and similarity of user to itself is 0
-    div_group = generate_divergent_group(loader, 2, prefix_embeddings[outlier_index], filt_out=filt_out)
+    div_group = generate_divergent_group(loader, 2, prefix_embeddings[outlier_index], filt_out=filt_out, history_length_limit=history_length_limit)
     assert div_group['embeddings'].shape == (2, n_items), f"div_group.shape={div_group['embeddings'].shape}"
 
     # We need to replace the -1 inside div_group since we passed prefix_embeddings[outlier_index] as the user embedding but it may not be user embedding actually
@@ -653,7 +652,7 @@ def generate_outlier_group(loader, group_size, user_embedding = None):
         # We still need group_size - 1 to be >= 2 that is why the "if" above
         # Now we generate similar group so it is much more important to properly pass filt_out
         # so that we do not include a user twice
-        sim_group = generate_similar_group(loader, group_size - 1, div_group['embeddings'][1], filt_out=filt_out)
+        sim_group = generate_similar_group(loader, group_size - 1, div_group['embeddings'][1], filt_out=filt_out, history_length_limit=history_length_limit)
         # We need to replace the -1 inside div_group since we passed prefix_embeddings[outlier_index] as the user embedding but it may not be user embedding actually
         if user_embedding is None:
             idx = sim_group["indices"].index(-1)
@@ -679,14 +678,14 @@ def generate_outlier_group(loader, group_size, user_embedding = None):
             "extra_data": {
                 "mean_sim_homogeneous_part": (group_sim_homogeneous[np.triu_indices(group_size - 1, k=1)].sum() / (((group_size - 1) * (group_size - 2)) / 2)).item(),
                 "mean_outlier_sim": mean_outlier_sim.mean().item(),
-                "past_positive_history": {user_idx : get_past_positive_history(user_idx, loader.rating_matrix).tolist() for user_idx in indices + sim_group['indices']}
+                "past_positive_history": {user_idx : get_past_positive_history(user_idx, loader.rating_matrix, history_length_limit).tolist() for user_idx in indices + sim_group['indices']}
             }}
     else:
         group_sim = cos_sim_np(div_group["embeddings"])
         assert group_sim.shape == (group_size, group_size), f"group_sim.shape={group_sim.shape}"
         div_group["extra_data"] = {
             "mean_outlier_sim": (group_sim[np.triu_indices(group_size, k=1)].sum() / ((group_size * (group_size - 1)) / 2)).item(),
-            "past_positive_history": {user_idx : get_past_positive_history(user_idx, loader.rating_matrix).tolist() for user_idx in div_group['indices']}
+            "past_positive_history": {user_idx : get_past_positive_history(user_idx, loader.rating_matrix, history_length_limit).tolist() for user_idx in div_group['indices']}
         }
         return div_group
 
@@ -698,7 +697,7 @@ def generate_outlier_group(loader, group_size, user_embedding = None):
 # Corresponding to "user" embeddings. The term user here is vague, we do not deal
 # with user IDs and instead, only care about the embeddings
 
-def generate_groups(loader, group_types_permutation, group_size, user_embedding = None):
+def generate_groups(loader, group_types_permutation, group_size, user_embedding, history_length_limit):
     assert group_size >= 2, f"group_size={group_size}"
     rm_normed = get_normalized_rating_matrix(loader)
     n_users, n_items = rm_normed.shape
@@ -710,9 +709,9 @@ def generate_groups(loader, group_types_permutation, group_size, user_embedding 
     for gtype in group_types_permutation:
         assert gtype in GROUP_TYPES, f"gtype={gtype}"
         if gtype == "similar":
-            resulting_groups.append(generate_similar_group(loader, group_size, user_embedding, []))
+            resulting_groups.append(generate_similar_group(loader, group_size, user_embedding, [], history_length_limit))
         elif gtype == "divergent":
-            resulting_groups.append(generate_divergent_group(loader, group_size, user_embedding, []))
+            resulting_groups.append(generate_divergent_group(loader, group_size, user_embedding, [], history_length_limit))
         elif gtype == "random":
             # Random is so simple that we do it inline here
             if user_embedding is not None:
@@ -726,7 +725,7 @@ def generate_groups(loader, group_types_permutation, group_size, user_embedding 
                     "indices": [-1] + members.tolist(),
                     "extra_data": {
                         "mean_sim": group_sim[np.triu_indices(group_size, k=1)].sum() / ((group_size * (group_size - 1)) / 2),
-                        "past_positive_history": {user_idx : get_past_positive_history(user_idx, loader.rating_matrix).tolist() for user_idx in [-1] + members.tolist()}
+                        "past_positive_history": {user_idx : get_past_positive_history(user_idx, loader.rating_matrix, history_length_limit).tolist() for user_idx in [-1] + members.tolist()}
                     }
                 })
             else:
@@ -740,11 +739,11 @@ def generate_groups(loader, group_types_permutation, group_size, user_embedding 
                     "indices": rnd_members.tolist(),
                     "extra_data": {
                         "mean_sim": group_sim[np.triu_indices(group_size, k=1)].sum() / ((group_size * (group_size - 1)) / 2),
-                        "past_positive_history": {user_idx : get_past_positive_history(user_idx, loader.rating_matrix).tolist() for user_idx in rnd_members}
+                        "past_positive_history": {user_idx : get_past_positive_history(user_idx, loader.rating_matrix, history_length_limit).tolist() for user_idx in rnd_members}
                     }
                 })
         elif gtype == "outlier":
-            resulting_groups.append(generate_outlier_group(loader, group_size, user_embedding))
+            resulting_groups.append(generate_outlier_group(loader, group_size, user_embedding, history_length_limit))
 
         print(resulting_groups[-1]['extra_data']['past_positive_history'])
         assert len(resulting_groups[-1]['indices']) == len(resulting_groups[-1]['extra_data']['past_positive_history'])
@@ -786,6 +785,7 @@ def create():
     params["user_part_of_group"] = "User part of group"
     params["basic_grs"] = "Please select basic GRS algorithm"
     params["choice_model"] = "Select model used to simulate group choice"
+    params["filter_option"] = "What items should be filtered between iterations"
 
     return render_template("grs_create.html", **params)
 
@@ -807,14 +807,19 @@ def on_joined():
     user_part_of_group = conf["user_part_of_group"]
     extended_explanations = conf["extended_explanations"]
     basic_grs = conf["basic_grs"]
+    choice_model = conf["choice_model"]
+    filter_option = conf["filter_option"]
 
     assert user_part_of_group in (["Random", True, False]), f"user_part_of_group={user_part_of_group}"
     assert extended_explanations in (["Random", True, False]), f"extended_explanations={extended_explanations}"
     assert basic_grs in (["Random"] + BASIC_ALGORITHMS), f"basic_grs={basic_grs}"
+    assert choice_model in ["Random", "RandomChoice", "Same", "None"] + BASIC_ALGORITHMS + NON_BASIC_ALGORITHMS, f"choice_model={choice_model}"
+    assert filter_option in ["Selection", "Impressions"], f"filter_option={filter_option}"
 
     selected_user_part_of_group = user_part_of_group if user_part_of_group != "Random" else np.random.choice(USER_PART_OF_GROUP)
     selected_extended_explanations = extended_explanations if extended_explanations != "Random" else np.random.choice(EXTENDED_EXPLANATIONS)
     selected_basic_grs = basic_grs if basic_grs != "Random" else np.random.choice(BASIC_ALGORITHMS)
+    selected_choice_model = choice_model if choice_model != "Random" else np.random.choice(["Same", "RandomChoice"] + BASIC_ALGORITHMS + NON_BASIC_ALGORITHMS)
 
     # Build the configuration
     # We know we have several group types, each of them gets repeated ITERS_PER_GROUP_TYPE times
@@ -873,6 +878,8 @@ def on_joined():
         "selected_group_types": selected_group_types,
         "generated_iters": generated_iters,
         "algorithm_name_assignment": algorithm_name_assignment,
+        "selected_choice_model": selected_choice_model,
+        "filter_option": filter_option,
     }
     
     set_mapping(get_uname(), generated_config)
@@ -1198,7 +1205,8 @@ def send_feedback():
     #return redirect(url_for("multiobjective.compare_and_refine"))
     return redirect(url_for("grs2024.group_gen"))
 
-def generate_group_recommendations(conf, loader, iteration, shown_items):
+
+def generate_group_recommendations(conf, loader, iteration, shown_items, group_choices):
     user_data = get_all(get_uname())
     start_time = time.perf_counter()
 
@@ -1235,36 +1243,51 @@ def generate_group_recommendations(conf, loader, iteration, shown_items):
     n_per_user_selections = []
     user_ids = []
     items_ids = []
-    ratings = []
+    ratings_raw = []
+    ratings_normed = []
     ratings_lists = []
     for g_user, g_emb in zip(group_members, group_member_embeddings):
         member_selections = np.where(g_emb >= 1.0)[0]
         # conf['k'] is actually not needed since we only care about scores not the top_k
         scores, user_vector, top_k = ease.predict_with_score(member_selections, member_selections, conf['k'])
         scores_list = scores.tolist()
-        ratings.extend(scores_list)
-        ratings_lists.append(scores)
+
+        non_neg_inf_score_indices = scores > NEG_INF
+        neg_inf_score_indices = scores <= NEG_INF
+        qt = QuantileTransformer().fit(scores[non_neg_inf_score_indices].reshape(-1, 1))
+        scores_transformed = qt.transform(scores.reshape(-1, 1)).reshape(scores.shape)
+        scores_transformed[neg_inf_score_indices] = NEG_INF
+        ratings_raw.extend(scores_list)
+        ratings_normed.extend(scores_transformed.tolist())
+        ratings_lists.append(scores_transformed)
         items_ids.extend(items.tolist())
         user_ids.extend([g_user] * items.size)
         n_per_user_selections.append(len(member_selections))
         assert len(member_selections) == scores[scores == NEG_INF].size, f"NEG_INF={NEG_INF} occurrences not matching {member_selections}, {scores_list}"
 
-        group_ratings_full = pd.DataFrame({
-            "user": user_ids,
-            "item": items_ids,
-            "predicted_rating" : ratings
-        })
+    group_ratings_full = pd.DataFrame({
+        "user": user_ids,
+        "item": items_ids,
+        "predicted_rating_raw" : ratings_raw,
+        "predicted_rating": ratings_normed,
+    })
 
-        old_size = len(group_ratings_full)
-        neg_inf_rating_items = group_ratings_full[group_ratings_full['predicted_rating'] == NEG_INF]['item'].unique()
-        # We need to drop all the rows that contain item rated NEG_INF by ANY of the group members
-        group_ratings = group_ratings_full[~group_ratings_full['item'].isin(neg_inf_rating_items)]
-        #group_ratings = group_ratings_full[group_ratings_full.predicted_rating != NEG_INF]
-        # Assertion no longer hold since if only one group mamber gave NEG_INF, we filter it out from all the users
-        #assert old_size - len(group_ratings) == sum(n_per_user_selections), f"Number of selections per user ({n_per_user_selections}) not reflected in size drop: {old_size}, {len(group_ratings)}"
+    group_ratings_full.to_csv("full_ratings_tmp.csv")
+    print(group_ratings_full.groupby("user").mean())
+    print(group_ratings_full.predicted_rating.describe())
+
+    old_size = len(group_ratings_full)
+    neg_inf_rating_items = group_ratings_full[group_ratings_full['predicted_rating'] <= NEG_INF]['item'].unique()
+    # We need to drop all the rows that contain item rated NEG_INF by ANY of the group members
+    group_ratings = group_ratings_full[~group_ratings_full['item'].isin(neg_inf_rating_items)]
+    #group_ratings = group_ratings_full[group_ratings_full.predicted_rating != NEG_INF]
+    # Assertion no longer hold since if only one group mamber gave NEG_INF, we filter it out from all the users
+    #assert old_size - len(group_ratings) == sum(n_per_user_selections), f"Number of selections per user ({n_per_user_selections}) not reflected in size drop: {old_size}, {len(group_ratings)}"
+
 
     print(f"Until we get the predictions for group members: {time.perf_counter() - start_time}")
     group_ratings_rm = np.stack(ratings_lists, axis=0)
+    group_ratings_rm[:, neg_inf_rating_items] = NEG_INF
 
     # Recommendations from all available algorithms, not just those selected for current iteration
     # Only used for logging purposes
@@ -1275,13 +1298,32 @@ def generate_group_recommendations(conf, loader, iteration, shown_items):
         "iteration_data": generated_iters[iteration],
     }
 
+    selected_choice_model = user_data["selected_choice_model"]
+    filter_option = user_data["filter_option"]
+    if selected_choice_model == "None":
+        filter_option = "Impressions"
+
+    algo_anon_to_name = dict()
+
     for order, (algo_anon, algo_name) in enumerate(generated_iters[iteration]["algorithms"].items()):
         
+        algo_anon_to_name[algo_anon] = algo_name
+
         if algo_name in BASIC_ALGORITHMS:
             # These are part of "BASE" aggregator
             algo = AggregationStrategy.getAggregator("BASE")
         else:
             algo = AggregationStrategy.getAggregator(algo_name)
+
+        if filter_option == "Impressions":
+            filter_out_items = shown_items
+        elif filter_option == "Selection":
+            filter_out_items = group_choices
+
+        all_filter_out_items = list(itertools.chain(*filter_out_items[algo_anon]))
+
+        group_ratings_rm_copy = group_ratings_rm.copy()
+        group_ratings_rm_copy[:, all_filter_out_items] = NEG_INF
 
         # Build the group_ratings dataframe in the format that is expected
         # by the algorithms, so basically DF with the following columns: [user, item, predicted_rating]
@@ -1289,24 +1331,31 @@ def generate_group_recommendations(conf, loader, iteration, shown_items):
             # We use precomputed rating matrix to save on time (since we would pivot inside RLProp and that would take unneccessary time)
             rec_list = algo.generate_group_recommendations_for_group(group_ratings,
                                                                      recommendations_number=conf['k'],
-                                                                     group_ratings_rm=group_ratings_rm,
-                                                                     past_recommendations=shown_items[algo_anon])
+                                                                     group_ratings_rm=group_ratings_rm_copy,
+                                                                     past_recommendations=filter_out_items[algo_anon])
         else:
-            rec_list = algo.generate_group_recommendations_for_group(group_ratings[~group_ratings.item.isin(list(itertools.chain(*shown_items[algo_anon])))],
+            rec_list = algo.generate_group_recommendations_for_group(group_ratings[~group_ratings.item.isin(all_filter_out_items)],
                                                                      recommendations_number=conf['k'])
         rec_list = rec_list[algo_name]
         rec_list = enrich_results(rec_list, loader)
+
+        if selected_choice_model == "Same":
+            rec_list[0]["group_choice"] = True
 
         # Add information about predicted rating w.r.t. each of the group members
         for idx in range(len(rec_list)):
             movie_idx = int(rec_list[idx]["movie_idx"])
             predicted_ratings = group_ratings[group_ratings.item == movie_idx].set_index("user")
             assert len(predicted_ratings) == len(group_members), f"{len(predicted_ratings)} != {len(group_members)}"
+
+            group_member_ratings_raw, group_member_ratings_normed = dict(), dict()
+            for g_uid in group_members:
+                group_member_ratings_raw[g_uid] = predicted_ratings.loc[g_uid].predicted_rating_raw
+                group_member_ratings_normed[g_uid] = predicted_ratings.loc[g_uid].predicted_rating
+
             rec_list[idx]["extra_data"] = {
-                "group_member_ratings": {
-                    g_uid: predicted_ratings.loc[g_uid].predicted_rating
-                    for g_uid in group_members
-                }
+                "group_member_ratings_raw": group_member_ratings_raw,
+                "group_member_ratings_normed": group_member_ratings_normed,
             }
 
         group_recommendations[algo_anon] = {
@@ -1332,30 +1381,47 @@ def generate_group_recommendations(conf, loader, iteration, shown_items):
         else:
             algo = AggregationStrategy.getAggregator(algo_name)
 
+        if filter_option == "Impressions":
+            filter_out_items = shown_items
+        elif filter_option == "Selection":
+            filter_out_items = group_choices
+
+        all_filter_out_items = list(itertools.chain(*filter_out_items[algo_anon]))
+
+        group_ratings_rm_copy = group_ratings_rm.copy()
+        group_ratings_rm_copy[:, all_filter_out_items] = NEG_INF
+
         # Build the group_ratings dataframe in the format that is expected
         # by the algorithms, so basically DF with the following columns: [user, item, predicted_rating]
         if algo_name == "RLProp":
             # We use precomputed rating matrix to save on time (since we would pivot inside RLProp and that would take unneccessary time)
             rec_list = algo.generate_group_recommendations_for_group(group_ratings,
                                                                      recommendations_number=conf['k'],
-                                                                     group_ratings_rm=group_ratings_rm,
-                                                                     past_recommendations=shown_items[algo_anon])
+                                                                     group_ratings_rm=group_ratings_rm_copy,
+                                                                     past_recommendations=filter_out_items[algo_anon])
         else:
-            rec_list = algo.generate_group_recommendations_for_group(group_ratings[~group_ratings.item.isin(list(itertools.chain(*shown_items[algo_anon])))],
+            rec_list = algo.generate_group_recommendations_for_group(group_ratings[~group_ratings.item.isin(all_filter_out_items)],
                                                                      recommendations_number=conf['k'])
         rec_list = rec_list[algo_name]
         rec_list = enrich_results(rec_list, loader)
+
+        if selected_choice_model == "Same":
+            rec_list[0]["group_choice"] = True
 
         # Add information about predicted rating w.r.t. each of the group members
         for idx in range(len(rec_list)):
             movie_idx = int(rec_list[idx]["movie_idx"])
             predicted_ratings = group_ratings[group_ratings.item == movie_idx].set_index("user")
             assert len(predicted_ratings) == len(group_members), f"{len(predicted_ratings)} != {len(group_members)}"
+            
+            group_member_ratings_raw, group_member_ratings_normed = dict(), dict()
+            for g_uid in group_members:
+                group_member_ratings_raw[g_uid] = predicted_ratings.loc[g_uid].predicted_rating_raw
+                group_member_ratings_normed[g_uid] = predicted_ratings.loc[g_uid].predicted_rating
+
             rec_list[idx]["extra_data"] = {
-                "group_member_ratings": {
-                    g_uid: predicted_ratings.loc[g_uid].predicted_rating
-                    for g_uid in group_members
-                }
+                "group_member_ratings_raw": group_member_ratings_raw,
+                "group_member_ratings_normed": group_member_ratings_normed,
             }
 
         full_recs[algo_name] = {
@@ -1363,9 +1429,49 @@ def generate_group_recommendations(conf, loader, iteration, shown_items):
             "order": order,
         }
 
+    # "Same" was already handled above
+    # "None" does not need any handling
+    if selected_choice_model not in ["Same", "None"]:
+        for algo_anon, recs in group_recommendations.items():
+
+            algo_name = algo_anon_to_name[algo_anon]
+
+            # Get the original algorithm name
+            rec_list = recs["movies"]
+            rec_list_indices = [int(x["movie_idx"]) for x in rec_list]
+
+            # Limit ourselves to items that are present in top-k (rec_list) as these are those that we are selecting from
+            ratings_to_choose_from = group_ratings[group_ratings.item.isin(rec_list_indices)].copy()
+
+            group_ratings_rm_copy = group_ratings_rm.copy()
+            all_items = np.arange(group_ratings_rm.shape[1])
+            group_ratings_rm_copy[:, np.setdiff1d(all_items, rec_list_indices)] = NEG_INF
+
+            if selected_choice_model == "RLProp":
+                # We use precomputed rating matrix to save on time (since we would pivot inside RLProp and that would take unneccessary time)
+                [the_choice] = algo.generate_group_recommendations_for_group(ratings_to_choose_from,
+                                                                        recommendations_number=1,
+                                                                        group_ratings_rm=group_ratings_rm_copy)
+            else:
+                [the_choice] = algo.generate_group_recommendations_for_group(ratings_to_choose_from,
+                                                                         recommendations_number=1)
+            idx = rec_list_indices.index(the_choice)
+            assert idx >= 0, f"rec_list={rec_list_indices}, the_choice={the_choice}"
+            full_recs[algo_name]["choice"] = the_choice
+            group_recommendations[algo_anon]["movies"][idx]["group_choice"] = True
+
     full_recs_data["recommendations"] = full_recs
+    full_recs_data["algorithm_name_mapping"] = algo_anon_to_name
 
     log_interaction(session["participation_id"], "generate-group-recommendations", **full_recs_data)
+
+    # If extra explanations are disabled, then we deleted group_member_ratings so that they do not leak to the participants
+    extended_explanations = user_data["selected_extended_explanations"]
+    if not extended_explanations:
+        for algo_name, vals in group_recommendations.items():
+            for it in vals["movies"]:
+                it["extra_data"]["group_member_ratings"] = None
+                it["extra_data"]["group_member_ratings_normed"] = None 
 
     return group_recommendations
 
@@ -1387,13 +1493,15 @@ def group_gen():
 
     n_items = loader.rating_matrix.shape[1]
 
+    history_length_limit = conf["user_history_length"]
+
     if is_user_part_of_group:
         user_embedding = np.zeros(shape=(n_items, ), dtype=np.int8)
         user_embedding[user_data['elicitation_selected_movies']] = 1
         assert sum(user_embedding) > 0, f"{len(user_embedding)} <= 0, {user_data['elicitation_selected_movies']}"
-        groups = generate_groups(loader, user_data['selected_group_types'], conf['group_size'], user_embedding)
+        groups = generate_groups(loader, user_data['selected_group_types'], conf['group_size'], user_embedding, history_length_limit)
     else:
-        groups = generate_groups(loader, user_data['selected_group_types'], conf['group_size'])
+        groups = generate_groups(loader, user_data['selected_group_types'], conf['group_size'], user_embedding=None, history_length_limit=history_length_limit)
 
     print(f"Until end of group generation it took: {time.perf_counter() - start_time}")
 
@@ -1417,15 +1525,18 @@ def group_gen():
 
     # We are about to start the very first iteration, so no items were shown yet
     shown_items = { algo_name: [] for algo_name in ALGORITHM_ANON_NAMES }
+    group_choices = { algo_name: [] for algo_name in ALGORITHM_ANON_NAMES }
     set_val('shown_items', shown_items)
+    set_val('group_choices', group_choices)
+    group_recommendations = generate_group_recommendations(conf, loader, initial_iteration, shown_items, group_choices)
 
-    group_recommendations = generate_group_recommendations(conf, loader, initial_iteration, shown_items)
-
-    print(f"## Shown before: {shown_items}")
+    print(f"## Shown before: {shown_items}, choices before: {group_choices}")
     for anon_name, recs in group_recommendations.items():
         shown_items[anon_name].append([int(x['movie_idx']) for x in recs['movies']])
-    print(f"## Shown after: {shown_items}")
+        group_choices[anon_name].append([int(x['movie_idx']) for x in recs['movies'] if 'group_choice' in x and x['group_choice']])
+    print(f"## Shown after: {shown_items}, choices after: {group_choices}")
     set_val('shown_items', shown_items)
+    set_val('group_choices', group_choices)
 
     print(f"Until all recommendations got generated it took: {time.perf_counter() - start_time}")
 
@@ -1700,7 +1811,8 @@ def grs_feedback():
     loader = load_data_loader_cached(loader, session['user_study_guid'], loader_factory.name(), get_semi_local_cache_name(loader))
 
     shown_items = get_val('shown_items')
-    print(f"@@ Shown items before: {shown_items}")
+    group_choices = get_val('group_choices')
+    print(f"@@ Shown items before: {shown_items}, group_choices before: {group_choices}")
     
 
     # Iterations are zero-based
@@ -1713,7 +1825,7 @@ def grs_feedback():
             pass # do not generate recommendations, its end of study now
         else:
             # generate recommendations that will be shown later, after finishing block questionnaire
-            group_recommendations = generate_group_recommendations(conf, loader, curr_iter + 1, shown_items)
+            group_recommendations = generate_group_recommendations(conf, loader, curr_iter + 1, shown_items, group_choices)
             print(f"## Generated recommendations: {group_recommendations}")
             set_mapping(get_uname() + ":grs_movies", {
                 "movies": group_recommendations
@@ -1721,6 +1833,7 @@ def grs_feedback():
 
             for anon_name, recs in group_recommendations.items():
                 shown_items[anon_name].append([int(x['movie_idx']) for x in recs['movies']])
+                group_choices[anon_name].append([int(x['movie_idx']) for x in recs['movies'] if 'group_choice' in x and x['group_choice']])
 
 
         print("End of block")
@@ -1730,10 +1843,11 @@ def grs_feedback():
         # Redirect to next iteration
         print(f"Not end of block")
         # Generate group recommendations
-        group_recommendations = generate_group_recommendations(conf, loader, curr_iter + 1, shown_items)
+        group_recommendations = generate_group_recommendations(conf, loader, curr_iter + 1, shown_items, group_choices)
 
         for anon_name, recs in group_recommendations.items():
-                shown_items[anon_name].append([int(x['movie_idx']) for x in recs['movies']])
+            shown_items[anon_name].append([int(x['movie_idx']) for x in recs['movies']])
+            group_choices[anon_name].append([int(x['movie_idx']) for x in recs['movies'] if 'group_choice' in x and x['group_choice']])
 
         print(f"## Generated recommendations: {group_recommendations}")
 
@@ -1749,8 +1863,9 @@ def grs_feedback():
         log_interaction(session["participation_id"], "group-recommendation-started", **data)
         next_page = "grs2024.compare_grs"
 
-    print(f"@@ Shown items after: {shown_items}")
+    print(f"@@ Shown items after: {shown_items}, group choices after: {group_choices}")
     set_val('shown_items', shown_items)
+    set_val('group_choices', group_choices)
     incr("iteration")
     continuation_url = url_for('grs2024.grs_feedback')
     return redirect(url_for(next_page, continuation_url=continuation_url))
@@ -2348,7 +2463,7 @@ def block_questionnaire():
         "finish": "Continue",
         "title": "Questionnaire"
     }
-    return render_template("journal_block_questionnaire.html", **params)
+    return render_template("grs_block_questionnaire.html", **params)
 
 # Endpoint that should be called once block questionnaire is done
 @bp.route("/block-questionnaire-done", methods=["GET", "POST"])
@@ -2357,16 +2472,18 @@ def block_questionnaire_done():
     conf = load_user_study_config(session['user_study_id'])
 
     it = user_data["iteration"]
+    print(f"Iteration = {it}")
     n_iterations_per_block = (len(GROUP_TYPES) * conf['iters_per_group_type'])
     n_blocks = len(user_data["generated_iters"]) // n_iterations_per_block
     cur_block = (int(it) - 1) // n_iterations_per_block
-    current_data = user_data["generated_iters"][it]
+    # Take from last iteration of the block (that is why we have -1 since it was already incremented)
+    current_data = user_data["generated_iters"][it - 1]
 
     # Log the iteration block, algorithm as well as responses to all the questions
     data = {
         "block": cur_block,
         "group_data": current_data,
-        "iteration": it
+        "iteration": it - 1 # Last iteration of the block
     }
     data.update(**request.form)
 
@@ -2383,15 +2500,16 @@ def block_questionnaire_done():
         group_recommendations = get_all(u_key + ":grs_movies")
         data_rec = {
             "recommendations": group_recommendations,
-            "iteration": it
+            "iteration": it # First iteration of the new block, so no decrement
         }
         log_interaction(session["participation_id"], "group-recommendation-started", **data_rec)
         return redirect(url_for("grs2024.compare_grs"))
 
 @bp.route("/done", methods=["GET", "POST"])
 def done():
-    return "DONE - TODO"
-    return redirect(url_for("journal.final_questionnaire"))
+    #return "DONE - TODO"
+    #return redirect(url_for("journal.final_questionnaire"))
+    return redirect(url_for("grs2024.finish_user_study"))
 
 # Endpoint for final questionnaire
 @bp.route("/final-questionnaire", methods=["GET", "POST"])
@@ -2408,9 +2526,9 @@ def final_questionnaire():
 @bp.route("/finish-user-study", methods=["GET", "POST"])
 def finish_user_study():
     # Handle final questionnaire feedback, logging all the answers
-    data = {}
-    data.update(**request.form)
-    log_interaction(session["participation_id"], "final-questionnaire", **data)
+    #data = {}
+    #data.update(**request.form)
+    #log_interaction(session["participation_id"], "final-questionnaire", **data)
 
     session["iteration"] = int(get_val("iteration"))
     session.modified = True
@@ -2431,11 +2549,16 @@ def initialize():
 def get_block_questions():
    
     user_data = get_all(get_uname())
+    conf = load_user_study_config(session['user_study_id'])
     it = user_data["iteration"]
-    cur_block = (int(it) - 1) // N_ITERATIONS
-    cur_algorithm = user_data["selected_algorithms"][cur_block]
+    n_iterations_per_block = (len(GROUP_TYPES) * conf['iters_per_group_type'])
+    n_blocks = len(user_data["generated_iters"]) // n_iterations_per_block
+    cur_block = (int(it) - 1) // n_iterations_per_block
+    #cur_algorithm = user_data["selected_algorithms"][cur_block]
 
     conf = load_user_study_config(session['user_study_id'])
+
+    extended_explanations = user_data["selected_extended_explanations"]
 
     if "Goodbooks" in conf["selected_data_loader"]:
         item_text = "books"
@@ -2448,81 +2571,127 @@ def get_block_questions():
 
     questions = [
         {
-            "text": f"The {item_text} recommended to me matched my interests.",
+            "text": f"The recommendations were fair to all group members.",
             "name": "q1",
             "icon": "grid"
         },
         {
-            "text": f"The recommended {item_text} were mostly novel to me.",
+            "text": f"The recommendations reflected the group's collective preferences.",
             "name": "q2",
             "icon": "grid"
         },
         {
-            "text": f"The recommended {item_text} were highly different from each other.",
+            "text": "The recommendations provided high utility for the group overall (i.e., a good balance for the group, even if not every user's top choice was included).",
             "name": "q3",
-            "icon": "grid"
+            "icon": "grid",
         },
         {
-            "text": f"The recommended {item_text} were unexpected yet interesting to me.",
+            "text": "The recommendations included options for every group member (i.e., each user had at least one preferred item in the recommendations).",
             "name": "q4",
-            "icon": "grid"
+            "icon": "grid",
         },
         {
-            "text": f"The recommended {item_text} differed from my usual choices.",
+            "text": "Assessing the fairness of recommendations was challenging.",
             "name": "q5",
-            "icon": "grid"
+            "icon": "grid",
         },
         {
-            "text": f"The recommended {item_text} were mostly similar to what I usually {do_text}.",
+            "text": "Provided information was sufficient to evaluate the fairness of recommendations.",
             "name": "q6",
-            "icon": "grid"
+            "icon": "grid",
         },
         {
-            "text": f"The recommended {item_text} were mostly popular (i.e., {popular_text}).",
+            "text": "Information about group members' histories helped to evaluate the fairness of recommendations.",
             "name": "q7",
-            "icon": "grid"
+            "icon": "grid",
         },
         {
-            "text": f"The recommended {item_text} were mostly similar to each other",
+            "text": "There were group members' whose preferences were overlooked in the recommendations.",
             "name": "q8",
-            "icon": "grid"
+            "icon": "grid",
         },
-        {
-            "text": f"Overall, I am satisfied with the recommended {item_text}.",
-            "name": "q9",
-            "icon": "grid"
-        },
-        {
-            "text": "The initial values of sliders already provided good recommendations.",
-            "name": "q10",
-            "icon": "sliders"
-        },
-        {
-            "text": "Being able to change objective criteria (relevance, diversity, etc.) was useful for me.",
-            "name": "q11",
-            "icon": "sliders"
-        },
-        {
-            "text": "Overall, after modifying the objective criteria, recommendations improved.",
-            "name": "q12",
-            "icon": "sliders"
-        },
-        {
-            "text": "The mechanism (slider) was sufficient to tell the system what recommendations I wanted.",
-            "name": "q13",
-            "icon": "sliders"
-        },
-        {
-            "text": "I was able to describe my preferences w.r.t. supported objective criteria.",
-            "name": "q14",
-            "icon": "sliders"
-        },
-        {
-            "text": "Setting appropriate values for the objective criteria was straightforward.",
-            "name": "q15",
-            "icon": "sliders"
-        }
     ]
+
+    if extended_explanations:
+        questions.append(
+            {
+                "text": "Having each member's ratings for the recommended items visible helped to evaluate the fairness of the recommendations.",
+                "name": "q9",
+                "icon": "grid",
+            }
+        )
+
+
+    questions.extend([
+        {
+            "text": "Some group members were disadvantaged in both iterations of recommendations received by the group.",
+            "name": "q10",
+            "icon": "grid",
+        },
+        {
+            "text": "The highlighted group's choices were fair to all members.",
+            "name": "q11",
+            "icon": "ui-checks-grid",
+        },
+        {
+            "text": "The highlighted group's choices were the best option among the recommended items.",
+            "name": "q12",
+            "icon": "ui-checks-grid",
+        },
+        {
+            "text": "The highlighted group's choices would help facilitate group decision-making.",
+            "name": "q13",
+            "icon": "ui-checks-grid",
+        },
+        {
+            "text": "Assessing the fairness of group's choices was challenging.",
+            "name": "q14",
+            "icon": "ui-checks-grid",
+        },
+        {
+            "text": "Provided information was sufficient to evaluate the fairness of group choice.",
+            "name": "q15",
+            "icon": "ui-checks-grid",
+        },
+        {
+            "text": "Information about group members' histories helped to evaluate the fairness of group choice.",
+            "name": "q16",
+            "icon": "ui-checks-grid",
+        },
+        {
+            "text": "There were group members' whose preferences were overlooked in the group choice",
+            "name": "q17",
+            "icon": "ui-checks-grid",
+        },
+        {
+            "text": "Some group members were disadvantaged in both iterations of the group's choices.",
+            "name": "q18",
+            "icon": "ui-checks-grid",
+        },
+    ])
+
+    if extended_explanations:
+        questions.append(
+            {
+                "text": "Having each member's ratings for the recommended items visible helped to evaluate the fairness of the group choice.",
+                "name": "q19",
+                "icon": "ui-checks-grid",
+            }
+        )
+
+    questions.extend([
+        {
+            "text": "Did you notice any changes in the fairness of recommendations across iterations?",
+            "name": "q20",
+            "icon": "arrow90deg-right",
+        },
+        {
+            "text": "The recommendations included options for every group member (i.e., each user had at least one preferred item in the recommendations).",
+            "name": "q21",
+            "icon": "grid",
+        },
+    ])
+
 
     attention_checks = [
         {
@@ -2535,18 +2704,18 @@ def get_block_questions():
             "text": "Using this recommender system was entertaining and I would recommend it to my friends. To answer ",
             "text2": "this attention check question correctly, you must select 'Strongly Disagree'.",
             "name": "qs2",
-            "icon": "sliders"
+            "icon": "ui-checks-grid"
         },
         {
-            "text": "This recommender system provided me with many tips for interesting computer games.",
+            "text": "This group recommender system provided many tips for interesting computer games.",
             "name": "qs3",
-            "icon": "sliders",
+            "icon": "ui-checks-grid",
             "atn": "true"
         },
         {
-            "text": "The recommendations I got from this system provided me with great recipes for exotic cuisines.",
+            "text": "The group recommendations produced by this system provided great recipes for exotic cuisines.",
             "name": "qs4",
-            "icon": "sliders",
+            "icon": "ui-checks-grid",
             "atn": "true"
         }
     ]
@@ -2556,30 +2725,30 @@ def get_block_questions():
         0: 7,
         1: 11,
         2: 15,
-        3: 14
+        3: 14,
     }
 
-    if cur_algorithm == "RELEVANCE-BASED":
-        # If this is the case, we only show first 9 questions
-        questions = questions[:9]
-        # However, this also means that we have to redistribute attention checks!
-        atn_check_indices = {
-            0: 1,
-            1: 6,
-            2: 9,
-            3: 8
-        }
-        # No sliders icon for relevance-only so having different icon for attention check would make it too easy
-        attention_checks[3]["icon"] = "grid"
-        attention_checks[2]["icon"] = "grid"
-        attention_checks[1]["icon"] = "grid"
+    # if cur_algorithm == "RELEVANCE-BASED":
+    #     # If this is the case, we only show first 9 questions
+    #     questions = questions[:9]
+    #     # However, this also means that we have to redistribute attention checks!
+    #     atn_check_indices = {
+    #         0: 1,
+    #         1: 6,
+    #         2: 9,
+    #         3: 8
+    #     }
+    #     # No sliders icon for relevance-only so having different icon for attention check would make it too easy
+    #     attention_checks[3]["icon"] = "grid"
+    #     attention_checks[2]["icon"] = "grid"
+    #     attention_checks[1]["icon"] = "grid"
 
     # Use first attention check
     questions.insert(atn_check_indices[cur_block], attention_checks[cur_block])
     if cur_block == 1:
         # For second block we have two attention checks
         questions.insert(atn_check_indices[3], attention_checks[3])
-    assert cur_block >= 0 and cur_block < N_BLOCKS, f"cur_block == {cur_block}"
+    assert cur_block >= 0 and cur_block < n_blocks, f"cur_block == {cur_block}"
 
     return jsonify(questions)
 
@@ -2677,17 +2846,23 @@ def get_group_member_histories():
     loader = loader_factory(**filter_params(conf["data_loader_parameters"], loader_factory))
     loader = load_data_loader_cached(loader, session['user_study_guid'], loader_factory.name(), get_semi_local_cache_name(loader))
 
-    result = []
+    result = dict()
+    member_to_idx = dict()
     for idx, member in enumerate(group_indices_named[current_group_type]):
         #print(f"\tg_data={g_data}, current_group_type={current_group_type}")
         #print(f"\tg_data[current_group_type]={g_data[current_group_type]}")
         #print(f"\tg_data[current_group_type]['past_positive_history']={g_data[current_group_type]['past_positive_history']}")
         #print(f"\tMember: {member}, type={type(member)}")
         history_item_indices = g_data[current_group_type]['past_positive_history'][member]
-        result.append(enrich_results(history_item_indices, loader))
+        result[member] = enrich_results(history_item_indices, loader)
+        member_to_idx[member] = idx
 
     #print(f"Final result: {result}")
-    return jsonify(result)
+    return jsonify({
+        "histories": result,
+        "member_mapping": member_to_idx,
+    })
+
 
 @bp.route("/get-instruction-bullets", methods=["GET"])
 def get_instruction_bullets():
@@ -2696,6 +2871,16 @@ def get_instruction_bullets():
         return jsonify([])
 
     conf = load_user_study_config(session['user_study_id'])
+
+    user_data = get_all(get_uname())
+    it = user_data["iteration"]
+    n_iterations_per_block = (len(GROUP_TYPES) * conf['iters_per_group_type'])
+    n_blocks = len(user_data["generated_iters"]) // n_iterations_per_block
+    cur_block = (int(it) - 1) // n_iterations_per_block
+
+    first_iter_of_block = cur_block * n_iterations_per_block
+
+    prev_algos = list(user_data["generated_iters"][first_iter_of_block]["algorithms"].keys())
 
     if page == "mors":
         if is_books(conf):
@@ -2716,14 +2901,15 @@ def get_instruction_bullets():
             ]
     elif page == "block-questionnaire":
         bullets = [
-            "Important: These questions are about the recent recommendations, specifically recommendations from the last block (meaning the last 6 iterations).",
+            f"Important: These questions are about the recent recommendations, specifically recommendations from the last block (meaning the last {n_iterations_per_block} iterations).",
+            f"These {n_iterations_per_block} iterations covered {n_iterations_per_block // conf['iters_per_group_type']} distinct groups, each receiving {conf['iters_per_group_type']} iterations (all iterations for group before moving to the next group). All recommendations made in these iterations were done by the same pair of GRS algorithms ({prev_algos}).",
             "Please answer them before moving on to the next step in the study.",
             "If any question is unclear, choose 'I don't understand' as your response for that specific question."
         ]
     elif page == "pre-study-questionnaire":
         bullets = [
             "Please answer these questions before moving on to the next step in the study.",
-            "For questions 7 to 11, pick the answer that most aligns with your personal understanding of the specific recommendation mentioned in each question.",
+            "For question 6, pick the answer that most aligns with your personal understanding of fairness.",
             "Considering that different people may have different views/interpretations, you can choose 'Other' and share your personal thoughts in the text box below each question."
         ]
     elif page == "final-questionnaire":

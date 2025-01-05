@@ -22,7 +22,7 @@
     }
 
     .draggable {
-        width: 100px;
+        width: 150px;
         height: 10px;
         margin: 2px;
         color: white;
@@ -287,10 +287,10 @@ window.dragMoveListener = dragMoveListener;
                 <b-row>
                     <b-col :name="'outerCol'" class="row-container" style="display: flex; flex-direction: column; overflow: hidden; height: 100%;">
                 
-                        <b-row align-v="center" :name="'innerRow' + userIdx" align-h="center" class="custom-row" v-for="(vals, userIdx) in groupMemberHistories" :key="'userRow' + userIdx">
-                            User [[userIdx + 1]]
-                            <b-col cols="auto" style="height: 100px; margin-left: 1px; margin-right: 1px; padding-left: 0; padding-right: 0;" class="align-middle" v-for="col in vals" :name="'innerCol_' + userIdx + '_' + col.movie_idx" :key="'userCol_' + userIdx + '_' + col.movie_idx">
-                                    <b-popover @show="popoverShown" @hidden="popoverHidden" :target="userIdx + '_' + col.movie_idx" triggers="hover" placement="right">
+                        <b-row align-v="center" align-h="center" class="custom-row" v-for="(vals, userId) in groupMemberHistories" :key="'userRow' + userId" :name="'innerRow' + userId">
+                            User [[groupMemberMapping[userId] + 1]]
+                            <b-col cols="auto" style="height: 100px; margin-left: 1px; margin-right: 1px; padding-left: 0; padding-right: 0;" class="align-middle" v-for="col in vals" :name="'innerCol_' + userId + '_' + col.movie_idx" :key="'userCol_' + userId + '_' + col.movie_idx">
+                                    <b-popover @show="popoverShown" @hidden="popoverHidden" :target="userId + '_' + col.movie_idx" triggers="hover" placement="right">
                                         <template #title>[[col.movie]]</template>
                                             <div v-if="col.genres">
                                                 <strong>Genres: </strong>
@@ -307,7 +307,7 @@ window.dragMoveListener = dragMoveListener;
                                     </b-popover>
                                     <b-img
                                         @mouseenter="itemMouseEnter" @mouseleave="itemMouseLeave"
-                                        :id="userIdx + '_' + col.movie_idx" style="height: 99%;"
+                                        :id="userId + '_' + col.movie_idx" style="height: 99%;"
                                         block center :src="col.url"
                                         :name="col.movie_idx" :alt="col.movie"
                                     />
@@ -360,8 +360,9 @@ window.dragMoveListener = dragMoveListener;
             <!-- Prevent the column from overflow in vertical direction -->
             <b-col class="row-container" style="display: flex; flex-direction: column; overflow: hidden; height: 100%;" v-for="variantResults in variantsResults" :set="algoIdx = variantsResults.indexOf(variantResults)" :id="variantNames[algoIdx]" :class="variantsResults.indexOf(variantResults) != 0 ? 'verticalSeparator' : ''">
                 
-                <b-row align-h="center" class="custom-row" :style="{'background-color': variantColors[algoIdx]}" v-for="row in variantResults">
-                    <b-col cols="auto" style="height: 100%; margin-left: 1px; margin-right: 1px; padding-left: 0; padding-right: 0;" class="align-middle" v-for="col in row">
+                <b-row align-h="center" class="custom-row" :style="{'background-color': variantColors[algoIdx]}" v-for="(row, rowIndex) in variantResults">
+                    <b-col cols="auto" style="height: 100%; margin-left: 1px; margin-right: 1px; padding-left: 0; padding-right: 0;" class="align-middle" v-for="(col, itemRank) in row">
+                        <span>
                             <b-popover @show="popoverShown" @hidden="popoverHidden" :target="variantNames[algoIdx] + '_' + col.movie_idx" triggers="hover" placement="right">
                                 <template #title>[[col.movie]]</template>
                                     <div v-if="col.genres">
@@ -377,23 +378,38 @@ window.dragMoveListener = dragMoveListener;
                                     </div>
                                     
                             </b-popover>
-                            <!-- <b-img
-                                @mouseenter="itemMouseEnter" @mouseleave="itemMouseLeave"
-                                :id="variantNames[algoIdx] + '_' + col.movie_idx" style="height: 99%;"
-                                block center :src="col.url"
-                                v-on:click="onSelectMovie($event, col, variantsResults.indexOf(variantResults))"
-                                :name="col.movie_idx" :alt="col.movie"
-                            /> -->
                             <b-img
                                 @mouseenter="itemMouseEnter" @mouseleave="itemMouseLeave"
                                 :id="variantNames[algoIdx] + '_' + col.movie_idx" style="height: 99%;"
                                 block center :src="col.url"
                                 :name="col.movie_idx" :alt="col.movie"
+                                :class="col.group_choice === true ? 'selected' : ''"
                             />
+                        </span>
+                            <!-- :class="itemRank === 0 && rowIndex === 0 ? 'selected' : ''" -->
+                            <b-row align-h="center" class="text-center" v-for="(userIdx, userId) in groupMemberMapping">
+                                
+                                <!-- User [[ userIdx + 1 ]] -->
+                                <!-- <b-col cols="auto" style="height: 100%; margin-left: 1px; margin-right: 1px; padding-left: 0; padding-right: 0;" class="align-middle" v-for="(col, itemRank) in row"> -->
+                                    [[ (parseFloat(col.extra_data.group_member_ratings_normed[userId]) * 5.0).toFixed(1) ]] <b-icon class="ml-1 mt-1" scale="1" icon="star">
+                                <!-- </b-col> -->
+                            </b-row>
                     </b-col>
                 </b-row>
+                <b-row>
+                    <b-col>
+                        <b-row align-h="left" class="text-left" v-for="(userIdx, userId) in groupMemberMapping">
+                            User [[ userIdx + 1 ]]
+                        </b-row>
+                    </b-col>
+                </b-row>
+
             </b-col>
         </b-row>
+
+
+
+        
         <b-form method="POST" ref="myForm" @submit.prevent="onSubmit" action="{{continuation_url}}">
             <b-row class="horizontalSeparator mt-1" style="height: 15vh;" align-h="center" align-v="center">
                 <b-col cols="4" class="text-center" style="height: auto;">
@@ -405,6 +421,9 @@ window.dragMoveListener = dragMoveListener;
                         <div style="display: flex; flex-direction: column; height: 100%;">
                             <div class="draggable" :style="{'background-color': variantColors[variantNames.indexOf(variantName)]}" style="color: black; height: 30px;" :id="variantName" v-for="variantName in variantNames">
                                 [[variantName]]
+                            </div>
+                            <div class="draggable selected" :style="{'background-color': variantColors[variantNames.indexOf(variantName)]}" style="color: black; height: 30px;" :id="variantName+'-Choice'" v-for="variantName in variantNames">
+                                [[variantName]]-Choice
                             </div>
                         </div>
                         <div style="display: flex; flex-direction: column; width: 100%; height: 100%;">
@@ -446,7 +465,9 @@ window.dragMoveListener = dragMoveListener;
                 
             </b-row> -->
             <b-row align-h="center">
-                <b-col class="text-center">
+                <b-col></b-col>
+                <b-col></b-col>
+                <b-col class="text-left">
                     <input type="hidden" name="csrf_token" value="{{csrf_token()}}"/>
                     <input type="hidden" name="drag_and_drop_positions" :value="JSON.stringify(dragAndDropPositions)"/>
                     <input type="hidden" name="dropzone_position" :value="JSON.stringify(dropzonePosition)"/>
@@ -482,7 +503,7 @@ window.dragMoveListener = dragMoveListener;
     var refinementLayout = "{{refinement_layout}}";
     var defaultRefinementValidated = refinementLayout != "4";
     
-    var itemsPerRow = 3; // Three columns per recommendation list
+    var itemsPerRow = 10; // Three columns per recommendation list
 
     function compare_ctx_lambda() {
         return {
@@ -554,6 +575,10 @@ window.dragMoveListener = dragMoveListener;
             dragAndDropValidated[variantNames[order]] = false;
             dragAndDropPositions[variantNames[order]] = null;
 
+            // Also add "-Choice" version
+            dragAndDropValidated[variantNames[order] + "-Choice"] = false;
+            dragAndDropPositions[variantNames[order] + "-Choice"] = null;
+
             console.log(variantIdx);
             console.log(variantResults);
             console.log(order);
@@ -590,6 +615,7 @@ window.dragMoveListener = dragMoveListener;
             busy: false,
             instructionBullets: [],
             groupMemberHistories: [],
+            groupMemberMapping: null,
         };
     },
     computed: {
@@ -614,7 +640,7 @@ window.dragMoveListener = dragMoveListener;
                 let container = containers[containerIdx];
                 const rows = container.querySelectorAll('.custom-row');
                 const numRows = rows.length;
-                const rowHeight = 100 / numRows; // Calculate height per row
+                const rowHeight = 100 / (numRows + 1); // Calculate height per row
 
                 rows.forEach(row => {
                     row.style.height = `${rowHeight}%`; // Set the height for each row
@@ -787,13 +813,15 @@ window.dragMoveListener = dragMoveListener;
                                 return response.json();
                             });
 
-        this.groupMemberHistories = await fetch("{{url_for('grs2024.get_group_member_histories')}}")
+        let groupMemberHistoriesData = await fetch("{{url_for('grs2024.get_group_member_histories')}}")
                             .then(response => {
                                 if (!response.ok) {
                                     console.log("Error getting group member histories");
                                 }
                                 return response.json();
                             });
+        this.groupMemberHistories = groupMemberHistoriesData["histories"];
+        this.groupMemberMapping = groupMemberHistoriesData["member_mapping"];
         
         // Register the handlers for event reporting
         startViewportChangeReportingWithLimit(`/utils/changed-viewport`, csrfToken, 1.0, true);
@@ -815,6 +843,8 @@ window.dragMoveListener = dragMoveListener;
                 return {"type": "Navigate back", "iteration": iteration};
             });
         });
+
+        this.$forceUpdate();
     },
     beforeDestroy() {
         window.removeEventListener('resize', this.setRowHeights); // Remove event listener on component destroy
