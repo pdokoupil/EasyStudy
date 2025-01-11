@@ -178,11 +178,11 @@
     "journal_more_novel_help_books": "By increasing novelty, the algorithm will pay more attention to books that are novel, i.e., books that are less known in general.",
     "journal_more_explorative_help_books": "By increasing exploration, the algorithm will try to produce more exploratory recommendations, i.e., recommend books that differ from what you typically read, often introducing new themes, styles, or genres to expand your reading experience.",
 
-    "journal_compare_alphas_hint": "Use the drag&drop (gray area below the lists with recommendations) to order the recommendation lists from least diverse to most diverse.",
-    "journal_compare_alphas_title": "Metric assessment",
-    "journal_compare_alphas_header": "Metric assessment",
-    "journal_compare_alphas_finish": "Finish metric assessment",
-    "grs_compare_alphas_drag": "Drag the two lists into the gray area, organizing them based on fairness. Put the more fair lists towards the right side and the less fair ones towards the left side.",
+    "grs2024_compare_grs_hint": "Use the drag-and-drop feature (gray area below the recommendation lists) to arrange the lists and group choices from least fair to most fair.",
+    "grs2024_compare_grs_title": "Compare group recommenders",
+    "grs2024_compare_grs_header": "Compare group recommenders",
+    "journal_compare_alphas_finish": "Finish comparing group recommenders",
+    "grs2024_compare_grs_drag": "Drag the four rectangles into the gray area, organizing them by fairness. Please note that there are two fairness conditions: one applies to the entire list of recommendations (e.g., BETA), and the other focuses solely on the item selected by the group (e.g., BETA-Choice). Place the fairer lists on the right and the less fair ones on the left.",
 
     "journal_recommendation_hint_movies": "Select movies that you would add to your 'to watch' / 'watch later' lists.",
     "journal_recommendation_title_movies": "Recommended movies",

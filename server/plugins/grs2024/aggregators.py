@@ -464,7 +464,7 @@ class GreedyEXACTAggregator(AggregationStrategy):
     NEG_INF = int(-10e6)
 
     def __init__(self):
-        self.with_norm = True
+        self.with_norm = False
 
     def mask_scores(self, scores, seen_items_mask):
         # Ensure seen items get lowest score of 0
@@ -829,7 +829,7 @@ class RLPropAggregator(AggregationStrategy):
     NEG_INF = int(-10e6)
 
     def __init__(self):
-        self.with_norm = True
+        self.with_norm = False
 
     def mask_scores(self, scores, seen_items_mask):
         # Ensure seen items get lowest score of 0
@@ -1371,6 +1371,66 @@ class RLPropAggregator(AggregationStrategy):
 
         #print(f"FAST Took: {time.perf_counter() - start_time}, part2: {time.perf_counter() - start_time_2}")
         return top_k
+    
+    def fast_impl_v3_without_history(self, group_ratings_rm, recommendations_number, past_recommendations):
+        group_size, n_items = group_ratings_rm.shape
+        weights = np.ones(shape=(group_size, ), dtype=np.float32)
+        weights /= weights.sum()
+
+        # Already in the input, there could be some NEG_INF entries, these needs to be masked out before normalization
+        # since the normalization ranges would be affected
+        neg_infs = group_ratings_rm <= RLPropAggregator.NEG_INF
+        neg_infs = np.repeat(np.any(neg_infs, axis=0, keepdims=True), group_size, axis=0)
+
+        group_ratings_rm[neg_infs] = 0.0 # This is done to mimick original pandas based implementation
+
+        if self.with_norm:
+            rating_matrix_scaled = QuantileTransformer().fit_transform(group_ratings_rm.T).T
+        else:
+            rating_matrix_scaled = group_ratings_rm
+
+        if self.with_norm:
+            assert np.all(rating_matrix_scaled >= 0.0), "We expect all mgains to be normalized to be greater than 0"
+
+        # Algorithm variables
+        TOT = 0.0
+        gm = np.zeros(shape=(group_size, ), dtype=np.float32)
+        tots = np.zeros(shape=(n_items, ), dtype=np.float32)
+
+        seen_items_mask = np.ones(shape=(rating_matrix_scaled.shape[1], ), dtype=np.float32)
+        # Already masked out by the input
+        seen_items_mask[neg_infs[0]] = 0
+
+        top_k = []
+
+        # Precompute the masks outside of the loop
+        positive_gain_mask = rating_matrix_scaled >= 0.0
+        negative_gain_mask = rating_matrix_scaled < 0.0
+
+        for _ in range(recommendations_number):
+
+            # Added second dimension to enable broadcasting
+            gain_items = np.zeros_like(rating_matrix_scaled)
+
+            tots = np.maximum(TOT, TOT + rating_matrix_scaled.sum(axis=0)) # Old, original way
+
+            remainder = tots * weights[:, np.newaxis] - gm[:, np.newaxis]
+
+            assert remainder.shape == (group_size, n_items), f"Need to ensure proper remainder size"
+
+            gain_items[positive_gain_mask] = np.maximum(0, np.minimum(rating_matrix_scaled, remainder)[positive_gain_mask])
+            gain_items[negative_gain_mask] = np.minimum(0, (rating_matrix_scaled - remainder)[negative_gain_mask])
+
+            scores = self.mask_scores(gain_items.sum(axis=0), seen_items_mask) # Old WAY
+            i_best = scores.argmax()
+            seen_items_mask[i_best] = 0
+
+            gm = gm + rating_matrix_scaled[:, i_best]
+            TOT = np.clip(gm, 0.0, None).sum()
+
+            top_k.append(i_best)
+
+        return top_k
 
     # Returns single item recommended at a given time
     def generate_group_recommendations_for_group(self, group_ratings, recommendations_number, **kwargs):
@@ -1380,7 +1440,7 @@ class RLPropAggregator(AggregationStrategy):
         #assert top_k_slow == top_k_fast
 
         past_recommendations = []
-        #df_test_pred_full = group_ratings
+        df_test_pred_full = group_ratings
         if "past_recommendations" in kwargs:
             past_recommendations = kwargs["past_recommendations"]
             #df_test_pred_full = kwargs["df_test_pred_full"]
@@ -1388,7 +1448,10 @@ class RLPropAggregator(AggregationStrategy):
         #res = self.fast_impl(group_ratings, recommendations_number, past_recommendations, df_test_pred_full)
         #res2 = self.fast_impl_without_history(group_ratings, recommendations_number, past_recommendations, df_test_pred_full)
         #res2 = self.fast_impl_v2(group_ratings, recommendations_number, past_recommendations, df_test_pred_full)
-        res3 = self.fast_impl_v3(kwargs["group_ratings_rm"], recommendations_number, past_recommendations)
+        #res3 = self.fast_impl_v3(kwargs["group_ratings_rm"], recommendations_number, past_recommendations)
+        res3 = self.fast_impl_v3_without_history(kwargs["group_ratings_rm"], recommendations_number, past_recommendations)
+        #res3 = self.fast_impl_without_history(group_ratings, recommendations_number, past_recommendations, df_test_pred_full)
+        #print(f"Fast impl without history 2")
         #assert res2 == res3, f"res2 ({res2}) != res3 ({res3})"
         #assert set(res) == set(res2)
         

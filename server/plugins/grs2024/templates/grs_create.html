@@ -110,7 +110,14 @@
               <b-form-select v-model="filterOption" :options="filteringOptions" name="filterOption" type=""/>
             </b-col>
           </b-row>
-          
+
+          <b-row align-h="center" class="mb-3">
+            <b-col cols="8">
+              <label for="groupSource">{{group_source}}</label>
+              <b-form-select v-model="groupSource" :options="groupSourceOptions" name="groupSource" :state="(groupSource != null) && (!userPartOfGroup || groupSource == 'Online')" required="True" type=""/>
+            </b-col>
+          </b-row>
+
           <b-row align-h="center" class="mb-3">
             <b-col cols="8">
               <label for="k">{{basic_grs}}</label>
@@ -249,6 +256,10 @@
                 { value: "GFAR", text: "GFAR" },
                 { value: "RLProp", text: "RLProp" },
               ],
+              groupSourceOptions: [ // How are groups gathered / generated
+                { value: "Online", text: "Online" }, // Generate them online during the user study itself
+                { value: "Pre-generated", text: "Pre-generated" }, // Take json with pregenerated groups
+              ],
               filteringOptions: [
                 { value: "Selection", text: "Selection" },
                 { value: "Impressions", text: "Impressions" }
@@ -266,6 +277,7 @@
               basicGrs: "Random",
               choiceModel: "Random",
               dataLoader: null,
+              groupSource: null,
               dataLoaders: [
                 { value: null, text: '{{select_loader}}' }
               ],
@@ -276,7 +288,7 @@
         },
         computed: {
           allValidated() {
-            return this.dataLoader != null && this.basicGrs != null;
+            return this.dataLoader != null && this.basicGrs != null && this.groupSource != null && (!this.userPartOfGroup || this.groupSource == "Online");
           }
         },
         methods: {
@@ -325,6 +337,7 @@
                     "group_size": parseInt(this.groupSize),
                     "choice_model": this.choiceModel,
                     "filter_option": this.filterOption,
+                    "group_source": this.groupSource,
                     "iters_per_group_type": parseInt(this.itersPerGroupType),
                     "user_history_length": parseInt(this.userHistoryLength),
                     // This are just needed by the fastcompare plugin, but we do not really use them in GRS

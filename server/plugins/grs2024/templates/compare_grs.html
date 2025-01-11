@@ -240,7 +240,7 @@ window.dragMoveListener = dragMoveListener;
             </p> -->
             <b-row>
                 <b-col cols="auto" style="text-align: left;">
-                    <h1 style="font-size: 1.0rem; margin-bottom: -0.1em; padding: 0;">{{header}} ({{iteration + 1}}/{{n_iterations}})</h1>
+                    <h1 style="font-size: 1.0rem; margin-bottom: -0.1em; padding: 0;">{{header}} ({{iteration + 1}}/{{n_iterations}}) {{grs2024_debug}}</h1>
                     <p style="margin-top: 0px;">
                         {{hint}}
                     </p>
@@ -278,6 +278,7 @@ window.dragMoveListener = dragMoveListener;
             </b-col>
         </b-row> -->
 
+        <!-- Each user has separate rows that are stacked on top of each another
         <b-row align-v="center" class="mb-2">
             <b-col class="text-right" align-v="center">
                 <strong>Input group -&gt;</strong>
@@ -287,9 +288,9 @@ window.dragMoveListener = dragMoveListener;
                 <b-row>
                     <b-col :name="'outerCol'" class="row-container" style="display: flex; flex-direction: column; overflow: hidden; height: 100%;">
                 
-                        <b-row align-v="center" align-h="center" class="custom-row" v-for="(vals, userId) in groupMemberHistories" :key="'userRow' + userId" :name="'innerRow' + userId">
+                        <b-row align-v="center" align-h="center" class="custom-row" v-for="userId in membersSorted" :key="'userRow' + userId" :name="'innerRow' + userId">
                             User [[groupMemberMapping[userId] + 1]]
-                            <b-col cols="auto" style="height: 100px; margin-left: 1px; margin-right: 1px; padding-left: 0; padding-right: 0;" class="align-middle" v-for="col in vals" :name="'innerCol_' + userId + '_' + col.movie_idx" :key="'userCol_' + userId + '_' + col.movie_idx">
+                            <b-col cols="auto" style="height: 100px; margin-left: 1px; margin-right: 1px; padding-left: 0; padding-right: 0;" class="align-middle" v-for="col in groupMemberHistories[userId]" :name="'innerCol_' + userId + '_' + col.movie_idx" :key="'userCol_' + userId + '_' + col.movie_idx">
                                     <b-popover @show="popoverShown" @hidden="popoverHidden" :target="userId + '_' + col.movie_idx" triggers="hover" placement="right">
                                         <template #title>[[col.movie]]</template>
                                             <div v-if="col.genres">
@@ -315,37 +316,49 @@ window.dragMoveListener = dragMoveListener;
                         </b-row>
                     </b-col>
                 </b-row>
-                <!-- <b-row v-for="(vals, userIdx) in groupMemberHistories" style="border-bottom: 1px solid black;">
-                    <b-col>
-                        <div v-for="item in vals">
-                            <b-popover @show="popoverShown" @hidden="popoverHidden" :target="userIdx + '_' + item.movie_idx" triggers="hover" placement="right">
-                                <template #title>[[item.movie]]</template>
-                                    <div v-if="item.genres">
-                                        <strong>Genres: </strong>
-                                        <i>[[item.genres.join(', ')]]</i>
-                                    </div>
-                                    <div v-if="item.plot">
-                                        <strong>Plot: </strong>
-                                        [[item.plot]]
-                                    </div>
-                                    <div v-if="item.trailer_url" class="mt-1 text-center">
-                                        <b-button target="_blank" @click="onTrailerWatch(item)" :href="item.trailer_url" size="sm" variant="primary">IMDb trailer</b-button>
-                                    </div>
-                                    
-                            </b-popover>
-                            <b-img
-                                @mouseenter="itemMouseEnter" @mouseleave="itemMouseLeave"
-                                :id="userIdx + '_' + item.movie_idx" style="height: 25%;"
-                                block center :src="item.url"
-                                :name="item.movie_idx" :alt="item.movie"
-                            />
-                        </div>
-                    </b-col>
-                </b-row> -->
+                
             </b-col>
             <b-col class="text-left" align-v="center">
                 <strong> &lt;- Liked in the past:</strong>
             </b-col>
+        </b-row> -->
+        <!-- Alternative layout, all histories in a single row -->
+        <b-row align-h="center">
+            <h5>Group members</h5>
+            <b-icon class="h3 ml-1" style="height: 80%;" id="input-group-help" icon="question-circle-fill" variant="primary"></b-icon>
+            <b-tooltip target="input-group-help" triggers="hover">For each group member, here is a list of movies they liked in the past.</b-tooltip>
+        </b-row>
+        <b-row align-h="center" class="mb-2" style="height: 20vh;">
+            <b-col style="height: 100%;" v-for="userId in membersSorted" :key="'userRow' + userId" :name="'innerRow' + userId">
+                <b-row style="height: 100%;" align-h="center" align-v="center">
+                    <strong>User [[ groupMemberMapping[userId] ]]&nbsp;</strong>
+                    <b-col cols="auto" style="height: 80%; margin-left: 1px; margin-right: 1px; padding-left: 0; padding-right: 0;" class="align-middle" v-for="col in groupMemberHistories[userId]" :name="'innerCol_' + userId + '_' + col.movie_idx" :key="'userCol_' + userId + '_' + col.movie_idx">
+                        <b-popover @show="popoverShown" @hidden="popoverHidden" :target="userId + '_' + col.movie_idx" triggers="hover" placement="right">
+                            <template #title>[[col.movie]]</template>
+                                <div v-if="col.genres">
+                                    <strong>Genres: </strong>
+                                    <i>[[col.genres.join(', ')]]</i>
+                                </div>
+                                <div v-if="col.plot">
+                                    <strong>Plot: </strong>
+                                    [[col.plot]]
+                                </div>
+                                <div v-if="col.trailer_url" class="mt-1 text-center">
+                                    <b-button target="_blank" @click="onTrailerWatch(col)" :href="col.trailer_url" size="sm" variant="primary">IMDb trailer</b-button>
+                                </div>
+                                
+                        </b-popover>
+                        <b-img
+                            @mouseenter="itemMouseEnter" @mouseleave="itemMouseLeave"
+                            :id="userId + '_' + col.movie_idx" style="height: 99%;"
+                            block center :src="col.url"
+                            :name="col.movie_idx" :alt="col.movie"
+                        />
+                </b-col>
+            </b-col>
+        </b-row>
+        <b-row align-h="center" class="horizontalSeparator mt-1">
+            <h5>Group recommendation</h5>
         </b-row>
 
         <b-row>
@@ -356,10 +369,24 @@ window.dragMoveListener = dragMoveListener;
             </b-col>
         </b-row>
 
+        
+        <b-row class="ml-1 mr-1" align-v="center">
+            <b-col align-v="center" v-for="variantResults in variantsResults" :set="algoIdx = variantsResults.indexOf(variantResults)">
+                <b-row align-v="center" align-h="center" class="custom-row" :style="{'background-color': variantColors[algoIdx]}" v-for="(row, rowIndex) in variantResults">
+                    <b-col align-v="center" cols="auto" style="height: 100%; margin-left: 1px; margin-right: 1px; padding-left: 0; padding-right: 0;" class="align-middle choices text-center" v-for="(col, itemRank) in row" :id="variantNames[algoIdx] + '_' + col.movie_idx + '+2'">
+                        <div class="text-center" v-if="col.group_choice">
+                            Group choice
+                            <b-icon class="ml-1 mt-1" style="height: 100%;" scale="1.5" :id="'group-choice-' + variantNames[algoIdx] + '_' + col.movie_idx + '-help'" icon="question-circle-fill" variant="primary"></b-icon>
+                            <b-tooltip :target="'group-choice-' + variantNames[algoIdx] + '_' + col.movie_idx + '-help'" triggers="hover">The movie with the green border represents the group choice, while all five movies together represent the group recommendation.</b-tooltip>
+                        </div>
+                    </b-col>
+                </b-row>
+            </b-col>
+        </b-row>
+
         <b-row class="ml-1 mr-1" style="height: 40vh;">
             <!-- Prevent the column from overflow in vertical direction -->
             <b-col class="row-container" style="display: flex; flex-direction: column; overflow: hidden; height: 100%;" v-for="variantResults in variantsResults" :set="algoIdx = variantsResults.indexOf(variantResults)" :id="variantNames[algoIdx]" :class="variantsResults.indexOf(variantResults) != 0 ? 'verticalSeparator' : ''">
-                
                 <b-row align-h="center" class="custom-row" :style="{'background-color': variantColors[algoIdx]}" v-for="(row, rowIndex) in variantResults">
                     <b-col cols="auto" style="height: 100%; margin-left: 1px; margin-right: 1px; padding-left: 0; padding-right: 0;" class="align-middle" v-for="(col, itemRank) in row">
                         <span>
@@ -387,19 +414,23 @@ window.dragMoveListener = dragMoveListener;
                             />
                         </span>
                             <!-- :class="itemRank === 0 && rowIndex === 0 ? 'selected' : ''" -->
-                            <b-row align-h="center" class="text-center" v-for="(userIdx, userId) in groupMemberMapping">
-                                
+                            <b-row align-h="center" class="mt-1 text-center" v-for="userId in membersSorted">
+                                <div :style="{'background-color': getGradientColor(parseFloat(col.extra_data.group_member_ratings_normed_percentage[userId])) }">
+                                    [[ (parseFloat(col.extra_data.group_member_ratings_normed_percentage[userId])) ]] %
+                                </div>
                                 <!-- User [[ userIdx + 1 ]] -->
                                 <!-- <b-col cols="auto" style="height: 100%; margin-left: 1px; margin-right: 1px; padding-left: 0; padding-right: 0;" class="align-middle" v-for="(col, itemRank) in row"> -->
-                                    [[ (parseFloat(col.extra_data.group_member_ratings_normed[userId]) * 5.0).toFixed(1) ]] <b-icon class="ml-1 mt-1" scale="1" icon="star">
+                                    <!-- [[ (parseFloat(col.extra_data.group_member_ratings_normed[userId]) * 100).toFixed(0) ]] <b-icon class="ml-1 mt-1" scale="1" icon="star"> -->
+                                        <!-- [[ (parseFloat(col.extra_data.group_member_ratings_normed[userId]) * 100).toFixed(0) ]] % -->
+                                        <!-- [[ (parseFloat(col.extra_data.group_member_ratings_normed_percentage[userId])) ]] % -->
                                 <!-- </b-col> -->
                             </b-row>
                     </b-col>
                 </b-row>
                 <b-row>
                     <b-col>
-                        <b-row align-h="left" class="text-left" v-for="(userIdx, userId) in groupMemberMapping">
-                            User [[ userIdx + 1 ]]
+                        <b-row class="mt-1" align-h="left" class="text-left" v-for="userId in membersSorted">
+                            <strong>&nbsp; User [[ groupMemberMapping[userId] ]]</strong>
                         </b-row>
                     </b-col>
                 </b-row>
@@ -427,11 +458,24 @@ window.dragMoveListener = dragMoveListener;
                             </div>
                         </div>
                         <div style="display: flex; flex-direction: column; width: 100%; height: 100%;">
-                            <div class="dropzone" id="dropzone" style="display: flex; justify-content: center; align-items: center; width: 100%; height: 100%">
+                            <div class="dropzone" id="dropzone" style="display: flex; justify-content: center; align-items: center; width: 100%; height: 100%; min-height: 140px">
 
                             </div>
                             <div style="display: flex; flex-direction: row; justify-content: space-between; align-items: center; font-weight: bold;">
                                 <span class="ml-2"><b-icon class="mr-3" scale="2.5" icon="arrow-left"></b-icon>Least Fair</span>
+                                <input type="hidden" name="csrf_token" value="{{csrf_token()}}"/>
+                                <input type="hidden" name="drag_and_drop_positions" :value="JSON.stringify(dragAndDropPositions)"/>
+                                <input type="hidden" name="dropzone_position" :value="JSON.stringify(dropzonePosition)"/>
+                                <b-overlay
+                                    :show="busy"
+                                    rounded
+                                    opacity="0.6"
+                                    spinner-small
+                                    spinner-variant="primary"
+                                    class="d-inline-block"
+                                    >
+                                    <b-button :disabled="!Object.values(dragAndDropValidated).every(value => value === true)" class="mb-1 mt-1" variant="success" type="submit" name="continueBtn">Continue</b-button>
+                                </b-overlay>
                                 <span class="mr-2">Most Fair<b-icon class="ml-3" scale="2.5" icon="arrow-right"></b-icon></span>
                             </div>
                         </div>
@@ -464,7 +508,8 @@ window.dragMoveListener = dragMoveListener;
                 </b-col>
                 
             </b-row> -->
-            <b-row align-h="center">
+            <!-- <b-row align-h="center" class="mt-3">
+                
                 <b-col></b-col>
                 <b-col></b-col>
                 <b-col class="text-left">
@@ -482,7 +527,7 @@ window.dragMoveListener = dragMoveListener;
                         <b-button :disabled="!Object.values(dragAndDropValidated).every(value => value === true)" class="mb-1" variant="success" type="submit" name="continueBtn">Continue</b-button>
                     </b-overlay>
                 </b-col>
-            </b-row>
+            </b-row> -->
         </b-form>
 
     </b-container>
@@ -616,6 +661,7 @@ window.dragMoveListener = dragMoveListener;
             instructionBullets: [],
             groupMemberHistories: [],
             groupMemberMapping: null,
+            membersSorted: null,
         };
     },
     computed: {
@@ -646,6 +692,37 @@ window.dragMoveListener = dragMoveListener;
                     row.style.height = `${rowHeight}%`; // Set the height for each row
                 });
             }
+
+            const choiceLabels = this.$el.querySelectorAll('.choices');
+
+            for (let c of choiceLabels) {
+                let origElId = c.id.split("+2")[0];
+                let w = this.getImageWidth(origElId);
+                console.log(w);
+                c.style.width = `${w}px`;
+            }
+        },
+        
+        getGradientColor(value) {
+            // Ensure value is within [0, 100]
+            value = Math.max(0, Math.min(100, value));
+            
+            // Adjust hue range for quicker transition
+            let hue = (120 * value) / 100; // Still 0 to 120, but we'll adjust perception
+            
+            // Shift the hue range to compress green and expand red/yellow transition
+            if (value < 50) {
+                hue = (60 * value) / 50;  // Red to yellow faster
+            } else {
+                hue = 60 + (60 * (value - 50)) / 50;  // Yellow to green slower
+            }
+            
+            // Pastel tone: moderate saturation and high lightness
+            let saturation = 70; // in percentage
+            let lightness = 80;  // in percentage
+            
+            // Construct the HSL color string
+            return `hsl(${hue}, ${saturation}%, ${lightness}%)`;
         },
         onTrailerWatch(movieData) {
             reportOnInput("/utils/on-input", csrfToken, "link", movieData);
@@ -791,6 +868,14 @@ window.dragMoveListener = dragMoveListener;
                 }
             });
         },
+        getImageWidth(elId) {
+            let el = document.getElementById(elId);
+            let width = 0;
+            if (el) {
+                width = el.offsetWidth;
+            }
+            return width;
+        },
         onSubmit() {
             this.busy = true;
             this.$refs.myForm.submit();
@@ -822,6 +907,7 @@ window.dragMoveListener = dragMoveListener;
                             });
         this.groupMemberHistories = groupMemberHistoriesData["histories"];
         this.groupMemberMapping = groupMemberHistoriesData["member_mapping"];
+        this.membersSorted = Object.keys(this.groupMemberMapping).sort((a, b) => this.groupMemberMapping[a] < this.groupMemberMapping[b] ? -1 : this.groupMemberMapping[a] === this.groupMemberMapping[b] ? 1 : 0);
         
         // Register the handlers for event reporting
         startViewportChangeReportingWithLimit(`/utils/changed-viewport`, csrfToken, 1.0, true);
