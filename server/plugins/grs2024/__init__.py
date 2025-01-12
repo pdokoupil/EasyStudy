@@ -896,7 +896,6 @@ def generate_group_recommendations(conf, loader, iteration, shown_items, group_c
     current_group = groups[selected_group_types.index(current_group_type)]
 
     group_members = current_group['indices']
-    group_member_embeddings = current_group['embeddings']
 
     # Instead of iterating algorithms first, we first iterate over users
     # Since all GRS can reuse output of single EASE call
@@ -906,8 +905,8 @@ def generate_group_recommendations(conf, loader, iteration, shown_items, group_c
     ratings_raw = []
     ratings_normed = []
     ratings_lists = []
-    for g_user, g_emb in zip(group_members, group_member_embeddings):
-        member_selections = np.where(g_emb >= 1.0)[0]
+    for g_user in group_members:
+        member_selections = np.where(loader.rating_matrix[g_user] > 0.0)[0]
         # conf['k'] is actually not needed since we only care about scores not the top_k
         scores, user_vector, top_k = ease.predict_with_score(member_selections, member_selections, conf['k'])
         scores_list = scores.tolist()
@@ -931,10 +930,6 @@ def generate_group_recommendations(conf, loader, iteration, shown_items, group_c
         "predicted_rating_raw" : ratings_raw,
         "predicted_rating": ratings_normed,
     })
-
-    
-    print(group_ratings_full[group_ratings_full.predicted_rating > NEG_INF].groupby("user").mean())
-    print(group_ratings_full[group_ratings_full.predicted_rating > NEG_INF].predicted_rating.describe())
 
     old_size = len(group_ratings_full)
     neg_inf_rating_items = group_ratings_full[group_ratings_full['predicted_rating'] <= NEG_INF]['item'].unique()
