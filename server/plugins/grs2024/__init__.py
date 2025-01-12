@@ -255,6 +255,10 @@ def load_cdf_cache(base_path, metric_name):
     with open(os.path.join(base_path, "cdf", f"{metric_name}.pckl"), "rb") as f:
         return pickle.load(f)
 
+@functools.lru_cache(maxsize=None)
+def get_extended_rm(path):
+    return np.load(path)
+
 #################################################################################
 ###########################   ALGORITHMS   ######################################
 #################################################################################
@@ -310,35 +314,36 @@ class EASER_pretrained:
 # def get_user_similarity_matrix(loader):
 #     return cos_sim_np(loader.rating_matrix)
 
-@cached(cache={}, key=lambda loader: loader.name())
-def get_normalized_rating_matrix(loader):
+@cached(cache={}, key=lambda loader, rm: loader.name())
+def get_normalized_rating_matrix(loader, rating_matrix_orig):
     # We use the same thresholds on which the EASE was pretrained
-    return np.where(loader.rating_matrix >= 3.0, 1, 0).astype(np.uint8)
+    return np.where(rating_matrix_orig >= 3.0, 1, 0).astype(np.uint8)
 
-@cached(cache={}, key=lambda loader: loader.name())
-def get_normalized_rating_matrix_for_cos_sim(loader):
+@cached(cache={}, key=lambda loader, rm: loader.name())
+def get_normalized_rating_matrix_for_cos_sim(loader, rating_matrix_extended):
     # We use the same thresholds on which the EASE was pretrained
-    x = get_normalized_rating_matrix(loader)
+    x = rating_matrix_extended #get_normalized_rating_matrix(loader)
     # We need this for cosine similarity in group construction and need it to be as quick as possible
     return (x / np.linalg.norm(x, axis=1, keepdims=True)).T
 
 
 # Returns past positive history for a given user
-def get_past_positive_history(user_idx, rating_matrix, history_length_limit):
+def get_past_positive_history(user_idx, rating_matrix_orig, history_length_limit):
     if user_idx == -1:
         return np.array([], dtype=np.int32)
-    positive_feedback = np.where(rating_matrix[user_idx] >= POSITIVE_RATING_THRESHOLD)[0]
+    positive_feedback = np.where(rating_matrix_orig[user_idx] >= POSITIVE_RATING_THRESHOLD)[0]
     np.random.shuffle(positive_feedback)
     return positive_feedback[:history_length_limit]
 
-# User embedding is vector of shape (n_items,) (if specified)
-# Each element being either 0 or 1 (implicit feedback)
-# The loader.rating_matrix may not be normalized to [0, 1] so we do it here
-def generate_similar_group(loader, group_size, user_embedding, filt_out, history_length_limit):
+def generate_similar_group(loader, rating_matrix_extended, rating_matrix_orig, group_size, user_embedding, filt_out, history_length_limit, min_dist_constraint=None):
     start_time = time.perf_counter()
-    rm_normed = get_normalized_rating_matrix(loader)
+    rm_normed = get_normalized_rating_matrix(loader, rating_matrix_orig)
     per_user_ratings = rm_normed.sum(axis=1)
     n_users, n_items = rm_normed.shape
+
+    # Take embeddings from extended rating matrix
+    user_embedding_matrix = rating_matrix_extended
+
     indices = []
     # Do it incrementally, start with a embedding user (either random, or the real user)
     if user_embedding is not None:
@@ -348,18 +353,24 @@ def generate_similar_group(loader, group_size, user_embedding, filt_out, history
     else:
         non_zero_users = np.where(per_user_ratings > 0)[0]
         rnd_idx = np.random.choice(non_zero_users)
-        prefix_embeddings = rm_normed[rnd_idx]
+        prefix_embeddings = user_embedding_matrix[rnd_idx]
         filt_out.append(rnd_idx)
         indices.append(rnd_idx.item())
 
-    assert prefix_embeddings.sum() > 0, f"We expect at least some history for the user: {prefix_embeddings.sum()}"
-
+    #assert prefix_embeddings.sum() > 0, f"We expect at least some history for the user: {prefix_embeddings.sum()}"
     assert prefix_embeddings.shape == (n_items, ), f"shape={prefix_embeddings.shape}"
     prefix_embeddings = prefix_embeddings[np.newaxis, :]
 
     # rm_normed_t = (rm_normed / np.linalg.norm(rm_normed, axis=1, keepdims=True)).T
-    rm_normed_t = get_normalized_rating_matrix_for_cos_sim(loader)
+    rm_normed_t = get_normalized_rating_matrix_for_cos_sim(loader, rating_matrix_extended)
 
+    if min_dist_constraint is not None:
+        source_emb = min_dist_constraint[0]
+        source_emb = source_emb[np.newaxis, :]
+        source_distances = 1.0 - np.dot(source_emb / np.linalg.norm(source_emb, axis=1, keepdims=True), rm_normed_t)
+        assert source_distances.shape == (1, n_users)
+        source_distances = source_distances[0]
+    
     for i in range(group_size - 1):
         # These newaxis are here to ensure proper broadcasting
         # Basically, prefix_embeddings are converted from (i+1, N) to (i+1, 1, N) and rm_normed is from (M, N) to (1, M, N)
@@ -385,16 +396,23 @@ def generate_similar_group(loader, group_size, user_embedding, filt_out, history
         distances = distances.mean(axis=0)
         assert distances.shape == (n_users, ), f"distances.shape after mean = {distances.shape}"
 
-        # We take 20th percentile as a threshold (we go <= not >=)
-        threshold = np.percentile(distances, 20)
+        # We take 30th percentile as a threshold (we go <= not >=)
+        threshold = np.percentile(distances[distances <= non_nan_max], 30)
         candidates = np.where(distances <= threshold)[0]
+        if min_dist_constraint is not None:
+            source_emb, min_req_distance = min_dist_constraint
+            # Furthermore filter candidates so that min dist constraint is achieved
+            candidates_dist_wrt_source = source_distances[candidates]
+            assert candidates_dist_wrt_source.size == candidates.size
+            candidates = candidates[candidates_dist_wrt_source >= min_req_distance]
+
         #print(f"### threshold={threshold}, candidates={candidates.tolist()}")
         selected_candidate = np.random.choice(candidates)
         # Mask it out
         filt_out.append(selected_candidate)
         indices.append(selected_candidate.item())
         # Append it to current group
-        prefix_embeddings = np.concatenate([prefix_embeddings, rm_normed[selected_candidate][np.newaxis, :]], axis=0) #TODO rm_normed_t ???
+        prefix_embeddings = np.concatenate([prefix_embeddings, user_embedding_matrix[selected_candidate][np.newaxis, :]], axis=0)
     
     assert prefix_embeddings.shape == (group_size, n_items), f"prefix_embeddings.shape={prefix_embeddings.shape}"
 
@@ -407,16 +425,18 @@ def generate_similar_group(loader, group_size, user_embedding, filt_out, history
         "indices": indices,
         "extra_data": {
             "mean_sim": (group_sim[np.triu_indices(group_size, k=1)].sum() / ((group_size * (group_size - 1)) / 2)).item(),
-            "past_positive_history": {user_idx : get_past_positive_history(user_idx, loader.rating_matrix, history_length_limit).tolist() for user_idx in indices}
+            "past_positive_history": {user_idx : get_past_positive_history(user_idx, rating_matrix_orig, history_length_limit).tolist() for user_idx in indices}
         }
     }
 
-def generate_divergent_group(loader, group_size, user_embedding, filt_out, history_length_limit):
+def generate_divergent_group(loader, rating_matrix_extended, rating_matrix_orig, group_size, user_embedding, filt_out, history_length_limit):
     start_time = time.perf_counter()
-    rm_normed = get_normalized_rating_matrix(loader)
+    rm_normed = get_normalized_rating_matrix(loader, rating_matrix_extended)
     per_user_ratings = rm_normed.sum(axis=1)
     n_users, n_items = rm_normed.shape
     indices = []
+    # Take embeddings from extended rating matrix
+    user_embedding_matrix = rating_matrix_extended
 
     # Do it incrementally, start with a embedding user (either random, or the real user)
     if user_embedding is not None:
@@ -425,16 +445,16 @@ def generate_divergent_group(loader, group_size, user_embedding, filt_out, histo
     else:
         non_zero_users = np.where(per_user_ratings > 0)[0]
         rnd_idx = np.random.choice(non_zero_users)
-        prefix_embeddings = rm_normed[rnd_idx]
+        prefix_embeddings = user_embedding_matrix[rnd_idx]
         filt_out.append(rnd_idx)
         indices.append(rnd_idx.item())
 
-    assert prefix_embeddings.sum() > 0, f"We expect at least some history for the user: {prefix_embeddings.sum()}"
+    #assert prefix_embeddings.sum() > 0, f"We expect at least some history for the user: {prefix_embeddings.sum()}"
     assert prefix_embeddings.shape == (n_items, ), f"shape={prefix_embeddings.shape}"
     prefix_embeddings = prefix_embeddings[np.newaxis, :]
 
     # rm_normed_t = (rm_normed / np.linalg.norm(rm_normed, axis=1, keepdims=True)).T
-    rm_normed_t = get_normalized_rating_matrix_for_cos_sim(loader)
+    rm_normed_t = get_normalized_rating_matrix_for_cos_sim(loader, rating_matrix_extended)
 
     for i in range(group_size - 1):
         # These newaxis are here to ensure proper broadcasting
@@ -461,8 +481,8 @@ def generate_divergent_group(loader, group_size, user_embedding, filt_out, histo
         distances = distances.mean(axis=0)
         assert distances.shape == (n_users, ), f"distances.shape after mean = {distances.shape}"
 
-        # We take 80th percentile as a threshold (we go >= not <=)
-        threshold = np.percentile(distances, 80)
+        # We take 70th percentile as a threshold (we go >= not <=)
+        threshold = np.percentile(distances[distances >= non_nan_min], 70)
         candidates = np.where(distances >= threshold)[0]
         #print(f"### threshold={threshold}, candidates={candidates.tolist()}")
         selected_candidate = np.random.choice(candidates)
@@ -470,7 +490,7 @@ def generate_divergent_group(loader, group_size, user_embedding, filt_out, histo
         filt_out.append(selected_candidate)
         indices.append(selected_candidate.item())
         # Append it to current group
-        prefix_embeddings = np.concatenate([prefix_embeddings, rm_normed[selected_candidate][np.newaxis, :]], axis=0)
+        prefix_embeddings = np.concatenate([prefix_embeddings, user_embedding_matrix[selected_candidate][np.newaxis, :]], axis=0)
     
     assert prefix_embeddings.shape == (group_size, n_items), f"prefix_embeddings.shape={prefix_embeddings.shape}"
 
@@ -483,15 +503,20 @@ def generate_divergent_group(loader, group_size, user_embedding, filt_out, histo
         "indices": indices,
         "extra_data": {
             "mean_sim": (group_sim[np.triu_indices(group_size, k=1)].sum() / ((group_size * (group_size - 1)) / 2)).item(),
-            "past_positive_history": {user_idx : get_past_positive_history(user_idx, loader.rating_matrix, history_length_limit).tolist() for user_idx in indices}
+            "past_positive_history": {user_idx : get_past_positive_history(user_idx, rating_matrix_orig, history_length_limit).tolist() for user_idx in indices}
         }
     }
 
-def generate_outlier_group(loader, group_size, user_embedding, history_length_limit):
+# Pre-computed outside as np.percentile(1.0 - user_similarity_matrix[np.triu_indices(user_similarity_matrix.shape[0], k=1)], 70)
+SIM_LIMIT = 0.9183362722396851
+
+def generate_outlier_group(loader, rating_matrix_extended, rating_matrix_orig, group_size, user_embedding, history_length_limit):
     start_time = time.perf_counter()
-    rm_normed = get_normalized_rating_matrix(loader)
+    rm_normed = get_normalized_rating_matrix(loader, rating_matrix_extended)
     per_user_ratings = rm_normed.sum(axis=1)
     n_users, n_items = rm_normed.shape
+    # Take embeddings from extended rating matrix
+    user_embedding_matrix = rating_matrix_extended
     indices = []
     # Outlier embedding is either the user, or randomly sampled vector from the rating matrix
     # Depending on the study variables
@@ -502,7 +527,7 @@ def generate_outlier_group(loader, group_size, user_embedding, history_length_li
     else:
         non_zero_users = np.where(per_user_ratings > 0)[0]
         rnd_idx = np.random.choice(non_zero_users)
-        prefix_embeddings = rm_normed[rnd_idx]
+        prefix_embeddings = user_embedding_matrix[rnd_idx]
         filt_out = [rnd_idx]
         indices.append(rnd_idx.item())
 
@@ -516,7 +541,7 @@ def generate_outlier_group(loader, group_size, user_embedding, history_length_li
     # Once we have it, we basically just generate similar group around the divergent member, this time, of size group_size - 1
     # We pass filt out so that it does not happen that second selected member is the same as the randomly generated outlier
     # Although this should never happen given that we generate divergent group and similarity of user to itself is 0
-    div_group = generate_divergent_group(loader, 2, prefix_embeddings[outlier_index], filt_out=filt_out, history_length_limit=history_length_limit)
+    div_group = generate_divergent_group(loader, rating_matrix_extended, rating_matrix_orig, 2, prefix_embeddings[outlier_index], filt_out=filt_out, history_length_limit=history_length_limit)
     assert div_group['embeddings'].shape == (2, n_items), f"div_group.shape={div_group['embeddings'].shape}"
 
     # We need to replace the -1 inside div_group since we passed prefix_embeddings[outlier_index] as the user embedding but it may not be user embedding actually
@@ -529,7 +554,8 @@ def generate_outlier_group(loader, group_size, user_embedding, history_length_li
         # We still need group_size - 1 to be >= 2 that is why the "if" above
         # Now we generate similar group so it is much more important to properly pass filt_out
         # so that we do not include a user twice
-        sim_group = generate_similar_group(loader, group_size - 1, div_group['embeddings'][1], filt_out=filt_out, history_length_limit=history_length_limit)
+        sim_group = generate_similar_group(loader, rating_matrix_extended, rating_matrix_orig, group_size - 1, div_group['embeddings'][1], filt_out=filt_out, history_length_limit=history_length_limit,
+                                          min_dist_constraint=(div_group['embeddings'][0], SIM_LIMIT))
         # We need to replace the -1 inside div_group since we passed prefix_embeddings[outlier_index] as the user embedding but it may not be user embedding actually
         if user_embedding is None:
             idx = sim_group["indices"].index(-1)
@@ -555,18 +581,16 @@ def generate_outlier_group(loader, group_size, user_embedding, history_length_li
             "extra_data": {
                 "mean_sim_homogeneous_part": (group_sim_homogeneous[np.triu_indices(group_size - 1, k=1)].sum() / (((group_size - 1) * (group_size - 2)) / 2)).item(),
                 "mean_outlier_sim": mean_outlier_sim.mean().item(),
-                "past_positive_history": {user_idx : get_past_positive_history(user_idx, loader.rating_matrix, history_length_limit).tolist() for user_idx in indices + sim_group['indices']}
+                "past_positive_history": {user_idx : get_past_positive_history(user_idx, rating_matrix_orig, history_length_limit).tolist() for user_idx in indices + sim_group['indices']}
             }}
     else:
         group_sim = cos_sim_np(div_group["embeddings"])
         assert group_sim.shape == (group_size, group_size), f"group_sim.shape={group_sim.shape}"
         div_group["extra_data"] = {
             "mean_outlier_sim": (group_sim[np.triu_indices(group_size, k=1)].sum() / ((group_size * (group_size - 1)) / 2)).item(),
-            "past_positive_history": {user_idx : get_past_positive_history(user_idx, loader.rating_matrix, history_length_limit).tolist() for user_idx in div_group['indices']}
+            "past_positive_history": {user_idx : get_past_positive_history(user_idx, rating_matrix_orig, history_length_limit).tolist() for user_idx in div_group['indices']}
         }
         return div_group
-
-
 
 
 # What is outcome of group generation
@@ -574,11 +598,11 @@ def generate_outlier_group(loader, group_size, user_embedding, history_length_li
 # Corresponding to "user" embeddings. The term user here is vague, we do not deal
 # with user IDs and instead, only care about the embeddings
 
-def generate_groups(loader, group_types_permutation, group_size, user_embedding, history_length_limit):
+def generate_groups(loader, rating_matrix_extended, rating_matrix_orig, group_types_permutation, group_size, user_embedding, history_length_limit):
     assert group_size >= 2, f"group_size={group_size}"
-    rm_normed = get_normalized_rating_matrix(loader)
-    n_users, n_items = rm_normed.shape
-
+    n_users, n_items = rating_matrix_extended.shape
+    # Take embeddings from extended rating matrix
+    user_embedding_matrix = rating_matrix_extended
     #similarity_matrix = get_user_similarity_matrix(loader)
 
     resulting_groups = []
@@ -586,15 +610,15 @@ def generate_groups(loader, group_types_permutation, group_size, user_embedding,
     for gtype in group_types_permutation:
         assert gtype in GROUP_TYPES, f"gtype={gtype}"
         if gtype == "similar":
-            resulting_groups.append(generate_similar_group(loader, group_size, user_embedding, [], history_length_limit))
+            resulting_groups.append(generate_similar_group(loader, rating_matrix_extended, rating_matrix_orig, group_size, user_embedding, [], history_length_limit))
         elif gtype == "divergent":
-            resulting_groups.append(generate_divergent_group(loader, group_size, user_embedding, [], history_length_limit))
+            resulting_groups.append(generate_divergent_group(loader, rating_matrix_extended, rating_matrix_orig, group_size, user_embedding, [], history_length_limit))
         elif gtype == "random":
             # Random is so simple that we do it inline here
             if user_embedding is not None:
                 # We have group_size - 1 users and combine it with input user embedding (the real user doing the study)
                 members = np.random.choice(n_users, group_size - 1, replace=False)
-                emb = np.concatenate([rm_normed[members], user_embedding], axis=0)
+                emb = np.concatenate([user_embedding_matrix[members], user_embedding], axis=0)
                 group_sim = cos_sim_np(emb)
                 assert group_sim.shape == (group_size, group_size), f"group_sim.shape={group_sim.shape}"
                 resulting_groups.append({
@@ -602,13 +626,13 @@ def generate_groups(loader, group_types_permutation, group_size, user_embedding,
                     "indices": [-1] + members.tolist(),
                     "extra_data": {
                         "mean_sim": group_sim[np.triu_indices(group_size, k=1)].sum() / ((group_size * (group_size - 1)) / 2),
-                        "past_positive_history": {user_idx : get_past_positive_history(user_idx, loader.rating_matrix, history_length_limit).tolist() for user_idx in [-1] + members.tolist()}
+                        "past_positive_history": {user_idx : get_past_positive_history(user_idx, rating_matrix_orig, history_length_limit).tolist() for user_idx in [-1] + members.tolist()}
                     }
                 })
             else:
                 # We just sample all the embeddings
                 rnd_members = np.random.choice(n_users, group_size, replace=False)
-                emb = rm_normed[rnd_members]
+                emb = user_embedding_matrix[rnd_members]
                 group_sim = cos_sim_np(emb)
                 assert group_sim.shape == (group_size, group_size), f"group_sim.shape={group_sim.shape}"
                 resulting_groups.append({
@@ -616,11 +640,11 @@ def generate_groups(loader, group_types_permutation, group_size, user_embedding,
                     "indices": rnd_members.tolist(),
                     "extra_data": {
                         "mean_sim": group_sim[np.triu_indices(group_size, k=1)].sum() / ((group_size * (group_size - 1)) / 2),
-                        "past_positive_history": {user_idx : get_past_positive_history(user_idx, loader.rating_matrix, history_length_limit).tolist() for user_idx in rnd_members}
+                        "past_positive_history": {user_idx : get_past_positive_history(user_idx, rating_matrix_orig, history_length_limit).tolist() for user_idx in rnd_members}
                     }
                 })
         elif gtype == "outlier":
-            resulting_groups.append(generate_outlier_group(loader, group_size, user_embedding, history_length_limit))
+            resulting_groups.append(generate_outlier_group(loader, rating_matrix_extended, rating_matrix_orig, group_size, user_embedding, history_length_limit))
 
         print(resulting_groups[-1]['extra_data']['past_positive_history'])
         assert len(resulting_groups[-1]['indices']) == len(resulting_groups[-1]['extra_data']['past_positive_history'])
@@ -906,7 +930,10 @@ def generate_group_recommendations(conf, loader, iteration, shown_items, group_c
     ratings_normed = []
     ratings_lists = []
     for g_user in group_members:
-        member_selections = np.where(loader.rating_matrix[g_user] > 0.0)[0]
+        if g_user == -1:
+            member_selections = np.array(user_data['elicitation_selected_movies'], dtype=np.int32)
+        else:
+            member_selections = np.where(loader.rating_matrix[g_user] > 0.0)[0]
         # conf['k'] is actually not needed since we only care about scores not the top_k
         scores, user_vector, top_k = ease.predict_with_score(member_selections, member_selections, conf['k'])
         scores_list = scores.tolist()
@@ -1164,13 +1191,22 @@ def group_gen():
 
     history_length_limit = conf["user_history_length"]
 
+    extended_rm = get_extended_rm(os.path.join(get_cache_path(get_semi_local_cache_name(loader)), "extended_rm.npy"))
+
     if is_user_part_of_group:
         user_embedding = np.zeros(shape=(n_items, ), dtype=np.int8)
         user_embedding[user_data['elicitation_selected_movies']] = 1
         assert sum(user_embedding) > 0, f"{len(user_embedding)} <= 0, {user_data['elicitation_selected_movies']}"
-        groups = generate_groups(loader, user_data['selected_group_types'], conf['group_size'], user_embedding, history_length_limit)
+
+        items = np.arange(loader.rating_matrix.shape[1])
+        ease = EASER_pretrained(items)
+        ease = ease.load(os.path.join(get_cache_path(get_semi_local_cache_name(loader)), "item_item.npy"))
+
+        user_embedding = np.dot(user_embedding, ease.item_item)
+
+        groups = generate_groups(loader, extended_rm, loader.rating_matrix, user_data['selected_group_types'], conf['group_size'], user_embedding, history_length_limit)
     else:
-        groups = generate_groups(loader, user_data['selected_group_types'], conf['group_size'], user_embedding=None, history_length_limit=history_length_limit)
+        groups = generate_groups(loader, extended_rm, loader.rating_matrix, user_data['selected_group_types'], conf['group_size'], user_embedding=None, history_length_limit=history_length_limit)
 
     print(f"Until end of group generation it took: {time.perf_counter() - start_time}")
 
