@@ -1830,7 +1830,7 @@ def get_engagement_question():
         text = "How often do you typically engage in watching movies?"
         options = [
             "Non-Watcher / Infrequent Viewer (watch movies rarely/never)",
-            "Casual Viewer (watch movies occasionally, maybe a few times a week)",
+            "Casual Viewer (watch movies occasionally, maybe a few times a month)",
             "Frequent Viewer (watch one or two movies per week)",
             "Enthusiastic Viewer (watch several movies a week)"
         ]
