@@ -115,7 +115,7 @@ POSITIVE_RATING_THRESHOLD = 3.0
 ######
 
 
-ENABLE_DEBUG = False
+ENABLE_DEBUG = True
 
 
 ## GRS Algorihm Implementations ##
@@ -258,6 +258,13 @@ def load_cdf_cache(base_path, metric_name):
 @functools.lru_cache(maxsize=None)
 def get_extended_rm(path):
     return np.load(path)
+
+@cached(cache={}, key=lambda loader: loader.name())
+def get_pre_generated_config(loader):
+    path = os.path.join(get_cache_path(get_semi_local_cache_name(loader)), "group_and_recommendations_without_embeddings.pkl")
+    with open(path, "rb") as f:
+        return pickle.load(f)
+
 
 #################################################################################
 ###########################   ALGORITHMS   ######################################
@@ -889,6 +896,9 @@ def send_feedback():
 
     return redirect(url_for("grs2024.group_gen"))
 
+def use_pre_generated(conf):
+    return conf["group_source"] == "Pre-generated"
+
 
 def generate_group_recommendations(conf, loader, iteration, shown_items, group_choices):
     user_data = get_all(get_uname())
@@ -906,70 +916,73 @@ def generate_group_recommendations(conf, loader, iteration, shown_items, group_c
 
     selected_group_types = user_data["selected_group_types"]
 
-    items = np.arange(loader.rating_matrix.shape[1])
-    ease = EASER_pretrained(items)
-    ease = ease.load(os.path.join(get_cache_path(get_semi_local_cache_name(loader)), "item_item.npy"))
-
-    print(f"Until EASE got loaded it took: {time.perf_counter() - start_time}")
 
     # groups contains 1 group per group type
     # the whole configuration looks like selected_group_types where each element is repeated
     groups = get_val('groups')
     current_group_type = generated_iters[iteration]['group_type']
-    print(f"current_group_type: {current_group_type}, selected_group_types: {selected_group_types}, groups: {groups}")
-    current_group = groups[selected_group_types.index(current_group_type)]
 
-    group_members = current_group['indices']
+    if not use_pre_generated(conf):
+        items = np.arange(loader.rating_matrix.shape[1])
+        ease = EASER_pretrained(items)
+        ease = ease.load(os.path.join(get_cache_path(get_semi_local_cache_name(loader)), "item_item.npy"))
 
-    # Instead of iterating algorithms first, we first iterate over users
-    # Since all GRS can reuse output of single EASE call
-    n_per_user_selections = []
-    user_ids = []
-    items_ids = []
-    ratings_raw = []
-    ratings_normed = []
-    ratings_lists = []
-    for g_user in group_members:
-        if g_user == -1:
-            member_selections = np.array(user_data['elicitation_selected_movies'], dtype=np.int32)
-        else:
-            member_selections = np.where(loader.rating_matrix[g_user] > 0.0)[0]
-        # conf['k'] is actually not needed since we only care about scores not the top_k
-        scores, user_vector, top_k = ease.predict_with_score(member_selections, member_selections, conf['k'])
-        scores_list = scores.tolist()
+        print(f"Until EASE got loaded it took: {time.perf_counter() - start_time}")
 
-        non_neg_inf_score_indices = scores > NEG_INF
-        neg_inf_score_indices = scores <= NEG_INF
-        qt = MinMaxScaler().fit(scores[non_neg_inf_score_indices].reshape(-1, 1))
-        scores_transformed = qt.transform(scores.reshape(-1, 1)).reshape(scores.shape)
-        scores_transformed[neg_inf_score_indices] = NEG_INF
-        ratings_raw.extend(scores_list)
-        ratings_normed.extend(scores_transformed.tolist())
-        ratings_lists.append(scores_transformed)
-        items_ids.extend(items.tolist())
-        user_ids.extend([g_user] * items.size)
-        n_per_user_selections.append(len(member_selections))
-        assert len(member_selections) == scores[scores == NEG_INF].size, f"NEG_INF={NEG_INF} occurrences not matching {member_selections}, {scores_list}"
+        print(f"current_group_type: {current_group_type}, selected_group_types: {selected_group_types}, groups: {groups}")
+        current_group = groups[selected_group_types.index(current_group_type)]
 
-    group_ratings_full = pd.DataFrame({
-        "user": user_ids,
-        "item": items_ids,
-        "predicted_rating_raw" : ratings_raw,
-        "predicted_rating": ratings_normed,
-    })
+        group_members = current_group['indices']
 
-    old_size = len(group_ratings_full)
-    neg_inf_rating_items = group_ratings_full[group_ratings_full['predicted_rating'] <= NEG_INF]['item'].unique()
-    # We need to drop all the rows that contain item rated NEG_INF by ANY of the group members
-    group_ratings = group_ratings_full[~group_ratings_full['item'].isin(neg_inf_rating_items)]
-    #group_ratings = group_ratings_full[group_ratings_full.predicted_rating != NEG_INF]
-    # Assertion no longer hold since if only one group mamber gave NEG_INF, we filter it out from all the users
-    #assert old_size - len(group_ratings) == sum(n_per_user_selections), f"Number of selections per user ({n_per_user_selections}) not reflected in size drop: {old_size}, {len(group_ratings)}"
+        # Instead of iterating algorithms first, we first iterate over users
+        # Since all GRS can reuse output of single EASE call
+        n_per_user_selections = []
+        user_ids = []
+        items_ids = []
+        ratings_raw = []
+        ratings_normed = []
+        ratings_lists = []
+        for g_user in group_members:
+            if g_user == -1:
+                member_selections = np.array(user_data['elicitation_selected_movies'], dtype=np.int32)
+            else:
+                member_selections = np.where(loader.rating_matrix[g_user] > 0.0)[0]
+            # conf['k'] is actually not needed since we only care about scores not the top_k
+            scores, user_vector, top_k = ease.predict_with_score(member_selections, member_selections, conf['k'])
+            scores_list = scores.tolist()
+
+            non_neg_inf_score_indices = scores > NEG_INF
+            neg_inf_score_indices = scores <= NEG_INF
+            qt = MinMaxScaler().fit(scores[non_neg_inf_score_indices].reshape(-1, 1))
+            scores_transformed = qt.transform(scores.reshape(-1, 1)).reshape(scores.shape)
+            scores_transformed[neg_inf_score_indices] = NEG_INF
+            ratings_raw.extend(scores_list)
+            ratings_normed.extend(scores_transformed.tolist())
+            ratings_lists.append(scores_transformed)
+            items_ids.extend(items.tolist())
+            user_ids.extend([g_user] * items.size)
+            n_per_user_selections.append(len(member_selections))
+            assert len(member_selections) == scores[scores == NEG_INF].size, f"NEG_INF={NEG_INF} occurrences not matching {member_selections}, {scores_list}"
+
+        group_ratings_full = pd.DataFrame({
+            "user": user_ids,
+            "item": items_ids,
+            "predicted_rating_raw" : ratings_raw,
+            "predicted_rating": ratings_normed,
+        })
+
+        old_size = len(group_ratings_full)
+        neg_inf_rating_items = group_ratings_full[group_ratings_full['predicted_rating'] <= NEG_INF]['item'].unique()
+        # We need to drop all the rows that contain item rated NEG_INF by ANY of the group members
+        group_ratings = group_ratings_full[~group_ratings_full['item'].isin(neg_inf_rating_items)]
+        #group_ratings = group_ratings_full[group_ratings_full.predicted_rating != NEG_INF]
+        # Assertion no longer hold since if only one group mamber gave NEG_INF, we filter it out from all the users
+        #assert old_size - len(group_ratings) == sum(n_per_user_selections), f"Number of selections per user ({n_per_user_selections}) not reflected in size drop: {old_size}, {len(group_ratings)}"
 
 
-    print(f"Until we get the predictions for group members: {time.perf_counter() - start_time}")
-    group_ratings_rm = np.stack(ratings_lists, axis=0)
-    group_ratings_rm[:, neg_inf_rating_items] = NEG_INF
+        print(f"Until we get the predictions for group members: {time.perf_counter() - start_time}")
+        group_ratings_rm = np.stack(ratings_lists, axis=0)
+        group_ratings_rm[:, neg_inf_rating_items] = NEG_INF
 
     # Recommendations from all available algorithms, not just those selected for current iteration
     # Only used for logging purposes
@@ -1004,21 +1017,28 @@ def generate_group_recommendations(conf, loader, iteration, shown_items, group_c
 
         all_filter_out_items = list(itertools.chain(*filter_out_items[algo_anon][current_group_type]))
 
-        group_ratings_rm_copy = group_ratings_rm.copy()
-        group_ratings_rm_copy[:, all_filter_out_items] = NEG_INF
-
-        # Build the group_ratings dataframe in the format that is expected
-        # by the algorithms, so basically DF with the following columns: [user, item, predicted_rating]
-        if algo_name == "RLProp":
-            # We use precomputed rating matrix to save on time (since we would pivot inside RLProp and that would take unneccessary time)
-            rec_list = algo.generate_group_recommendations_for_group(group_ratings,
-                                                                     recommendations_number=conf['k'],
-                                                                     group_ratings_rm=group_ratings_rm_copy,
-                                                                     past_recommendations=filter_out_items[algo_anon][current_group_type])
+        if use_pre_generated(conf):
+            selected_group_idx = user_data["selected_group_idx"]
+            pre_generated = get_pre_generated_config(loader)
+            pre_generated_rec = pre_generated[current_group_type][selected_group_idx[current_group_type]]["recommendations"]
+            rec_list = pre_generated_rec[algo_name]["top_k"]
         else:
-            rec_list = algo.generate_group_recommendations_for_group(group_ratings[~group_ratings.item.isin(all_filter_out_items)],
-                                                                     recommendations_number=conf['k'])
-        rec_list = rec_list[algo_name]
+            group_ratings_rm_copy = group_ratings_rm.copy()
+            group_ratings_rm_copy[:, all_filter_out_items] = NEG_INF
+
+            # Build the group_ratings dataframe in the format that is expected
+            # by the algorithms, so basically DF with the following columns: [user, item, predicted_rating]
+            if algo_name == "RLProp":
+                # We use precomputed rating matrix to save on time (since we would pivot inside RLProp and that would take unneccessary time)
+                rec_list = algo.generate_group_recommendations_for_group(group_ratings,
+                                                                        recommendations_number=conf['k'],
+                                                                        group_ratings_rm=group_ratings_rm_copy,
+                                                                        past_recommendations=filter_out_items[algo_anon][current_group_type])
+            else:
+                rec_list = algo.generate_group_recommendations_for_group(group_ratings[~group_ratings.item.isin(all_filter_out_items)],
+                                                                        recommendations_number=conf['k'])
+            rec_list = rec_list[algo_name]
+
         rec_list = enrich_results(rec_list, loader)
 
         if selected_choice_model == "Same":
@@ -1027,20 +1047,23 @@ def generate_group_recommendations(conf, loader, iteration, shown_items, group_c
         # Add information about predicted rating w.r.t. each of the group members
         for idx in range(len(rec_list)):
             movie_idx = int(rec_list[idx]["movie_idx"])
-            predicted_ratings = group_ratings[group_ratings.item == movie_idx].set_index("user")
-            assert len(predicted_ratings) == len(group_members), f"{len(predicted_ratings)} != {len(group_members)}"
+            if use_pre_generated(conf):
+                rec_list[idx]["extra_data"] = pre_generated_rec[algo_name]["extra_data"][idx]
+            else:
+                predicted_ratings = group_ratings[group_ratings.item == movie_idx].set_index("user")
+                assert len(predicted_ratings) == len(group_members), f"{len(predicted_ratings)} != {len(group_members)}"
 
-            group_member_ratings_raw, group_member_ratings_normed, group_member_ratings_normed_percentage = dict(), dict(), dict()
-            for g_uid in group_members:
-                group_member_ratings_raw[g_uid] = predicted_ratings.loc[g_uid].predicted_rating_raw
-                group_member_ratings_normed[g_uid] = predicted_ratings.loc[g_uid].predicted_rating
-                group_member_ratings_normed_percentage[g_uid] = round(group_member_ratings_normed[g_uid] * 100)
+                group_member_ratings_raw, group_member_ratings_normed, group_member_ratings_normed_percentage = dict(), dict(), dict()
+                for g_uid in group_members:
+                    group_member_ratings_raw[g_uid] = predicted_ratings.loc[g_uid].predicted_rating_raw
+                    group_member_ratings_normed[g_uid] = predicted_ratings.loc[g_uid].predicted_rating
+                    group_member_ratings_normed_percentage[g_uid] = round(group_member_ratings_normed[g_uid] * 100)
 
-            rec_list[idx]["extra_data"] = {
-                "group_member_ratings_raw": group_member_ratings_raw,
-                "group_member_ratings_normed": group_member_ratings_normed,
-                "group_member_ratings_normed_percentage": group_member_ratings_normed_percentage,
-            }
+                rec_list[idx]["extra_data"] = {
+                    "group_member_ratings_raw": group_member_ratings_raw,
+                    "group_member_ratings_normed": group_member_ratings_normed,
+                    "group_member_ratings_normed_percentage": group_member_ratings_normed_percentage,
+                }
 
         group_recommendations[algo_anon] = {
             "movies": rec_list,
@@ -1074,21 +1097,27 @@ def generate_group_recommendations(conf, loader, iteration, shown_items, group_c
 
         all_filter_out_items = list(itertools.chain(*filter_out_items[algo_anon][current_group_type]))
 
-        group_ratings_rm_copy = group_ratings_rm.copy()
-        group_ratings_rm_copy[:, all_filter_out_items] = NEG_INF
-
-        # Build the group_ratings dataframe in the format that is expected
-        # by the algorithms, so basically DF with the following columns: [user, item, predicted_rating]
-        if algo_name == "RLProp":
-            # We use precomputed rating matrix to save on time (since we would pivot inside RLProp and that would take unneccessary time)
-            rec_list = algo.generate_group_recommendations_for_group(group_ratings,
-                                                                     recommendations_number=conf['k'],
-                                                                     group_ratings_rm=group_ratings_rm_copy,
-                                                                     past_recommendations=filter_out_items[algo_anon][current_group_type])
+        if use_pre_generated(conf):
+            selected_group_idx = user_data["selected_group_idx"]
+            pre_generated = get_pre_generated_config(loader)
+            pre_generated_rec = pre_generated[current_group_type][selected_group_idx[current_group_type]]["recommendations"]
+            rec_list = pre_generated_rec[algo_name]["top_k"]
         else:
-            rec_list = algo.generate_group_recommendations_for_group(group_ratings[~group_ratings.item.isin(all_filter_out_items)],
-                                                                     recommendations_number=conf['k'])
-        rec_list = rec_list[algo_name]
+            group_ratings_rm_copy = group_ratings_rm.copy()
+            group_ratings_rm_copy[:, all_filter_out_items] = NEG_INF
+
+            # Build the group_ratings dataframe in the format that is expected
+            # by the algorithms, so basically DF with the following columns: [user, item, predicted_rating]
+            if algo_name == "RLProp":
+                # We use precomputed rating matrix to save on time (since we would pivot inside RLProp and that would take unneccessary time)
+                rec_list = algo.generate_group_recommendations_for_group(group_ratings,
+                                                                        recommendations_number=conf['k'],
+                                                                        group_ratings_rm=group_ratings_rm_copy,
+                                                                        past_recommendations=filter_out_items[algo_anon][current_group_type])
+            else:
+                rec_list = algo.generate_group_recommendations_for_group(group_ratings[~group_ratings.item.isin(all_filter_out_items)],
+                                                                        recommendations_number=conf['k'])
+            rec_list = rec_list[algo_name]
         rec_list = enrich_results(rec_list, loader)
 
         if selected_choice_model == "Same":
@@ -1097,24 +1126,27 @@ def generate_group_recommendations(conf, loader, iteration, shown_items, group_c
         # Add information about predicted rating w.r.t. each of the group members
         for idx in range(len(rec_list)):
             movie_idx = int(rec_list[idx]["movie_idx"])
-            predicted_ratings = group_ratings[group_ratings.item == movie_idx].set_index("user")
-            assert len(predicted_ratings) == len(group_members), f"{len(predicted_ratings)} != {len(group_members)}"
-            
-            group_member_ratings_raw, group_member_ratings_normed, group_member_ratings_normed_percentage = dict(), dict(), dict()
-            for g_uid in group_members:
-                group_member_ratings_raw[g_uid] = predicted_ratings.loc[g_uid].predicted_rating_raw
-                group_member_ratings_normed[g_uid] = predicted_ratings.loc[g_uid].predicted_rating
-                group_member_ratings_normed_percentage = round(group_member_ratings_normed[g_uid] * 100)
+            if use_pre_generated(conf):
+                rec_list[idx]["extra_data"] = pre_generated_rec[algo_name]["extra_data"][idx]
+            else:
+                predicted_ratings = group_ratings[group_ratings.item == movie_idx].set_index("user")
+                assert len(predicted_ratings) == len(group_members), f"{len(predicted_ratings)} != {len(group_members)}"
 
-            rec_list[idx]["extra_data"] = {
-                "group_member_ratings_raw": group_member_ratings_raw,
-                "group_member_ratings_normed": group_member_ratings_normed,
-                "group_member_ratings_normed_percentage": group_member_ratings_normed_percentage,
-            }
+                group_member_ratings_raw, group_member_ratings_normed, group_member_ratings_normed_percentage = dict(), dict(), dict()
+                for g_uid in group_members:
+                    group_member_ratings_raw[g_uid] = predicted_ratings.loc[g_uid].predicted_rating_raw
+                    group_member_ratings_normed[g_uid] = predicted_ratings.loc[g_uid].predicted_rating
+                    group_member_ratings_normed_percentage[g_uid] = round(group_member_ratings_normed[g_uid] * 100)
+
+                rec_list[idx]["extra_data"] = {
+                    "group_member_ratings_raw": group_member_ratings_raw,
+                    "group_member_ratings_normed": group_member_ratings_normed,
+                    "group_member_ratings_normed_percentage": group_member_ratings_normed_percentage,
+                }
 
         full_recs[algo_name] = {
             "movies": rec_list,
-            "order": order,
+            "order": -1, # Not Shown
             "filter_out_items": filter_out_items,
             "all_filter_out_items": all_filter_out_items,
         }
@@ -1122,6 +1154,7 @@ def generate_group_recommendations(conf, loader, iteration, shown_items, group_c
     # "Same" was already handled above
     # "None" does not need any handling
     if selected_choice_model not in ["Same", "None"]:
+        assert not use_pre_generated(conf), "Using pre-generated is currently only supported with choice model Same or None"
         for algo_anon, recs in group_recommendations.items():
 
             algo_name = algo_anon_to_name[algo_anon]
@@ -1175,11 +1208,6 @@ def group_gen():
 
     conf = load_user_study_config(session['user_study_id'])
 
-    if conf["group_source"] == "Pre-generated":
-        print("USING PRE-GENERATED GROUPS")
-
-    is_user_part_of_group = user_data['selected_user_part_of_group']
-
     # Get a loader
     loader_factory = load_data_loaders()[conf["selected_data_loader"]]
     loader = loader_factory(**filter_params(conf["data_loader_parameters"], loader_factory))
@@ -1187,41 +1215,75 @@ def group_gen():
 
     print(f"Until we got the data loader it took: {time.perf_counter() - start_time}")
 
-    n_items = loader.rating_matrix.shape[1]
+    new_data = dict()
 
-    history_length_limit = conf["user_history_length"]
+    if use_pre_generated(conf):
+        pre_generated = get_pre_generated_config(loader)
+        groups_indices = []
+        groups_indices_named = dict()
+        groups_extra_data = dict()
+        groups = []
 
-    extended_rm = get_extended_rm(os.path.join(get_cache_path(get_semi_local_cache_name(loader)), "extended_rm.npy"))
+        selected_group_idx = dict()
+        selected_group = dict()
+        for gtype in user_data['selected_group_types']:
+            n_groups = np.arange(len(pre_generated[gtype]))
+            selected_g_index = int(np.random.choice(n_groups))
+            # For each group type, randomly select one pre-generated group
+            selected_group_idx[gtype] = selected_g_index
+            selected_g = pre_generated[gtype][selected_g_index]
+            selected_group[gtype] = selected_g
 
-    if is_user_part_of_group:
-        user_embedding = np.zeros(shape=(n_items, ), dtype=np.int8)
-        user_embedding[user_data['elicitation_selected_movies']] = 1
-        assert sum(user_embedding) > 0, f"{len(user_embedding)} <= 0, {user_data['elicitation_selected_movies']}"
+            groups_indices.append(selected_g["group"]["indices"])
+            groups_indices_named[gtype] = selected_g["group"]["indices"]
+            groups_extra_data[gtype] = selected_g["group"]["extra_data"]
+            groups.append(selected_g["group"])
 
-        items = np.arange(loader.rating_matrix.shape[1])
-        ease = EASER_pretrained(items)
-        ease = ease.load(os.path.join(get_cache_path(get_semi_local_cache_name(loader)), "item_item.npy"))
+        print("USING PRE-GENERATED GROUPS")
+        new_data["pre_generated"] = {
+            "selected_group_idx": selected_group_idx,
+            "selected_group": selected_group
+        }
 
-        user_embedding = np.dot(user_embedding, ease.item_item)
-
-        groups = generate_groups(loader, extended_rm, loader.rating_matrix, user_data['selected_group_types'], conf['group_size'], user_embedding, history_length_limit)
+        set_val("selected_group_idx", selected_group_idx)
     else:
-        groups = generate_groups(loader, extended_rm, loader.rating_matrix, user_data['selected_group_types'], conf['group_size'], user_embedding=None, history_length_limit=history_length_limit)
+        is_user_part_of_group = user_data['selected_user_part_of_group']
 
-    print(f"Until end of group generation it took: {time.perf_counter() - start_time}")
 
-    # We only store indices and no embeddings as these could be easily retrieved later
-    # from the pre-loaded rating matrix
-    groups_indices = [groups[idx]['indices'] for idx, _ in enumerate(user_data['selected_group_types'])]
-    groups_indices_named = {gtype: groups[idx]['indices'] for idx, gtype in enumerate(user_data['selected_group_types'])}
-    groups_extra_data = {gtype: groups[idx]['extra_data'] for idx, gtype in enumerate(user_data['selected_group_types'])}
+        n_items = loader.rating_matrix.shape[1]
+
+        history_length_limit = conf["user_history_length"]
+
+        extended_rm = get_extended_rm(os.path.join(get_cache_path(get_semi_local_cache_name(loader)), "extended_rm.npy"))
+
+        if is_user_part_of_group:
+            user_embedding = np.zeros(shape=(n_items, ), dtype=np.int8)
+            user_embedding[user_data['elicitation_selected_movies']] = 1
+            assert sum(user_embedding) > 0, f"{len(user_embedding)} <= 0, {user_data['elicitation_selected_movies']}"
+
+            items = np.arange(loader.rating_matrix.shape[1])
+            ease = EASER_pretrained(items)
+            ease = ease.load(os.path.join(get_cache_path(get_semi_local_cache_name(loader)), "item_item.npy"))
+
+            user_embedding = np.dot(user_embedding, ease.item_item)
+
+            groups = generate_groups(loader, extended_rm, loader.rating_matrix, user_data['selected_group_types'], conf['group_size'], user_embedding, history_length_limit)
+        else:
+            groups = generate_groups(loader, extended_rm, loader.rating_matrix, user_data['selected_group_types'], conf['group_size'], user_embedding=None, history_length_limit=history_length_limit)
+
+        print(f"Until end of group generation it took: {time.perf_counter() - start_time}")
+
+        # We only store indices and no embeddings as these could be easily retrieved later
+        # from the pre-loaded rating matrix
+        groups_indices = [groups[idx]['indices'] for idx, _ in enumerate(user_data['selected_group_types'])]
+        groups_indices_named = {gtype: groups[idx]['indices'] for idx, gtype in enumerate(user_data['selected_group_types'])}
+        groups_extra_data = {gtype: groups[idx]['extra_data'] for idx, gtype in enumerate(user_data['selected_group_types'])}
+
     initial_iteration = 0
-    new_data = {
-        "groups_indices": groups_indices,
-        "groups_indices_named": groups_indices_named,
-        "groups_extra_data": groups_extra_data,
-        "iteration": initial_iteration # Mark the beginning here
-    }
+    new_data["groups_indices"] = groups_indices
+    new_data["groups_indices_named"] = groups_indices_named
+    new_data["groups_extra_data"] = groups_extra_data
+    new_data["iteration"] = initial_iteration # Mark the beginning here
 
     set_mapping(get_uname(), new_data)
     set_val('groups', groups)
@@ -1663,7 +1725,7 @@ def get_group_member_histories():
 
     print("Getting group member histories")
     g_data = user_data["groups_extra_data"]
-    #print(f"Got data: {g_data}")
+    print(f"Got data: {g_data}")
     #print(f"Got iteration: {get_val('iteration')}")
     gen_iters = user_data["generated_iters"]
     #print(f"Generated iters: {gen_iters}")
@@ -1700,12 +1762,19 @@ def get_group_member_histories():
         #print(f"\tMember: {member}, type={type(member)}")
         history_item_indices = g_data[current_group_type]['past_positive_history'][member]
         result[member] = enrich_results(history_item_indices, loader)
-        print(ord('A'), idx, cur_block, conf['group_size'], "Result:", ord('A') + idx + cur_block * conf['group_size'])
+        #print(ord('A'), idx, cur_block, conf['group_size'], "Result:", ord('A') + idx + cur_block * conf['group_size'])
         member_to_name[member] = str(chr(ord('A') + idx + cur_block * conf['group_size']))
         #member_to_idx[member] = idx
 
     #print(f"Final result: {result}")
-    print(member_to_name)
+    #print(member_to_name)
+    log_interaction(session["participation_id"], "get-group-member-histories", **{
+        "histories": result,
+        "member_mapping": member_to_name,
+        "iteration": user_data['iteration'],
+        "current_iter_data": current_iter_data,
+        "cur_block": cur_block,
+    })
     return jsonify({
         "histories": result,
         "member_mapping": member_to_name,

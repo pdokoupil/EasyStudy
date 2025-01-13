@@ -199,7 +199,8 @@ interact('.dropzone').dropzone({
         let dragAndDropPos = getElementBoundingBox(event.relatedTarget);
         app.dragAndDropPositions[event.relatedTarget.id] = dragAndDropPos;
         reportOnInput("/utils/on-input", csrfToken, "on-drag-drop", {
-                "dropzone": this.dropzonePosition,
+                "dropzone": app.dropzonePosition,
+                "other_drag_and_drops": app.dragAndDropPositions,
                 "target":  dragAndDropPos,
                 "name": event.relatedTarget.name,
                 "id": event.relatedTarget.id
