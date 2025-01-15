@@ -1589,13 +1589,18 @@ def get_block_questions():
             "name": "q5",
             "icon": "grid",
         },
+        {
+            "text": "Overall, the recommendations were relevant to the individual users in the group.",
+            "name": "q6",
+            "icon": "grid",
+        },
     ]
 
     if extended_explanations:
         questions.append(
             {
                 "text": "Knowing the estimated preference of users (on a 0% - 100% scale) towards recommended items simplified evaluating the fairness of the recommendations.",
-                "name": "q6",
+                "name": "q7",
                 "icon": "grid",
             }
         )
@@ -1604,32 +1609,37 @@ def get_block_questions():
     questions.extend([
         {
             "text": "The highlighted group's choices were generally fair to all members.",
-            "name": "q7",
-            "icon": "ui-checks-grid",
-        },
-        {
-            "text": "The highlighted group's choices were generally the best option among the recommended items.",
             "name": "q8",
             "icon": "ui-checks-grid",
         },
         {
-            "text": "Assessing the fairness of the group's choices was challenging.",
+            "text": "The highlighted group's choices were generally the best option among the recommended items.",
             "name": "q9",
             "icon": "ui-checks-grid",
         },
         {
-            "text": "The provided information was sufficient to evaluate the fairness of the group's choices.",
+            "text": "Assessing the fairness of the group's choices was challenging.",
             "name": "q10",
             "icon": "ui-checks-grid",
         },
         {
-            "text": "Information about group members' history / previously liked movies helped to evaluate the fairness of group choice.",
+            "text": "The provided information was sufficient to evaluate the fairness of the group's choices.",
             "name": "q11",
             "icon": "ui-checks-grid",
         },
         {
-            "text": "There were group members whose preferences were often overlooked in the group choices.",
+            "text": "Information about group members' history / previously liked movies helped to evaluate the fairness of group choice.",
             "name": "q12",
+            "icon": "ui-checks-grid",
+        },
+        {
+            "text": "There were group members whose preferences were often overlooked in the group choices.",
+            "name": "q13",
+            "icon": "ui-checks-grid",
+        },
+        {
+            "text": "Overall, the recommendations provided good choices for the group as a whole.",
+            "name": "q14",
             "icon": "ui-checks-grid",
         },
     ])
@@ -1638,7 +1648,7 @@ def get_block_questions():
         questions.append(
             {
                 "text": "Knowing the estimated preference of users (on a 0% - 100% scale) towards recommended items simplified evaluating the fairness of the group choices.",
-                "name": "q13",
+                "name": "q15",
                 "icon": "ui-checks-grid",
             }
         )
@@ -1646,12 +1656,12 @@ def get_block_questions():
     questions.extend([
         {
             "text": "Did you notice any changes in the fairness of recommendations across iterations?",
-            "name": "q14",
+            "name": "q16",
             "icon": "arrow90deg-right",
         },
         {
             "text": "The recommendations included options for every group member (i.e., each user had at least one preferred item in the recommendations).",
-            "name": "q15",
+            "name": "q17",
             "icon": "grid",
         },
     ])

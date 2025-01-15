@@ -883,6 +883,9 @@ window.dragMoveListener = dragMoveListener;
         }
     },
     async mounted() {
+        const mount_start = performance.now();
+        let performance_measures = {};
+
         const btns = document.querySelectorAll("button");
         const radios = document.querySelectorAll("input[type=radio]");
         const checkboxes = document.querySelectorAll("input[type=checkbox]");
@@ -891,6 +894,7 @@ window.dragMoveListener = dragMoveListener;
         
         this.dropzonePosition = getElementBoundingBox(document.getElementById("dropzone"));
 
+        let start_time = performance.now();
         this.instructionBullets = await fetch("{{url_for('grs2024.get_instruction_bullets', page='compare-grs')}}")
                             .then(response => {
                                 if (!response.ok) {
@@ -899,6 +903,9 @@ window.dragMoveListener = dragMoveListener;
                                 return response.json();
                             });
 
+        performance_measures["get_instruction_bullets"] = performance.now() - start_time;
+
+        start_time = performance.now();
         let groupMemberHistoriesData = await fetch("{{url_for('grs2024.get_group_member_histories')}}")
                             .then(response => {
                                 if (!response.ok) {
@@ -906,6 +913,7 @@ window.dragMoveListener = dragMoveListener;
                                 }
                                 return response.json();
                             });
+        performance_measures["get_group_member_histories"] = performance.now() - start_time;
         this.groupMemberHistories = groupMemberHistoriesData["histories"];
         this.groupMemberMapping = groupMemberHistoriesData["member_mapping"];
         this.membersSorted = Object.keys(this.groupMemberMapping).sort((a, b) => this.groupMemberMapping[a] < this.groupMemberMapping[b] ? -1 : this.groupMemberMapping[a] === this.groupMemberMapping[b] ? 1 : 0);
@@ -932,6 +940,11 @@ window.dragMoveListener = dragMoveListener;
         });
 
         this.$forceUpdate();
+
+        performance_measures["mount"] = performance.now() - mount_start;
+        reportMessage("/utils/on-message", "info", csrfToken, window.location.href, "Mount finished", ()=> {
+                return {"type": "Mount has finished", "time_taken": performance_measures };
+        });
     },
     beforeDestroy() {
         window.removeEventListener('resize', this.setRowHeights); // Remove event listener on component destroy
