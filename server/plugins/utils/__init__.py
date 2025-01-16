@@ -413,7 +413,7 @@ def finish():
     # Prolific stuff
     if "PROLIFIC_PID" in flask.session:
         params["prolific_pid"] = flask.session["PROLIFIC_PID"]
-        params["prolific_url"] = f"https://app.prolific.co/submissions/complete?cc={conf['prolific_code']}"
+        params["prolific_url"] = f"https://app.prolific.com/submissions/complete?cc={conf['prolific_code']}"
     else:
         params["prolific_pid"] = None
 

@@ -432,7 +432,7 @@ def finish_user_study():
     if "PROLIFIC_PID" in session:
         conf = load_user_study_config(session["user_study_id"])
         params["prolific_pid"] = session["PROLIFIC_PID"]
-        params["prolific_url"] = f"https://app.prolific.co/submissions/complete?cc={conf['prolific_code']}"
+        params["prolific_url"] = f"https://app.prolific.com/submissions/complete?cc={conf['prolific_code']}"
     else:
         params["prolific_pid"] = None
 
