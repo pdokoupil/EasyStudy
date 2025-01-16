@@ -119,7 +119,7 @@ POSITIVE_RATING_THRESHOLD = 3.0
 ######
 
 
-ENABLE_DEBUG = True
+ENABLE_DEBUG = False
 LOCK_CONFIG = True
 
 ## GRS Algorihm Implementations ##
@@ -1798,7 +1798,7 @@ def get_instruction_bullets():
         ]
 
         if extended_explanations:
-            bullets.append("Additionally, below each recommended movie, you can see each user's preference for that movie on a 0% to 100% scale")
+            bullets.append("Additionally, below each recommended movie, you can view each user's preference for that movie displayed on a scale from 0% (least preferred) to 100% (most preferred).")
     else:
         bullets = []
 

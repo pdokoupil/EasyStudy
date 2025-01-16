@@ -418,7 +418,7 @@ window.dragMoveListener = dragMoveListener;
                             <b-row align-h="center" class="mt-1 text-center" v-for="userId in membersSorted">
                                 {% if extended_explanations == True %}
                                 <div :style="{'background-color': getGradientColor(parseFloat(col.extra_data.group_member_ratings_normed_percentage[userId])) }">
-                                    [[ (parseFloat(col.extra_data.group_member_ratings_normed_percentage[userId])) ]]
+                                    [[ (parseFloat(col.extra_data.group_member_ratings_normed_percentage[userId])) ]] %
                                 </div>
                                 {% endif %}
                                 <!-- User [[ userIdx + 1 ]] -->
