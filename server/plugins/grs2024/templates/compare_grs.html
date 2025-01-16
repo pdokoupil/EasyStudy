@@ -365,7 +365,7 @@ window.dragMoveListener = dragMoveListener;
         <b-row>
             <b-col v-for="variantResults in variantsResults" :set="algoIdx = variantsResults.indexOf(variantResults)">
                 <b-row style="flex: 1; display: flex; align-items: stretch;" align-h="center">
-                    <h5>{{algorithm}} [[ variantNames[algoIdx] ]]</h5>
+                    <h5>[[ variantNames[algoIdx] ]]</h5>
                 </b-row>
             </b-col>
         </b-row>
@@ -416,9 +416,11 @@ window.dragMoveListener = dragMoveListener;
                         </span>
                             <!-- :class="itemRank === 0 && rowIndex === 0 ? 'selected' : ''" -->
                             <b-row align-h="center" class="mt-1 text-center" v-for="userId in membersSorted">
+                                {% if extended_explanations == True %}
                                 <div :style="{'background-color': getGradientColor(parseFloat(col.extra_data.group_member_ratings_normed_percentage[userId])) }">
-                                    [[ (parseFloat(col.extra_data.group_member_ratings_normed_percentage[userId])) ]] %
+                                    [[ (parseFloat(col.extra_data.group_member_ratings_normed_percentage[userId])) ]]
                                 </div>
+                                {% endif %}
                                 <!-- User [[ userIdx + 1 ]] -->
                                 <!-- <b-col cols="auto" style="height: 100%; margin-left: 1px; margin-right: 1px; padding-left: 0; padding-right: 0;" class="align-middle" v-for="(col, itemRank) in row"> -->
                                     <!-- [[ (parseFloat(col.extra_data.group_member_ratings_normed[userId]) * 100).toFixed(0) ]] <b-icon class="ml-1 mt-1" scale="1" icon="star"> -->
@@ -428,6 +430,7 @@ window.dragMoveListener = dragMoveListener;
                             </b-row>
                     </b-col>
                 </b-row>
+                {% if extended_explanations == True %}
                 <b-row>
                     <b-col>
                         <b-row class="mt-1" align-h="left" class="text-left" v-for="userId in membersSorted">
@@ -435,7 +438,7 @@ window.dragMoveListener = dragMoveListener;
                         </b-row>
                     </b-col>
                 </b-row>
-
+                {% endif %}
             </b-col>
         </b-row>
 
@@ -699,9 +702,9 @@ window.dragMoveListener = dragMoveListener;
             for (let c of choiceLabels) {
                 let origElId = c.id.split("+2")[0];
                 let w = this.getImageWidth(origElId);
-                console.log(w);
                 c.style.width = `${w}px`;
             }
+            this.$forceUpdate();
         },
         
         getGradientColor(value) {
@@ -877,6 +880,12 @@ window.dragMoveListener = dragMoveListener;
             }
             return width;
         },
+        setDragAndDrop() {
+            if (this.dropzonePosition === null || this.dropzonePosition === undefined) {
+                console.log("Refetch");
+                this.dropzonePosition = getElementBoundingBox(document.getElementById("dropzone"));
+            }
+        },
         onSubmit() {
             this.busy = true;
             this.$refs.myForm.submit();
@@ -886,13 +895,7 @@ window.dragMoveListener = dragMoveListener;
         const mount_start = performance.now();
         let performance_measures = {};
 
-        const btns = document.querySelectorAll("button");
-        const radios = document.querySelectorAll("input[type=radio]");
-        const checkboxes = document.querySelectorAll("input[type=checkbox]");
-        const textboxes = document.querySelectorAll("input[type=text]");
-        const selects = document.querySelectorAll("select");
-        
-        this.dropzonePosition = getElementBoundingBox(document.getElementById("dropzone"));
+        this.setDragAndDrop();
 
         let start_time = performance.now();
         this.instructionBullets = await fetch("{{url_for('grs2024.get_instruction_bullets', page='compare-grs')}}")
@@ -917,18 +920,30 @@ window.dragMoveListener = dragMoveListener;
         this.groupMemberHistories = groupMemberHistoriesData["histories"];
         this.groupMemberMapping = groupMemberHistoriesData["member_mapping"];
         this.membersSorted = Object.keys(this.groupMemberMapping).sort((a, b) => this.groupMemberMapping[a] < this.groupMemberMapping[b] ? -1 : this.groupMemberMapping[a] === this.groupMemberMapping[b] ? 1 : 0);
-        
-        // Register the handlers for event reporting
-        startViewportChangeReportingWithLimit(`/utils/changed-viewport`, csrfToken, 1.0, true);
-        startScrollReportingWithLimit(`/utils/changed-viewport`, csrfToken, 1.0, document.getElementsByName("scrollableDiv"));
-        registerClickedButtonReporting(`/utils/on-input`, csrfToken, btns);
-        registerClickedRadioReporting("/utils/on-input", csrfToken, radios);
-        registerClickedCheckboxReporting("/utils/on-input", csrfToken, checkboxes);
-        registerChangedSelectionReporting("/utils/on-input", csrfToken, selects);
-        reportLoadedPage(`/utils/loaded-page`, csrfToken, "compare_alphas");
+
+        window.addEventListener("load", function(event) {
+            const btns = document.querySelectorAll("button");
+            const radios = document.querySelectorAll("input[type=radio]");
+            const checkboxes = document.querySelectorAll("input[type=checkbox]");
+            const textboxes = document.querySelectorAll("input[type=text]");
+            const selects = document.querySelectorAll("select");
+
+            // Register the handlers for event reporting
+            startViewportChangeReportingWithLimit(`/utils/changed-viewport`, csrfToken, 1.0, true);
+            startScrollReportingWithLimit(`/utils/changed-viewport`, csrfToken, 1.0, document.getElementsByName("scrollableDiv"));
+            registerClickedButtonReporting(`/utils/on-input`, csrfToken, btns);
+            registerClickedRadioReporting("/utils/on-input", csrfToken, radios);
+            registerClickedCheckboxReporting("/utils/on-input", csrfToken, checkboxes);
+            registerChangedSelectionReporting("/utils/on-input", csrfToken, selects);
+            reportLoadedPage(`/utils/loaded-page`, csrfToken, "compare_alphas");
+        });
+        window.addEventListener("load", this.setRowHeights);
+        window.addEventListener("load", this.setDragAndDrop);
+        window.addEventListener("load", this.$forceUpdate);
 
         this.setRowHeights();
         window.addEventListener('resize', this.setRowHeights);
+
 
         history.pushState(null, document.title, location.href);
         window.addEventListener('popstate', function (event)
@@ -939,12 +954,12 @@ window.dragMoveListener = dragMoveListener;
             });
         });
 
-        this.$forceUpdate();
-
         performance_measures["mount"] = performance.now() - mount_start;
         reportMessage("/utils/on-message", "info", csrfToken, window.location.href, "Mount finished", ()=> {
                 return {"type": "Mount has finished", "time_taken": performance_measures };
         });
+
+        this.$forceUpdate();
     },
     beforeDestroy() {
         window.removeEventListener('resize', this.setRowHeights); // Remove event listener on component destroy
