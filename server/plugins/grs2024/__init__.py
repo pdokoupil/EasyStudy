@@ -33,6 +33,10 @@ from plugins.fastcompare import elicitation_ended, filter_params, load_data_load
 
 from plugins.fastcompare import get_semi_local_cache_name, get_cache_path
 
+# We built on top of journal plugin since same dataset is used and also drag & drop and other mechanisms are similar
+from plugins.journal import enrich_results, get_lang, EASER_pretrained
+
+
 #from memory_profiler import profile
 
 NEG_INF = int(-10e6)
@@ -123,13 +127,6 @@ ENABLE_DEBUG = True
 
 ##################################
 
-# Implementation of this function can differ among plugins
-def get_lang():
-    default_lang = "en"
-    if "lang" in session and session['lang'] and session['lang'] in languages:
-        return session['lang']
-    return default_lang
-
 # Global, plugin related stuff
 __plugin_name__ = "grs2024"
 __version__ = "0.1.0"
@@ -171,90 +168,6 @@ def incr(key):
     x = get_val(key)
     set_val(key, x + 1)
 
-# Plugin specific version of enrich_results (transforming list of item indices into structured dict with additional item metadata)
-# Here we are sure that we are inside this particular plugin
-# thus we have a particular data loader and can use some of its internals
-def enrich_results(top_k, loader, support=None):
-    # This plugin is currently supposed to work with MLGenomeDataLoader and GoodBooksFilteredDataLoader
-    # this is just a temporary safety check, should be removed in the future as there are no valid reasons
-    # why this plugin should not work with other datasets
-    assert isinstance(loader, MLGenomeDataLoader) or isinstance(loader, GoodBooksFilteredDataLoader), f"Loader name: {loader.name()} type: {type(loader)}"
-    top_k_ids = [loader.get_item_id(movie_idx) for movie_idx in top_k]
-    top_k_description = [loader.items_df_indexed.loc[movie_id].title for movie_id in top_k_ids]
-    top_k_genres = [loader.get_item_id_categories(movie_id) for movie_id in top_k_ids]
-    top_k_genres = [x if x != ["(no genres listed)"] else [] for x in top_k_genres]
-    top_k_url = [loader.get_item_index_image_url(movie_idx) for movie_idx in top_k]
-    top_k_trailers = [""] * len(top_k)
-    top_k_plots = [loader.get_item_id_plot(movie_id) for movie_id in top_k_ids]
-
-
-    if support:
-        top_k_supports = [
-            {
-                "relevance": np.round(support["relevance"][i], 4),
-                "diversity": np.round(support["diversity"][i], 4),
-                "novelty": np.round(support["novelty"][i], 4),
-                "raw_rating": np.round(support["raw_rating"][i], 4),
-                "raw_distance": np.squeeze(np.round(support["raw_distance"][i], 4)).tolist(),
-                "raw_users_viewed_item": support["raw_users_viewed_item"][i],
-            }
-            for i in range(len(top_k))
-        ]
-        return [
-            {
-            "movie": movie,
-            "url": url,
-            "movie_idx": str(movie_idx),
-            "movie_id": movie_id,
-            "genres": genres,
-            "support": support,
-            "trailer_url": trailer_url,
-            "plot": plot,
-            "rank": rank
-            }
-            for movie, url, movie_idx, movie_id, genres, support, trailer_url, plot, rank in
-                zip(top_k_description, top_k_url, top_k, top_k_ids, top_k_genres, top_k_supports, top_k_trailers, top_k_plots, range(len(top_k_ids)))
-        ]
-    return [
-        {
-            "movie": movie,
-            "url": url,
-            "movie_idx": str(movie_idx),
-            "movie_id": movie_id,
-            "genres": genres,
-            "trailer_url": trailer_url,
-            "plot": plot,
-            "rank": rank
-        }
-        for movie, url, movie_idx, movie_id, genres, trailer_url, plot, rank in
-            zip(top_k_description, top_k_url, top_k, top_k_ids, top_k_genres, top_k_trailers, top_k_plots, range(len(top_k_ids)))
-    ]
-
-# Get content based distance matrix from a given path
-# this function is cached, so the matrix file is read just once
-@functools.lru_cache(maxsize=None)
-def get_distance_matrix_cb(path):
-    return np.load(path)
-
-# For a given distance_matrix_cb, we calculate similarity_matrix, cached by path to the distance matrix (if it changes, cache should be invalid)
-@functools.lru_cache(maxsize=None)
-def get_similarity_matrix_cb(distance_matrix_cb_path):
-    distance_matrix_cb = get_distance_matrix_cb(distance_matrix_cb_path)
-    return 1.0 - distance_matrix_cb
-
-# Get similarity_matrix (CF) -> cached version to prevent huge allocations when called for multiple users
-# Keyed by loader name as it just depends on the loader's distance_matrix
-@cached(cache={}, key=lambda loader: loader.name())
-def get_similarity_matrix_cf(loader):
-    return 1.0 - loader.distance_matrix
-
-# Get cdf cache for a given metric
-# this function is cached, so the cdf file is read just once
-@functools.lru_cache(maxsize=None)
-def load_cdf_cache(base_path, metric_name):
-    with open(os.path.join(base_path, "cdf", f"{metric_name}.pckl"), "rb") as f:
-        return pickle.load(f)
-
 @functools.lru_cache(maxsize=None)
 def get_extended_rm(path):
     return np.load(path)
@@ -269,57 +182,6 @@ def get_pre_generated_config(loader):
 #################################################################################
 ###########################   ALGORITHMS   ######################################
 #################################################################################
-# TODO move algorithms to shared common
-
-class EASER_pretrained:
-    def __init__(self, all_items, **kwargs):
-        self.all_items = all_items
-
-    # We do this to hijack the cache so that there is one shared cache instance
-    # instead of per algorithm instance cache (that causes leaks)
-    def __eq__(self, other) -> bool:
-        if not isinstance(other, EASER_pretrained):
-            return False
-        
-        # We use arange for items, so just comparing the size should be fine for our purpose
-        return self.all_items.size == other.all_items.size
-
-    def __hash__(self) -> int:
-        return self.all_items.size
-
-    @functools.lru_cache(maxsize=None)
-    def load(self, path):
-        self.item_item = np.load(path)
-        assert self.item_item.shape[0] == self.item_item.shape[1] == self.all_items.size
-        return self
-
-    def predict_with_score(self, selected_items, filter_out_items, k):
-        candidates = np.setdiff1d(self.all_items, selected_items)
-        candidates = np.setdiff1d(candidates, filter_out_items)
-        user_vector = np.zeros(shape=(self.all_items.size,), dtype=self.item_item.dtype)
-        if selected_items.size == 0:
-            return np.zeros_like(user_vector), user_vector, np.random.choice(candidates, size=k, replace=False).tolist()
-        user_vector[selected_items] = 1
-        probs = np.dot(user_vector, self.item_item)
-
-        # Here the NEG_INF used for masking must be STRICTLY smaller than probs predicted by the algorithms
-        # So that the masking works properly
-        assert NEG_INF < probs.min()
-        # Mask out selected items
-        probs[selected_items] = NEG_INF
-        # Mask out items to be filtered
-        probs[filter_out_items] = NEG_INF
-        return probs, user_vector, np.argsort(-probs)[:k].tolist()
-
-    # Predict for the user
-    def predict(self, selected_items, filter_out_items, k):
-        return self.predict_with_score(selected_items, filter_out_items, k)[2]
-
-
-
-# @cached(cache={}, key=lambda loader: loader.name())
-# def get_user_similarity_matrix(loader):
-#     return cos_sim_np(loader.rating_matrix)
 
 @cached(cache={}, key=lambda loader, rm: loader.name())
 def get_normalized_rating_matrix(loader, rating_matrix_orig):
@@ -332,7 +194,6 @@ def get_normalized_rating_matrix_for_cos_sim(loader, rating_matrix_extended):
     x = rating_matrix_extended #get_normalized_rating_matrix(loader)
     # We need this for cosine similarity in group construction and need it to be as quick as possible
     return (x / np.linalg.norm(x, axis=1, keepdims=True)).T
-
 
 # Returns past positive history for a given user
 def get_past_positive_history(user_idx, rating_matrix_orig, history_length_limit):
@@ -513,9 +374,6 @@ def generate_divergent_group(loader, rating_matrix_extended, rating_matrix_orig,
             "past_positive_history": {user_idx : get_past_positive_history(user_idx, rating_matrix_orig, history_length_limit).tolist() for user_idx in indices}
         }
     }
-
-# Pre-computed outside as np.percentile(1.0 - user_similarity_matrix[np.triu_indices(user_similarity_matrix.shape[0], k=1)], 70)
-SIM_LIMIT = 0.9183362722396851
 
 def generate_outlier_group(loader, rating_matrix_extended, rating_matrix_orig, group_size, user_embedding, history_length_limit):
     start_time = time.perf_counter()
@@ -1501,29 +1359,10 @@ def block_questionnaire_done():
 
 @bp.route("/done", methods=["GET", "POST"])
 def done():
-    #return "DONE - TODO"
-    #return redirect(url_for("journal.final_questionnaire"))
     return redirect(url_for("grs2024.finish_user_study"))
-
-# Endpoint for final questionnaire
-@bp.route("/final-questionnaire", methods=["GET", "POST"])
-def final_questionnaire():
-    params = {
-        "continuation_url": url_for("journal.finish_user_study"),
-        "header": "Final questionnaire",
-        "hint": "Please answer the questions below before finishing the user study. Note that these questions are related to the whole user study.",
-        "finish": "Finish",
-        "title": "Final questionnaire"
-    }
-    return render_template("journal_final_questionnaire.html", **params)
 
 @bp.route("/finish-user-study", methods=["GET", "POST"])
 def finish_user_study():
-    # Handle final questionnaire feedback, logging all the answers
-    #data = {}
-    #data.update(**request.form)
-    #log_interaction(session["participation_id"], "final-questionnaire", **data)
-
     session["iteration"] = int(get_val("iteration"))
     session.modified = True
     return redirect(url_for("utils.finish"))
@@ -1553,15 +1392,6 @@ def get_block_questions():
     conf = load_user_study_config(session['user_study_id'])
 
     extended_explanations = user_data["selected_extended_explanations"]
-
-    if "Goodbooks" in conf["selected_data_loader"]:
-        item_text = "books"
-        popular_text = "bestsellers"
-        do_text = "read"
-    else:
-        item_text = "movies"
-        popular_text = "blockbusters"
-        do_text = "watch"
 
     questions = [
         {
@@ -1701,21 +1531,6 @@ def get_block_questions():
         2: 10,
         3: 9,
     }
-
-    # if cur_algorithm == "RELEVANCE-BASED":
-    #     # If this is the case, we only show first 9 questions
-    #     questions = questions[:9]
-    #     # However, this also means that we have to redistribute attention checks!
-    #     atn_check_indices = {
-    #         0: 1,
-    #         1: 6,
-    #         2: 9,
-    #         3: 8
-    #     }
-    #     # No sliders icon for relevance-only so having different icon for attention check would make it too easy
-    #     attention_checks[3]["icon"] = "grid"
-    #     attention_checks[2]["icon"] = "grid"
-    #     attention_checks[1]["icon"] = "grid"
 
     # Use first attention check
     questions.insert(atn_check_indices[cur_block], attention_checks[cur_block])
