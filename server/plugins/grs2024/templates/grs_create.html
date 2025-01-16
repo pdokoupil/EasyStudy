@@ -228,8 +228,8 @@
             return {
               kValue: 5,
               groupSize: 3,
-              itersPerGroupType: 3,
-              userHistoryLength: 5, // Show 5 items rated by each user
+              itersPerGroupType: 1,
+              userHistoryLength: 3, // Show 5 items rated by each user
               overrideAbout: false,
               overrideInformedConsent: false,
               prolificCode: "",
@@ -274,10 +274,10 @@
                 { value: true, text: "Yes" },
                 { value: false, text: "No" },
               ],
-              basicGrs: "Random",
-              choiceModel: "Random",
+              basicGrs: "MUL",
+              choiceModel: "Same",
               dataLoader: null,
-              groupSource: null,
+              groupSource: "Pre-generated",
               dataLoaders: [
                 { value: null, text: '{{select_loader}}' }
               ],
