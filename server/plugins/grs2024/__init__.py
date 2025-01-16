@@ -168,9 +168,21 @@ def incr(key):
     x = get_val(key)
     set_val(key, x + 1)
 
-@functools.lru_cache(maxsize=None)
-def get_extended_rm(path):
-    return np.load(path)
+# TODO - if we ever shift away from pre-generated, we should move this into long running study initialization instead
+@cached(cache={}, key=lambda loader, history_length_limit: loader.name())
+def get_extended_rm_on_histories(loader, history_length_limit):
+    start_time = time.perf_counter()
+    item_item = os.path.join(get_cache_path(get_semi_local_cache_name(loader)), "item_item.npy")
+    _, per_user_history = get_per_user_history(loader, loader.rating_matrix, history_length_limit)
+    extended_rm = np.zeros(shape=loader.rating_matrix.shape, dtype=np.float32)
+    for i in range(loader.rating_matrix.shape[0]):
+        if i % 1000 == 0:
+            print(f"{i}/{loader.rating_matrix.shape[0]}", time.perf_counter() - start_time)
+
+        user_vector = np.zeros_like(item_item[0])
+        user_vector[per_user_history[i]] = 1.0
+        extended_rm[i] = np.dot(user_vector, item_item)
+    return extended_rm
 
 @cached(cache={}, key=lambda loader: loader.name())
 def get_pre_generated_config(loader):
@@ -1189,12 +1201,11 @@ def group_gen():
     else:
         is_user_part_of_group = user_data['selected_user_part_of_group']
 
-
         n_items = loader.rating_matrix.shape[1]
 
         history_length_limit = conf["user_history_length"]
 
-        extended_rm = get_extended_rm(os.path.join(get_cache_path(get_semi_local_cache_name(loader)), "extended_rm.npy"))
+        extended_rm = get_extended_rm_on_histories(loader, history_length_limit)
 
         if is_user_part_of_group:
             user_embedding = np.zeros(shape=(n_items, ), dtype=np.int8)
