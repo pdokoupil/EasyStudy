@@ -120,7 +120,7 @@ POSITIVE_RATING_THRESHOLD = 3.0
 
 
 ENABLE_DEBUG = True
-
+LOCK_CONFIG = True
 
 ## GRS Algorihm Implementations ##
 ##### Taken from GRS Tutorial ####
@@ -644,6 +644,8 @@ def create():
     params["choice_model"] = "Select model used to simulate group choice"
     params["group_source"] = "Select source of groups (when 'User part of group is set', the only option is 'Online')"
     params["filter_option"] = "What items should be filtered between iterations"
+    # Lock configuration
+    params["lock_config"] = LOCK_CONFIG
 
     return render_template("grs_create.html", **params)
 

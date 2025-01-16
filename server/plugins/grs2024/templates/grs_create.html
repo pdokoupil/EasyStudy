@@ -62,7 +62,7 @@
           <b-row align-h="center" class="mb-3">
             <b-col cols="8">
               <label for="k">Please select a value of K (recommendation length)</label>
-              <b-form-input v-model="kValue" type="range" min="1" max="20"></b-form-input>
+              <b-form-input v-model="kValue" type="range" min="1" max="20" :disabled="config_is_locked"></b-form-input>
               <div class="mb-2">Value: [[ kValue ]]</div>
             </b-col>
           </b-row>
@@ -70,7 +70,7 @@
           <b-row align-h="center" class="mb-3">
             <b-col cols="8">
               <label for="k">Group size</label>
-              <b-form-input v-model="groupSize" type="range" min="2" max="5"></b-form-input>
+              <b-form-input v-model="groupSize" type="range" min="2" max="5" :disabled="config_is_locked"></b-form-input>
               <div class="mb-2">Value: [[ groupSize ]]</div>
             </b-col>
           </b-row>
@@ -78,7 +78,7 @@
           <b-row align-h="center" class="mb-3">
             <b-col cols="8">
               <label for="k">Iters per group type</label>
-              <b-form-input v-model="itersPerGroupType" type="range" min="1" max="5"></b-form-input>
+              <b-form-input v-model="itersPerGroupType" type="range" min="1" max="5" :disabled="config_is_locked"></b-form-input>
               <div class="mb-2">Value: [[ itersPerGroupType ]]</div>
             </b-col>
           </b-row>
@@ -86,7 +86,7 @@
           <b-row align-h="center" class="mb-3">
             <b-col cols="8">
               <label for="k">Displayed user history length</label>
-              <b-form-input v-model="userHistoryLength" type="range" min="1" max="5"></b-form-input>
+              <b-form-input v-model="userHistoryLength" type="range" min="1" max="5" :disabled="config_is_locked"></b-form-input>
               <div class="mb-2">Value: [[ userHistoryLength ]]</div>
             </b-col>
           </b-row>
@@ -100,35 +100,35 @@
           <b-row align-h="center" class="mb-3">
             <b-col cols="8">
               <label for="choiceModel">{{choice_model}}</label>
-              <b-form-select v-model="choiceModel" :options="choiceModelOptions" name="choiceModel" required="True" type=""/>
+              <b-form-select v-model="choiceModel" :options="choiceModelOptions" name="choiceModel" required="True" type="" :disabled="config_is_locked"/>
             </b-col>
           </b-row>
 
           <b-row align-h="center" class="mb-3" v-if="choiceModel != 'None'">
             <b-col cols="8">
               <label for="filterOption">{{filter_option}}</label>
-              <b-form-select v-model="filterOption" :options="filteringOptions" name="filterOption" type=""/>
+              <b-form-select v-model="filterOption" :options="filteringOptions" name="filterOption" type="" :disabled="config_is_locked"/>
             </b-col>
           </b-row>
 
           <b-row align-h="center" class="mb-3">
             <b-col cols="8">
               <label for="groupSource">{{group_source}}</label>
-              <b-form-select v-model="groupSource" :options="groupSourceOptions" name="groupSource" :state="(groupSource != null) && (!userPartOfGroup || groupSource == 'Online')" required="True" type=""/>
+              <b-form-select v-model="groupSource" :options="groupSourceOptions" name="groupSource" :state="(groupSource != null) && (!userPartOfGroup || groupSource == 'Online')" required="True" type="" :disabled="config_is_locked"/>
             </b-col>
           </b-row>
 
           <b-row align-h="center" class="mb-3">
             <b-col cols="8">
               <label for="k">{{basic_grs}}</label>
-              <b-form-select v-model="basicGrs" :options="basicGrsOptions" required="True" type=""/>
+              <b-form-select v-model="basicGrs" :options="basicGrsOptions" required="True" type="" :disabled="config_is_locked"/>
             </b-col>
           </b-row>
 
           <b-row align-h="center" class="mb-3">
             <b-col cols="8">
               <label for="k">{{user_part_of_group}}</label>
-              <b-form-select v-model="userPartOfGroup" :options="userPartOfGroupOptions" required="True" type=""/>
+              <b-form-select v-model="userPartOfGroup" :options="userPartOfGroupOptions" required="True" type="" :disabled="config_is_locked"/>
             </b-col>
           </b-row>
 
@@ -148,7 +148,7 @@
 
           <b-row align-h="center" class="mb-3">
             <b-col class="text-center" cols="8">
-              <b-form-checkbox v-model="disableDemographics">{{disable_demographics}}</b-form-checkbox>
+              <b-form-checkbox v-model="disableDemographics" :disabled="config_is_locked">{{disable_demographics}}</b-form-checkbox>
             </b-col>
           </b-row>
 
@@ -174,7 +174,7 @@
           </b-row>
           <b-row align-h="center" class="mb-3">
             <b-col class="text-center" cols="8">
-              <b-form-checkbox v-model="overrideComparisonHint">{{override_algorithm_comparison_hint}}</b-form-checkbox>
+              <b-form-checkbox v-model="overrideComparisonHint" :disabled="config_is_locked">{{override_algorithm_comparison_hint}}</b-form-checkbox>
             </b-col>
           </b-row>
           <b-row :hidden="!overrideComparisonHint" align-h="center" class="mb-3">
@@ -221,6 +221,12 @@
         plugins: 'lists, advlist, link, image',
       });
 
+      {% if lock_config == True %}
+      let config_is_locked = true;
+      {% else %}
+      let config_is_locked = false;
+      {% endif %}
+
       window.app = new Vue({
         el: '#app',
         delimiters: ['[[',']]'], // Used to replace double { escaping with double [ escaping (to prevent jinja vs vue inference)
@@ -235,10 +241,11 @@
               prolificCode: "",
               overrideComparisonHint: false,
               overrideFooter: false,
-              disableDemographics: false,
+              disableDemographics: true,
               userPartOfGroup: false,
               filterOption: "Selection",
               extendedExplanations: false,
+              config_is_locked: config_is_locked,
               basicGrsOptions: [
                 { value: "Random", text: "Random" },
                 { value: "LMS", text: "LMS" },
