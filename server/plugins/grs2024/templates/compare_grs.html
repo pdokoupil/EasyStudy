@@ -139,6 +139,20 @@ function overlapsCheck (event) {
     }
 }
 
+function viewportCtxFunc() {
+    return {
+        "items": Array.from(document.getElementsByTagName("img")).map(x => {
+            return {
+                "id": x.id, // Contains also the movie idx
+                "name": x.name,
+                "url": x.src,
+                "title": x.title,
+                "viewport": getElementBoundingBox(x)
+            };
+        }),
+    };
+}
+
 // target elements with the "draggable" class
 interact('.draggable')
   .draggable({
@@ -571,7 +585,7 @@ window.dragMoveListener = dragMoveListener;
 
 
     var sliderState = 0;
-    console.log(sliderState);
+    //console.log(sliderState);
     //var refinementLayout = "{{version}}";
 
 
@@ -628,9 +642,9 @@ window.dragMoveListener = dragMoveListener;
             dragAndDropValidated[variantNames[order] + "-Choice"] = false;
             dragAndDropPositions[variantNames[order] + "-Choice"] = null;
 
-            console.log(variantIdx);
-            console.log(variantResults);
-            console.log(order);
+            // console.log(variantIdx);
+            // console.log(variantResults);
+            // console.log(order);
             let variantResultsColumnified = [];
             let row = [];
             for (idx in variantResults) {
@@ -733,7 +747,7 @@ window.dragMoveListener = dragMoveListener;
         },
 
         checkRefinementValidation() {
-            console.log(refinementLayout);
+            //console.log(refinementLayout);
             if (refinementLayout == REFINEMENT_LAYOUT_OPTIONS) {
                 this.refinementValidated = this.relevanceValue.some(x => x != null) && this.diversityValue.some(x => x != null) && this.noveltyValue.some(x => x != null);
             }
@@ -760,8 +774,8 @@ window.dragMoveListener = dragMoveListener;
             
             if (this.selectedMetric != null && this.selectedMetric.idx != variant) {
                 // We need to remove all selected class tags
-                console.log(this.selectedMetric);
-                console.log(this.selectedMetric.variant, " ", this.selectedMetric.variantName);
+                //console.log(this.selectedMetric);
+                //console.log(this.selectedMetric.variant, " ", this.selectedMetric.variantName);
                 let elem = document.getElementById(this.selectedMetric.variantName);
                 let imgs = elem.getElementsByTagName('img');
                 for (img of imgs) {
@@ -774,7 +788,7 @@ window.dragMoveListener = dragMoveListener;
                 variantName: variantName
             };
             
-            console.log(variant, " ", variantName);
+            //console.log(variant, " ", variantName);
 
             // SrcElement is the image, parentNode is cell above, then another Parent is row and final parent is whole column
             let elem = document.getElementById(variantName);
@@ -882,7 +896,7 @@ window.dragMoveListener = dragMoveListener;
         },
         setDragAndDrop() {
             if (this.dropzonePosition === null || this.dropzonePosition === undefined) {
-                console.log("Refetch");
+                //console.log("Refetch");
                 this.dropzonePosition = getElementBoundingBox(document.getElementById("dropzone"));
             }
         },
@@ -935,11 +949,17 @@ window.dragMoveListener = dragMoveListener;
             registerClickedRadioReporting("/utils/on-input", csrfToken, radios);
             registerClickedCheckboxReporting("/utils/on-input", csrfToken, checkboxes);
             registerChangedSelectionReporting("/utils/on-input", csrfToken, selects);
+            reportViewportChange('/utils/changed-viewport', csrfToken, viewportCtxFunc);
             reportLoadedPage(`/utils/loaded-page`, csrfToken, "compare_alphas");
         });
         window.addEventListener("load", this.setRowHeights);
         window.addEventListener("load", this.setDragAndDrop);
         window.addEventListener("load", this.$forceUpdate);
+
+        setTimeout(function () {
+            reportViewportChange(`/utils/changed-viewport`, csrfToken, viewportCtxFunc);
+        }, 5000);
+        
 
         this.setRowHeights();
         window.addEventListener('resize', this.setRowHeights);
