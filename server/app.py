@@ -111,6 +111,6 @@ def create_app():
     random.seed(seed)
     np.random.seed(seed)
     tf.random.set_seed(seed)
-    print(f"Seeding with: {seed} ({time_int}, {os.getpid()})", str=sys.stderr)
+    print(f"Seeding with: {seed} ({time_int}, {os.getpid()})", file=sys.stderr)
 
     return app
