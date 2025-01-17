@@ -318,6 +318,7 @@ def generate_similar_group(loader, rating_matrix_extended, rating_matrix_orig, g
         # We take SIMILAR_PERCENTILE_THRESHOLD-th percentile as a threshold (we go <= not >=)
         threshold = get_distance_percentiles(loader)["SIMILAR_PERCENTILE_THRESHOLD_VALUE"]
         candidates = np.where(distances <= threshold)[0]
+        candidates = np.setdiff1d(candidates, list(users_to_be_excluded_from_group_seed))
         if candidates.size == 0:
             if disable_restart:
                 # When we have real participant, we cannot just change the initial seed
@@ -421,7 +422,7 @@ def generate_divergent_group(loader, rating_matrix_extended, rating_matrix_orig,
         # We take DIVERGENT_PERCENTILE_THRESHOLD-th percentile as a threshold (we go >= not <=)
         threshold = get_distance_percentiles(loader)["DIVERGENT_PERCENTILE_THRESHOLD_VALUE"]
         candidates = np.where(distances >= threshold)[0]
-
+        candidates = np.setdiff1d(candidates, list(users_to_be_excluded_from_group_seed))
         if candidates.size == 0:
             if disable_restart:
                 # When we have real participant, we cannot just change the initial seed
@@ -465,6 +466,7 @@ def generate_outlier_group(loader, rating_matrix_extended, rating_matrix_orig, g
     # Take embeddings from extended rating matrix
     user_embedding_matrix = rating_matrix_extended
     indices = []
+    users_to_be_excluded_from_group_seed, _ = get_per_user_history(loader, rating_matrix_orig, history_length_limit)
     # Outlier embedding is either the user, or randomly sampled vector from the rating matrix
     # Depending on the study variables
     if user_embedding is not None:
@@ -473,6 +475,7 @@ def generate_outlier_group(loader, rating_matrix_extended, rating_matrix_orig, g
         indices.append(-1)
     else:
         non_zero_users = np.where(per_user_ratings > 0)[0]
+        non_zero_users = np.setdiff1d(non_zero_users, list(users_to_be_excluded_from_group_seed))
         rnd_idx = np.random.choice(non_zero_users)
         prefix_embeddings = user_embedding_matrix[rnd_idx]
         filt_out = [rnd_idx]
