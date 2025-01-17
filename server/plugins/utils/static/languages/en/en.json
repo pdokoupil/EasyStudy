@@ -38,7 +38,7 @@
     "join_start_user_study": "Start user study",
     "join_guid_not_found": "User study GUID not found, please check your URL",
     "join_server_error": "Server error, please try again later",
-    "join_min_resolution_error": "Sorry but for this user study, you need a larger resolution (at least 1000x550 pixels). In the case you are using a mobile or tablet, please try again from a laptop or desktop PC.",
+    "join_min_resolution_error": "Sorry but for this user study, you need a larger resolution (at least 1280x720 pixels or higher). In the case you are using a mobile or tablet, please try again from a laptop or desktop PC.",
     "join_czech": "Česky",
     "join_english": "English",
     "footer_contacts": "contacts",

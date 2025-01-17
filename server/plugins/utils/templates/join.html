@@ -34,7 +34,7 @@
                 <h4>{{participant_details}}</h4>
               </b-row>
               <!-- csrf_token is only needed for POST -->
-              <b-alert :show="showAlert" variant="danger">[[ alertText ]]</b-alert>
+              <b-alert id="mainErrorAlert" :show="showAlert" variant="danger">[[ alertText ]]</b-alert>
               <b-row class="mb-3">
                 <b-col class="mr-3 mt-2" sm="1">
                   <b-icon id="email-help" class="h2 mr-2" icon="question-circle-fill" variant="primary"></b-icon>
@@ -81,6 +81,8 @@
                   <b-form-select v-model="mlFamiliar" :options="mlFamiliarOptions" name="mlFamiliar" :state="mlFamiliar != null" required="True" type=""></b-form-select>
                 </b-col>
               </b-row>
+              {% else %}
+              <b-alert id="mainErrorAlert" :show="showAlert" variant="danger">[[ alertText ]]</b-alert>
               {% endif %}
               {% if informed_consent_override is defined and informed_consent_override is not none  %}
               <!-- <b-row class="mt-5"> -->
@@ -222,6 +224,10 @@
                   userData["screen_sizes"] = getScreenSizes();
                   return userData;
                 });
+              }
+              let alertElement = document.getElementById("mainErrorAlert");
+              if (alertElement) {
+                  alertElement.scrollIntoView();
               }
               return false;            
             } else {

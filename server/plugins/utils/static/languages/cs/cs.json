@@ -38,7 +38,7 @@
     "join_start_user_study": "Začít",
     "join_guid_not_found": "GUID nebylo nalezeno, prosím zkontrolujte Vámi zadanou URL adresu",
     "join_server_error": "Chyba na straně serveru, prosím zkuste později",
-    "join_min_resolution_error": "Pro spuštění této uživatelské studie potřebujete větší rozlišení obrazovky (alespoň 1000x550 pixelů). V případě, že právě používáte mobilní telefon/table, prosím zkuste studii spustit znovu z notebooku či stolního počítače.",
+    "join_min_resolution_error": "Pro spuštění této uživatelské studie potřebujete větší rozlišení obrazovky (alespoň 1280x720 pixelů nebo vyšší). V případě, že právě používáte mobilní telefon/table, prosím zkuste studii spustit znovu z notebooku či stolního počítače.",
     "join_czech": "Čeština",
     "join_english": "English",
     "footer_contacts": "kontakty",
