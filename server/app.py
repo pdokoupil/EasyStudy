@@ -7,15 +7,33 @@ from flask_wtf.csrf import CSRFProtect
 
 from flask_session import Session
 
-db = SQLAlchemy()
+from sqlalchemy import MetaData, event
+from sqlalchemy.engine import Engine
+
+naming_convention = {
+    "ix": 'ix_%(column_0_label)s',
+    "uq": "uq_%(table_name)s_%(column_0_name)s",
+    "ck": "ck_%(table_name)s_%(constraint_name)s",
+    "fk": "fk_%(table_name)s_%(column_0_name)s_%(referred_table_name)s",
+    "pk": "pk_%(table_name)s"
+}
+
+db = SQLAlchemy(metadata = MetaData(naming_convention=naming_convention))
 migrate = Migrate()
 pm = PluginManager(plugins_folder="plugins")
 csrf = CSRFProtect()
 
 sess = Session()
 
-
 from models import *
+
+# This is needed to ensure foreign keys and corresponding cascade deletion work as
+# expected when SQLite is used as backend for SQLAlchemy
+@event.listens_for(Engine, "connect")
+def set_sqlite_pragma(dbapi_connection, connection_record):
+    cursor = dbapi_connection.cursor()
+    cursor.execute("PRAGMA foreign_keys=ON")
+    cursor.close()
 
 # Insert/set all values that have to be set once (e.g. insert interaction types into DB)
 def initialize_db_tables():
@@ -54,7 +72,6 @@ def initialize_db_tables():
     #     x.name = "clicked-button"
     #     db.session.add(x)
 
-
 def create_app():
     app = flask.Flask(__name__)
 
@@ -67,7 +84,7 @@ def create_app():
 
     db.init_app(app)
 
-    migrate.init_app(app, db)
+    migrate.init_app(app, db, render_as_batch=True)
 
     csrf.init_app(app)
 

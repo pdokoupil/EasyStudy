@@ -59,7 +59,7 @@ class Participation(db.Model):
     gender = db.Column(db.String)
     education = db.Column(db.String)
     ml_familiar = db.Column(db.Boolean)
-    user_study_id = db.Column(db.Integer, db.ForeignKey('userstudy.id'))
+    user_study_id = db.Column(db.Integer, db.ForeignKey('userstudy.id', ondelete='CASCADE'))
     time_joined = db.Column(db.DateTime)
     time_finished = db.Column(db.DateTime)
     uuid = db.Column(db.String)
@@ -86,7 +86,7 @@ class Interaction(db.Model):
 
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     # Interactions are tied to participations
-    participation = db.Column(db.Integer, db.ForeignKey("participation.id"))
+    participation = db.Column(db.Integer, db.ForeignKey("participation.id", ondelete='CASCADE'))
     # interaction_type = db.Column(db.Integer, db.ForeignKey("interactiontype.id"))
     interaction_type = db.Column(db.String)
 
@@ -94,12 +94,13 @@ class Interaction(db.Model):
     time = db.Column(db.DateTime)
     data = db.Column(db.String)
 
+
 class Message(db.Model):
     __tablename__ = "message"
 
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     # Not mandatory
-    participation = db.Column(db.Integer, nullable=True)
+    participation = db.Column(db.Integer, db.ForeignKey("participation.id", ondelete='CASCADE'), nullable=True)
     # Time when massage has been received
     time = db.Column(db.DateTime)
     # Arbitrary data
