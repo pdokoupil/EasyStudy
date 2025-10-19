@@ -1,8 +1,6 @@
 FROM continuumio/miniconda3:4.12.0
 
-# RUN mkdir -p /app/src
 WORKDIR /app
-#ENV HOME=/app
 
 COPY conda_requirements.txt conda_requirements.txt
 COPY pip_requirements.txt pip_requirements.txt
@@ -19,4 +17,4 @@ RUN pip install -r pip_requirements.txt
 EXPOSE 5000
 
 ENTRYPOINT [ "python" ]
-CMD ["-m", "gunicorn", "-w", "4", "--bind", "0.0.0.0:5000", "app:create_app()"]
+CMD ["-m", "gunicorn", "-w", "1", "--bind", "0.0.0.0:5000", "--timeout", "0", "--preload", "--log-level", "debug", "--access-logfile", "/app/access_logfile.txt", "--error-logfile", "/app/error_logfile.txt", "app:create_app()"]
