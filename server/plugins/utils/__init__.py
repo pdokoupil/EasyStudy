@@ -204,6 +204,8 @@ def preference_elicitation():
     params["continuation_url"] = request.args.get("continuation_url") # Continuation url must be specified
     params["initial_data_url"] = request.args.get("initial_data_url")
     params["search_item_url"] = request.args.get("search_item_url")
+    params["not_enough_movies_detail"] = tr("elicitation_not_enough_movies_detail")
+    params["not_enough_movies_header"] = tr("elicitation_not_enough_movies_header")
 
     # Handle textual overrides
     params["elicitation_hint_override"] = None
@@ -404,7 +406,7 @@ def finish():
     # Prolific stuff
     if "PROLIFIC_PID" in flask.session:
         params["prolific_pid"] = flask.session["PROLIFIC_PID"]
-        params["prolific_url"] = f"https://app.prolific.co/submissions/complete?cc={conf['prolific_code']}"
+        params["prolific_url"] = f"https://app.prolific.com/submissions/complete?cc={conf['prolific_code']}"
     else:
         params["prolific_pid"] = None
 

@@ -1,3 +1,4 @@
+import time
 import flask
 from flask_pluginkit import PluginManager
 from flask_sqlalchemy import SQLAlchemy
@@ -6,6 +7,24 @@ from flask_login import LoginManager
 from flask_wtf.csrf import CSRFProtect
 
 from flask_session import Session
+
+import os
+import random
+import sys
+import numpy as np
+import tensorflow as tf
+
+#from werkzeug.middleware.profiler import ProfilerMiddleware
+import redis
+
+import os
+import random
+import sys
+import numpy as np
+import tensorflow as tf
+
+#from werkzeug.middleware.profiler import ProfilerMiddleware
+import redis
 
 from sqlalchemy import MetaData, event
 from sqlalchemy.engine import Engine
@@ -24,6 +43,17 @@ pm = PluginManager(plugins_folder="plugins")
 csrf = CSRFProtect()
 
 sess = Session()
+rds = redis.Redis(host='localhost', port=6379)
+
+from models import *
+
+# This is needed to ensure foreign keys and corresponding cascade deletion work as
+# expected when SQLite is used as backend for SQLAlchemy
+@event.listens_for(Engine, "connect")
+def set_sqlite_pragma(dbapi_connection, connection_record):
+    cursor = dbapi_connection.cursor()
+    cursor.execute("PRAGMA foreign_keys=ON")
+    cursor.close()
 
 from models import *
 
@@ -74,11 +104,14 @@ def initialize_db_tables():
 
 def create_app():
     app = flask.Flask(__name__)
+    #app.wsgi_app = ProfilerMiddleware(app.wsgi_app)
+
 
     app.config['SECRET_KEY'] = '8bf29bd88d0bfb94509f5fb0'
     app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///db.sqlite'
     app.config['SESSION_COOKIE_NAME'] = "something"
-    app.config["SESSION_TYPE"] = "filesystem"
+    app.config["SESSION_TYPE"] = "sqlalchemy"
+    app.config["SESSION_SQLALCHEMY"] = db
 
     sess.init_app(app)
 
@@ -111,5 +144,14 @@ def create_app():
     with app.app_context():
         db.create_all()
         initialize_db_tables()
+
+    # Seed setting in the case we use --preload with multiple workers and want to improve randomization on the first iteration
+    # Otherwise we can just assume that this will be random enough given that users are distributed to workers randomly
+    time_int = int(time.time())
+    seed = os.getpid() + time_int
+    random.seed(seed)
+    np.random.seed(seed)
+    tf.random.set_seed(seed)
+    print(f"Seeding with: {seed} ({time_int}, {os.getpid()})", file=sys.stderr)
 
     return app

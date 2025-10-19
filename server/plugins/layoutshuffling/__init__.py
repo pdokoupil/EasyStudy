@@ -431,7 +431,7 @@ def finish_user_study():
     if "PROLIFIC_PID" in session:
         conf = load_user_study_config(session["user_study_id"])
         params["prolific_pid"] = session["PROLIFIC_PID"]
-        params["prolific_url"] = f"https://app.prolific.co/submissions/complete?cc={conf['prolific_code']}"
+        params["prolific_url"] = f"https://app.prolific.com/submissions/complete?cc={conf['prolific_code']}"
     else:
         params["prolific_pid"] = None
 
@@ -468,12 +468,13 @@ def finish_user_study():
     params["n_selected_elicitation"] = len(session["elicitation_selected_movies"])
     params["n_shown_elicitation"] = len(session["elicitation_movies"])
 
+    loader = load_ml_dataset()
 
     all_selected_movie_indices = sum(session["selected_movie_indices"], [])
     all_shown_movies = []
     for shown_movie_lists in session["movies"].values():
         all_shown_movies.extend(sum(shown_movie_lists, []))
-    objective_importance = get_objective_importance(all_selected_movie_indices, all_shown_movies)
+    objective_importance = get_objective_importance(loader, all_selected_movie_indices, all_shown_movies)
     
     if objective_importance:
         params["relevance"] = round(objective_importance["relevance"], 1)
@@ -522,7 +523,7 @@ def finish_user_study():
 
                         per_user_selected.append(user_selected) # Convert 2d list to 1d list and append
                         print(f"!!!! participation_id={participation.id}")
-                        user_importances = get_objective_importance(user_selected, user_shown)
+                        user_importances = get_objective_importance(loader, user_selected, user_shown)
                         if user_importances:
                             for obj_name, importance in user_importances.items():
                                 per_user_importances[obj_name].append(importance)

@@ -5,6 +5,7 @@ from plugins.fastcompare.algo.algorithm_base import AlgorithmBase, Parameter, Pa
 from plugins.utils.tfrs_model import get_model_mf
 
 import tensorflow as tf
+tf.get_logger().setLevel('ERROR')
 
 class TFRecommendersWrapper(AlgorithmBase, ABC):
     def __init__(self, loader, model, epochs, **kwargs):
@@ -72,6 +73,7 @@ class TFRecommendersWrapper(AlgorithmBase, ABC):
 
     def load(self, instance_cache_path, class_cache_path):
         self.model.load_weights(instance_cache_path)
+        return self
 
 
 class SimpleMatrixFactorization(TFRecommendersWrapper):

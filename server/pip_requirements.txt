@@ -6,5 +6,8 @@ tensorflow
 tensorflow-recommenders
 recommenders
 python3-discogs-client
+redis
+BeautifulSoup4
 cachelib
 pytest
+jmetalpy
