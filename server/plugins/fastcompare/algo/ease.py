@@ -89,7 +89,7 @@ class EASE(AlgorithmBase, ABC):
             Parameter(
                 "l2",
                 ParameterType.FLOAT,
-                0.1,  # I did not find a value in the paper, we can try tweaking the default value in the future
+                500,
                 help="L2-norm regularization",
                 help_key="ease_l2_help",
             ),
