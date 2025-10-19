@@ -659,6 +659,8 @@ def long_initialization(guid):
         q.active = True
     except Exception as e:
         q.initialization_error = traceback.format_exc()
+        print(f"Error during initialization: {q.initialization_error}")
+        print(str(e))
 
     session.commit()
     session.expunge_all()
