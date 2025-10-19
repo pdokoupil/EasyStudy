@@ -152,7 +152,6 @@
                 
             </b-col>
             <b-col center class="align-middle">
-                {% if iteration < MIN_ITERATION_TO_CANCEL %}
                 <b-form @submit="busy = true" method="GET" action="{{ url_for(consuming_plugin + '.algorithm_feedback') }}">
                     <input type="hidden" hidden="true" :value="selectedMovieIndices" name="selected_movies"/>
                     <input type="hidden" hidden="true" :value="selectedMovieVariants" name="selected_movie_variants"/>
@@ -167,23 +166,13 @@
                     spinner-variant="primary"
                     class="d-inline-block"
                     >
+                    {% if iteration < MIN_ITERATION_TO_CANCEL %}
                         <b-button name="next_compare" type="submit" block variant="primary" :disabled="!allValidated" center>{{next}}</b-button>
-                    </b-overlay>
-                </b-form>
-                {% else %}
-                <b-form @submit="busy = true" method="GET" action="{{ url_for(consuming_plugin + '.finish_user_study') }}">
-                    <b-overlay
-                    :show="busy"
-                    rounded
-                    opacity="0.6"
-                    spinner-small
-                    spinner-variant="primary"
-                    class="d-inline-block"
-                    >
+                    {% else %}
                         <b-btn name="finish_compare" block type="submit" variant="success" :disabled="!allValidated" center>{{finish}}</b-btn>
+                    {% endif %}    
                     </b-overlay>
                 </b-form>
-                {% endif %}
             </b-col>
             <b-col></b-col>
         </b-row>

@@ -510,7 +510,11 @@ def algorithm_feedback():
     session["selected_variants"] = y
 
 
-    iteration_ended(session["iteration"], session["selected_movie_indices"], session["selected_variants"], session["nothing"], session["cmp"], session["a_r"])    
+    iteration_ended(session["iteration"], session["selected_movie_indices"], session["selected_variants"], session["nothing"], session["cmp"], session["a_r"])
+
+    if session["iteration"] >= len(session["permutation"]):
+        return redirect(url_for(f"{__plugin_name__}.finish_user_study"))
+
     # Increase iteration
     session["iteration"] += 1
     ### And generate new recommendations ###
@@ -669,9 +673,6 @@ def dispose():
 @bp.route("/finish-user-study")
 @multi_lang
 def finish_user_study():
-    # Last iteration has ended here
-    iteration_ended(session["iteration"], session["selected_movie_indices"], session["selected_variants"], session["nothing"], session["cmp"], session["a_r"])
-    
     conf = load_user_study_config(session["user_study_id"])
     if questionnaire_exists(conf):
         # There is an final questionnaire, show it to the participant
