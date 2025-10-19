@@ -34,7 +34,7 @@ class User(db.Model):
 class UserStudy(db.Model):
     __tablename__ = "userstudy"
 
-    id = db.Column(db.Integer, primary_key=True)
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     creator = db.Column(db.String, db.ForeignKey('user.email')) # User who created the user study
     guid = db.Column(db.String) # Used for link creation
     parent_plugin = db.Column(db.String)
@@ -52,7 +52,7 @@ class UserStudy(db.Model):
 class Participation(db.Model):
     __tablename__ = "participation"
 
-    id = db.Column(db.Integer, primary_key=True)
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     # It is not foreign key as the participant could be an anonymous user
     participant_email = db.Column(db.String)
     age_group = db.Column(db.String)
@@ -84,7 +84,7 @@ class SignupForm(FlaskForm):
 class Interaction(db.Model):
     __tablename__ = "interaction"
 
-    id = db.Column(db.Integer, primary_key=True)
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     # Interactions are tied to participations
     participation = db.Column(db.Integer, db.ForeignKey("participation.id"))
     # interaction_type = db.Column(db.Integer, db.ForeignKey("interactiontype.id"))
@@ -97,7 +97,7 @@ class Interaction(db.Model):
 class Message(db.Model):
     __tablename__ = "message"
 
-    id = db.Column(db.Integer, primary_key=True)
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     # Not mandatory
     participation = db.Column(db.Integer, nullable=True)
     # Time when massage has been received

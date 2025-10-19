@@ -14,6 +14,9 @@ csrf = CSRFProtect()
 
 sess = Session()
 
+
+from models import *
+
 # Insert/set all values that have to be set once (e.g. insert interaction types into DB)
 def initialize_db_tables():
     pass
@@ -72,8 +75,6 @@ def create_app():
     
     pm.init_app(app)
 
-
-    from models import User
 
     @login_manager.user_loader
     def user_loader(user_id):
