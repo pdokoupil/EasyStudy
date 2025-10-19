@@ -4,3 +4,6 @@ is-safe-url
 tensorflow
 tensorflow-recommenders
 recommenders
+python3-discogs-client
+cachelib
+pytest
