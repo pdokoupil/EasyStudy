@@ -654,6 +654,15 @@ def questionnaire_exists(conf):
             return True
 
 
+# Plugin specific disposal procedure
+@bp.route("/dispose", methods=["DELETE"])
+def dispose():
+    guid = request.args.get("guid")
+    p = get_cache_path(guid)
+    if os.path.exists(p):
+        shutil.rmtree(p)
+    return "OK"
+
 @bp.route("/finish-user-study")
 @multi_lang
 def finish_user_study():

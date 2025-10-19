@@ -57,6 +57,13 @@ def initialize():
     print("Going to redirect back")
     return redirect(request.args.get("continuation_url"))
 
+# Plugin specific disposal procedure
+# E.g. removing plugin-specific cache etc.
+# Leaving empty if no disposal is needed
+@bp.route("/dispose", methods=["DELETE"])
+def dispose():
+    return "OK"
+
 def register():
     return {
         "bep": dict(blueprint=bp, prefix=None),
