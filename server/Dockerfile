@@ -16,7 +16,7 @@ RUN conda update conda --yes \
 RUN pip install --upgrade pip
 RUN pip install -r pip_requirements.txt
 
-EXPOSE 5555
+EXPOSE 5000
 
 ENTRYPOINT [ "python" ]
-CMD ["-m", "gunicorn", "-w", "4", "--bind", "0.0.0.0:5555", "app:create_app()"]
+CMD ["-m", "gunicorn", "-w", "4", "--bind", "0.0.0.0:5000", "app:create_app()"]
