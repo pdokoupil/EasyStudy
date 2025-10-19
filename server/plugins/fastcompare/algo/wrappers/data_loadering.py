@@ -459,6 +459,9 @@ class MLGenomeDataLoader(DataLoaderBase):
         if len(self.movie_id_to_imdb_data[item_id]["plot"]) > 0:
             return self.movie_id_to_imdb_data[item_id]["plot"][0] # Get the first of plots
         return ""
+    
+    def get_all_categories(self):
+        return self.all_categories
 
     @classmethod
     def name(self):
@@ -570,7 +573,7 @@ class GoodbooksDataLoader(DataLoaderBase):
         self._ratings_df.loc[:, "item"] = self._ratings_df.item_id.map(lambda x: self.book_id_to_index[x])
         # TODO remove "movie" in column names to "item"
 
-        self._rating_matrix = self._ratings_df.reset_index().pivot(index='user_id', columns='item_id', values="rating").fillna(0).values
+        self._rating_matrix = self._ratings_df.reset_index().pivot(index='user', columns='item', values="rating").fillna(0).values
         self._distance_matrix = 1.0 - cos_sim_np(self._rating_matrix.T)
 
     # Returns dataframe with the interactions/ratings (be aware that implicit feedback is now considered)
@@ -948,6 +951,10 @@ class GoodBooksFilteredDataLoader(DataLoaderBase):
         if len(self.goodreads_data[item_id]["plot"]) > 0:
             return self.goodreads_data[item_id]["plot"][0] # Get the first of plots
         return ""
+    
+    # Return all available categories in the dataset
+    def get_all_categories(self):
+        return self.all_categories
 
     @classmethod
     def name(self):

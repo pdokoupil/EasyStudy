@@ -242,7 +242,7 @@ def item_search():
     ## TODO get_loader helper
     loader_factory = load_data_loaders()[conf["selected_data_loader"]]
     loader = loader_factory(**filter_params(conf["data_loader_parameters"], loader_factory))
-    load_data_loader(loader, session["user_study_guid"], loader_factory.name(), get_semi_local_cache_name(loader))
+    loader = load_data_loader_cached(loader, session["user_study_guid"], loader_factory.name(), get_semi_local_cache_name(loader))
 
     res = search_for_item(pattern, loader, tr)
 
@@ -292,7 +292,7 @@ def send_feedback():
 
     loader_factory = load_data_loaders()[conf["selected_data_loader"]]
     loader = loader_factory(**filter_params(conf["data_loader_parameters"], loader_factory))
-    load_data_loader(loader, session["user_study_guid"], loader_factory.name(), get_semi_local_cache_name(loader))
+    loader = load_data_loader_cached(loader, session["user_study_guid"], loader_factory.name(), get_semi_local_cache_name(loader))
     prepare_recommendations(loader, conf, recommendations, selected_movies, filter_out_movies, k)
 
     
@@ -461,7 +461,7 @@ def algorithm_feedback():
     ## TODO get_loader helper
     loader_factory = load_data_loaders()[conf["selected_data_loader"]]
     loader = loader_factory(**filter_params(conf["data_loader_parameters"], loader_factory))
-    load_data_loader(loader, session["user_study_guid"], loader_factory.name(), get_semi_local_cache_name(loader))
+    loader = load_data_loader_cached(loader, session["user_study_guid"], loader_factory.name(), get_semi_local_cache_name(loader))
 
     selected_movies = request.args.get("selected_movies")
     selected_movies = selected_movies.split(",") if selected_movies else []
@@ -645,7 +645,7 @@ def long_initialization(guid):
             print(f"Done training algorithm: {algorithm_displayed_name}")
 
             # Save the algorithm
-            algorithm.save(get_cache_path(guid, algorithm_displayed_name), get_cache_path("", algorithm_displayed_name))
+            algorithm.save(get_cache_path(guid, algorithm_displayed_name), get_cache_path("", algorithm_displayed_name), get_cache_path(semi_local_cache_name, algorithm_displayed_name))
 
 
         # Move the questionnaire file if present
@@ -724,7 +724,7 @@ def fetch_results(guid):
     conf = load_user_study_config(user_study.id)
     loader_factory = load_data_loaders()[conf["selected_data_loader"]]
     loader = loader_factory(**filter_params(conf["data_loader_parameters"], loader_factory))
-    load_data_loader(loader, guid, loader_factory.name(), get_semi_local_cache_name(loader))
+    loader = load_data_loader_cached(loader, guid, loader_factory.name(), get_semi_local_cache_name(loader))
     
     rating_matrix = loader.ratings_df.pivot(index='user', columns='item', values="rating").fillna(0).values
     #similarity_matrix = 1.0 - np.float32(squareform(pdist(rating_matrix.T, "cosine")))
