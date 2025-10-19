@@ -1,5 +1,6 @@
 Flask-PluginKit
 Flask-Session
+Flask-Migrate
 is-safe-url
 tensorflow
 tensorflow-recommenders
