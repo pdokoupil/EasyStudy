@@ -15,17 +15,16 @@ from PIL import Image
 from io import BytesIO
 
 # A wrapper against MLDataLoader from utils plugin that satisfy the DataLoaderBase interface
-# The interface itself is specific to fastcompare so that is why 
+# The interface itself is specific to fastcompare so that is why
 
 class MLDataLoaderWrapper(DataLoaderBase):
 
     def __init__(self, **kwargs):
-
         datasets_base_dir = os.path.join(get_abs_project_root_path(), 'static', 'datasets')
 
         if not os.path.exists(datasets_base_dir):
             assert False, f"Datasets base dir ({datasets_base_dir}) does not exist"
-        
+
         if not os.path.exists(os.path.join(datasets_base_dir, "ml-latest")):
             assert False, f"ml-latest dataset is missing in the dataset base directory ({datasets_base_dir})"
 
@@ -51,7 +50,7 @@ class MLDataLoaderWrapper(DataLoaderBase):
         start_time = time.perf_counter()
         self.loader.load()
         print(f"## Loading took: {time.perf_counter() - start_time}")
-        
+
         self.loader.movies_df = self.loader.movies_df.rename(columns={"movieId": "item_id"})
         self.loader.movies_df_indexed = self.loader.movies_df_indexed.rename(columns={"movieId": "item_id"})
 
@@ -72,6 +71,14 @@ class MLDataLoaderWrapper(DataLoaderBase):
 
     @property
     def items_df(self):
+        """
+        Columns:
+            - item_id: int64
+            - title: str (including year in brackets)
+            - genres: str (pipe-separated list of genres)
+            - year: int64
+            - description: str (title + genres)
+        """
         return self.loader.movies_df
 
     @property
@@ -80,7 +87,7 @@ class MLDataLoaderWrapper(DataLoaderBase):
 
     def get_item_id_image_url(self, item_id):
         return self.loader.get_image(self.get_item_index(item_id))
-    
+
     def get_item_index_image_url(self, item_index):
         return self.loader.get_image(item_index)
 
@@ -111,7 +118,7 @@ class MLDataLoaderWrapper(DataLoaderBase):
     @classmethod
     def parameters(self):
         return []
-    
+
 
 # Disabled for ndbi021 branch to avoid extra dependencies
 
@@ -122,7 +129,7 @@ class MLDataLoaderWrapper(DataLoaderBase):
 
 #         if not os.path.exists(datasets_base_dir):
 #             assert False, f"Datasets base dir ({datasets_base_dir}) does not exist"
-        
+
 #         if not os.path.exists(os.path.join(datasets_base_dir, "ml-latest")):
 #             assert False, f"ml-latest dataset is missing in the dataset base directory ({datasets_base_dir})"
 
@@ -165,10 +172,10 @@ class MLDataLoaderWrapper(DataLoaderBase):
 
 #         self.books_df = self.books_df.rename(columns={"book_id": "item_id"})
 #         self.books_df_indexed = self.books_df.set_index("item_id")
-        
+
 #         self.books_df.loc[:, "description"] = self.books_df.title # + ' ' + self.books_df.genres
 #         self.book_index_to_description = dict(zip(self.books_df.index, self.books_df.description))
-        
+
 
 #         already_downloaded = [] if not os.path.exists(self.img_dir_path) else os.listdir(self.img_dir_path)
 #         self.book_index_to_url = dict()
@@ -198,14 +205,14 @@ class MLDataLoaderWrapper(DataLoaderBase):
 
 #     def get_item_id_image_url(self, item_id):
 #         return self.get_item_index_image_url(self.get_item_index(item_id))
-    
+
 #     def get_item_index_image_url(self, item_index):
 #         if self.img_dir_path and has_app_context():
 #             if item_index not in self.book_index_to_url:
 #                 # Download it first if it is missing
 #                 book_id = self.book_index_to_id[item_index]
 #                 remote_url = self.books_df_indexed.loc[book_id].image_url
-                
+
 #                 err = False
 #                 try:
 #                     resp = requests.get(remote_url, stream=True)

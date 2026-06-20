@@ -1,3 +1,6 @@
+from __future__ import annotations
+from collections.abc import Callable
+
 import datetime
 import time
 from imdb import Cinemagoer
@@ -28,7 +31,7 @@ class RatingUserFilter:
         loader.ratings_df = loader.ratings_df[loader.ratings_df['userId'].map(loader.ratings_df['userId'].value_counts()) >= self.min_ratings_per_user]
         loader.ratings_df = loader.ratings_df.reset_index(drop=True)
         print(f"Ratings shape after user filtering: {loader.ratings_df.shape}, n_users = {loader.ratings_df.userId.unique().size}, n_items = {loader.ratings_df.movieId.unique().size}")
-        
+
 # Filters out all low ratings
 class RatingLowFilter:
     def __init__(self, min_rating):
@@ -75,17 +78,17 @@ class RatingsPerYearFilter:
 
         # Add column with age of each movie
         movies_df_indexed.loc[:, "age"] = movies_df_indexed.year.max() - movies_df_indexed.year
-        
+
         # Calculate number of ratings per year for each of the movies
         loader.ratings_df.loc[:, "ratings_per_year"] = loader.ratings_df['movieId'].map(loader.ratings_df['movieId'].value_counts()) / loader.ratings_df['movieId'].map(movies_df_indexed["age"])
-        
+
         # Filter out movies that do not have enough yearly ratings
         loader.ratings_df = loader.ratings_df[loader.ratings_df.ratings_per_year >= self.min_ratings_per_year]
 
 class MovieFilterByYear:
     def __init__(self, min_year):
         self.min_year = min_year
-        
+
     def _parse_year(self, x):
         x = x.split("(")
         if len(x) <= 1:
@@ -97,7 +100,7 @@ class MovieFilterByYear:
 
     def __call__(self, loader):
         # Filter out unrated movies and old movies
-        # Add year column      
+        # Add year column
         loader.movies_df.loc[:, "year"] = loader.movies_df.title.apply(self._parse_year)
         loader.movies_df = loader.movies_df[loader.movies_df.year >= self.min_year]
         loader.movies_df = loader.movies_df.reset_index(drop=True)
@@ -139,35 +142,46 @@ class LinkFilter:
         loader.links_df = loader.links_df[loader.links_df.index.isin((loader.movies_df.movieId))]
 
 class MLDataLoader:
-    def __init__(self, ratings_path, movies_path, tags_path, links_path,
-        filters = None, rating_matrix_path = None, img_dir_path = None):
+    movies_df: pd.DataFrame
+    """
+    Columns:
+        - movieId: int64
+        - title: str (including year in brackets)
+        - genres: str (pipe-separated list of genres)
+        - year: int64
+        - description: str (title + genres)
 
+    MLDataLoaderWrapper changes the column names and adds new columns.
+    """
+
+    def __init__(self, ratings_path: str, movies_path: str, tags_path: str, links_path: str, filters: list[Callable[[MLDataLoader], None]] | None = None, rating_matrix_path = "", img_dir_path = ""):
         self.ratings_path = ratings_path
         self.movies_path = movies_path
         self.tags_path = tags_path
         self.filters = filters
         self.links_path = links_path
         self.rating_matrix_path = rating_matrix_path
+        self.img_dir_path = img_dir_path
 
-        self.ratings_df = None
-        self.movies_df = None
-        self.movies_df_indexed = None
-        self.tags_df = None
-        self.links_df = None
-        self.rating_matrix = None
-        self.movie_index_to_id = None
-        self.movie_id_to_index = None
-        self.num_movies = None
-        self.num_users = None
-        self.user_to_user_index = None
-        self.movie_index_to_description = None
-        self.tag_counts_per_movie = None
+        ## commented out so the types aren't T | None, since they are always initialized in load() method
+        # self.ratings_df = None
+        # self.movies_df = None
+        # self.movies_df_indexed = None
+        # self.tags_df = None
+        # self.links_df = None
+        # self.rating_matrix = None
+        # self.movie_index_to_id = None
+        # self.movie_id_to_index = None
+        # self.num_movies = None
+        # self.num_users = None
+        # self.user_to_user_index = None
+        # self.movie_index_to_description = None
+        # self.tag_counts_per_movie = None
 
         self.access = Cinemagoer()
         self.movie_index_to_url = dict()
-        self.similarity_matrix = None
+        # self.similarity_matrix = None
 
-        self.img_dir_path = img_dir_path        
 
     def _get_image(self, imdbId):
         try:
@@ -191,13 +205,13 @@ class MLDataLoader:
         i = 0
         start_time = time.perf_counter()
         for movie_idx, url in self.movie_index_to_url.items():
-            
+
             if i % 100 == 0:
                 print(f"{i}/{len(self.movie_index_to_url)} images were downloaded, took: {time.perf_counter() - start_time}")
                 start_time = time.perf_counter()
 
             movie_id = self.movie_index_to_id[movie_idx]
-            
+
             err = False
             try:
                 resp = requests.get(url, stream=True)
@@ -239,7 +253,7 @@ class MLDataLoader:
                 movie_id = self.movie_index_to_id[movie_idx]
                 imdbId = self.links_df.loc[movie_id].imdbId
                 remote_url = self._get_image(imdbId)
-                
+
                 err = False
                 try:
                     resp = requests.get(remote_url, stream=True)
@@ -284,7 +298,7 @@ class MLDataLoader:
         # Load ratings
         self.ratings_df = pd.read_csv(self.ratings_path)
         print(f"Ratings shape: {self.ratings_df.shape}, n_users = {self.ratings_df.userId.unique().size}, n_items = {self.ratings_df.movieId.unique().size}")
-        
+
         # Load tags and convert them to lower case
         self.tags_df = pd.read_csv(self.tags_path)
         self.tags_df.tag = self.tags_df.tag.str.casefold()
@@ -294,7 +308,7 @@ class MLDataLoader:
 
         # Load links
         self.links_df = pd.read_csv(self.links_path, index_col=0)
-        
+
         #### Filtering ####
 
         # # Filter rating dataframe
@@ -319,7 +333,7 @@ class MLDataLoader:
 
         unique_users = self.ratings_df.userId.unique()
         num_users = unique_users.size
-        
+
         self.user_to_user_index = dict(zip(unique_users, range(num_users)))
 
         ratings_df_i = self.ratings_df.copy()
@@ -327,11 +341,11 @@ class MLDataLoader:
         ratings_df_i.movieId = ratings_df_i.movieId.map(self.movie_id_to_index)
         self.rating_matrix = self.ratings_df.pivot(index='userId', columns='movieId', values="rating").fillna(0).values
         self.similarity_matrix = np.float32(squareform(pdist(self.rating_matrix.T, "cosine")))
-        
+
         # Maps movie index to text description
         self.movies_df["description"] = self.movies_df.title + ' ' + self.movies_df.genres
         self.movie_index_to_description = dict(zip(self.movies_df.index, self.movies_df.description))
-        
+
 
         self.movies_df_indexed = self.movies_df.set_index("movieId")
 

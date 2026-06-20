@@ -159,6 +159,17 @@ class DataLoaderBase(ABC):
     @property
     @abstractmethod
     def ratings_df(self) -> DataFrame:
+        """
+        Columns:
+            - user: int64
+            - item_id: int64
+            - rating: float64
+            - timestamp: int64
+            - ratings_per_year: float64
+            - item: int64
+
+        TODO specify difference between item_id and item
+        """
         pass
 
     # Returns dataframe with information about items. Should have item_id, and title columns
@@ -171,6 +182,7 @@ class DataLoaderBase(ABC):
     @property
     @abstractmethod
     def items_df_indexed(self) -> DataFrame:
+        """Same as items_df, but item_id is the index column"""
         pass
 
     # Return image url for the given item id
