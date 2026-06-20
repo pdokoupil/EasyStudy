@@ -7,6 +7,7 @@ from plugins.fastcompare.algo.algorithm_base import (
     Parameter,
     ParameterType,
 )
+from server.plugins.fastcompare.algo.wrappers.data_loadering import MLDataLoaderWrapper
 
 
 class EASE(AlgorithmBase, ABC):
@@ -19,7 +20,8 @@ class EASE(AlgorithmBase, ABC):
     is also mentioned in the paper.
     """
 
-    def __init__(self, loader, positive_threshold, l2, **kwargs):
+    # the loader type should be DataLoaderBase, but this makes the developer experience better and is good enough for this branch
+    def __init__(self, loader: MLDataLoaderWrapper, positive_threshold: float, l2: float, **kwargs):
         self._ratings_df = loader.ratings_df
         self._loader = loader
         self._all_items = self._ratings_df.item.unique()
