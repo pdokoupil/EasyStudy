@@ -1,10 +1,13 @@
+from __future__ import annotations
+
 from abc import ABC, abstractmethod
 import pickle
+from pandas import DataFrame
 
 
 algorithm_registry = []
 
-def register_algorithm(algo_class):
+def register_algorithm(algo_class: type[AlgorithmBase]):
     assert issubclass(algo_class, AlgorithmBase)
     if algo_class not in algorithm_registry:
         algorithm_registry.append(algo_class)
@@ -19,7 +22,7 @@ class ParameterType:
     BOOL = "bool"
 
 class Parameter(dict):
-    def __init__(self, param_name, param_type, param_default_value, help=None, help_key=None, **kwargs):
+    def __init__(self, param_name: str, param_type: str, param_default_value: object, help: str | None = None, help_key: str | None = None, **kwargs):
         self.name = param_name
         self.type = param_type
         self.default = param_default_value
@@ -32,6 +35,10 @@ class Parameter(dict):
 class AlgorithmBase(ABC):
 
     _my_id = "821e13b63f5a4df4ca54c30b6b0cf48f" # MD5 hash of "AlgorithmBase"
+
+    @abstractmethod
+    def __init__(self, loader: DataLoaderBase, **kwargs):
+        pass
 
     # Initialize method that is called after preference elicitation may be useful for some algorithms
     # TODO think if this is useful for anything except for RLprop
@@ -50,20 +57,20 @@ class AlgorithmBase(ABC):
     # Performs prediction for new, previously unknown user, by simulating his history using a list of selected items.
     # It should return list of item indices of the k recommended items. Note, that none of the filter_out_items can be present in the result
     @abstractmethod
-    def predict(self, selected_items, filter_out_items, k):
+    def predict(self, selected_items: list[int], filter_out_items: list[int], k: int) -> list[int]:
         pass
 
     # Names have to be unique!
     @classmethod
     @abstractmethod
-    def name(cls):
+    def name(cls) -> str:
         pass
 
     # Return list of parameters (see ParameterType type) that will be set by the user when creating the user study and passed to the
     # Algorithm's constructor
     @classmethod
     @abstractmethod
-    def parameters(cls):
+    def parameters(cls) -> list[Parameter]:
         pass
 
     ### Serialization methods ###
@@ -73,7 +80,7 @@ class AlgorithmBase(ABC):
     # Instance_cache_path is for data specific for each instance (e.g. depends on parameters)
     # while class_cache_path is single cache for all combinations (useful for static data)
     # When in doubt, just use instance_cache_path and ignore class_cache_path
-    def load(self, instance_cache_path, class_cache_path):
+    def load(self, instance_cache_path: str, class_cache_path: str):
         with open(instance_cache_path, "rb") as f:
             attribs = pickle.load(f)
         vars(self).update(attribs)
@@ -83,7 +90,7 @@ class AlgorithmBase(ABC):
     # Instance_cache_path is for data specific for each instance (e.g. depends on parameters)
     # while class_cache_path is single cache for all combinations (useful for static data)
     # When in doubt, just use instance_cache_path and ignore class_cache_path
-    def save(self, instance_cache_path, class_cache_path):
+    def save(self, instance_cache_path: str, class_cache_path: str):
         with open(instance_cache_path, "wb") as f:
             pickle.dump(vars(self), f)
 
@@ -93,12 +100,12 @@ class PreferenceElicitationBase(ABC):
 
     # Perform any sort of dataset-dependent initialization (most of the preference elicitation methods does not really need this)
     @abstractmethod
-    def fit():
+    def fit(self):
         pass
 
     # Returns the initial data shown to the user that the user is asked to select from
     @abstractmethod
-    def get_initial_data(movie_indices_to_ignore=[]):
+    def get_initial_data(self, movie_indices_to_ignore: list[int] | None = None):
         pass
 
     # Names have to be unique! Will be displayed to the users when creating user study from fastcompare plugin
@@ -121,7 +128,7 @@ class PreferenceElicitationBase(ABC):
     # Instance_cache_path is for data specific for each instance (e.g. depends on parameters)
     # while class_cache_path is single cache for all combinations (useful for static data)
     # When in doubt, just use instance_cache_path and ignore class_cache_path
-    def load(self, instance_cache_path, class_cache_path):
+    def load(self, instance_cache_path: str, class_cache_path: str):
         with open(instance_cache_path, "rb") as f:
             attribs = pickle.load(f)
         vars(self).update(attribs)
@@ -131,7 +138,7 @@ class PreferenceElicitationBase(ABC):
     # Instance_cache_path is for data specific for each instance (e.g. depends on parameters)
     # while class_cache_path is single cache for all combinations (useful for static data)
     # When in doubt, just use instance_cache_path and ignore class_cache_path
-    def save(self, instance_cache_path, class_cache_path):
+    def save(self, instance_cache_path: str, class_cache_path: str):
         with open(instance_cache_path, "wb") as f:
             pickle.dump(vars(self), f)
 
@@ -144,81 +151,81 @@ class DataLoaderBase(ABC):
 
     # Load the data, here you can perform long running stuff
     @abstractmethod
-    def load_data():
+    def load_data(self):
         pass
 
     # Returns dataframe with the interactions/ratings (be aware that implicit feedback is now considered)
     # There should be "user", "item", and "item_id" (zero-based) columns in the dataframe
     @property
     @abstractmethod
-    def ratings_df(self):
+    def ratings_df(self) -> DataFrame:
         pass
 
     # Returns dataframe with information about items. Should have item_id, and title columns
     @property
     @abstractmethod
-    def items_df(self):
+    def items_df(self) -> DataFrame:
         pass
 
     # Same as items_df but using item as an index
     @property
     @abstractmethod
-    def items_df_indexed(self):
+    def items_df_indexed(self) -> DataFrame:
         pass
 
     # Return image url for the given item id
     # Either remote URL (http://) (could be slow)
     # Or local, already processed via flask's url_for (if you place images into server/static/datasets/x/img/*.jpg)
     @abstractmethod
-    def get_item_id_image_url(self, item_id):
+    def get_item_id_image_url(self, item_id: int) -> str:
         pass
 
     # Same as above, but for given item index instead of item id
     @abstractmethod
-    def get_item_index_image_url(self, item_index):
+    def get_item_index_image_url(self, item_index: int) -> str:
         pass
 
     # Map item id to item index
     @abstractmethod
-    def get_item_index(self, item_id):
+    def get_item_index(self, item_id: int) -> int:
         pass
 
     # Map item index to item id
     @abstractmethod
-    def get_item_id(self, item_index):
+    def get_item_id(self, item_index: int) -> int:
         pass
 
     # Return textual description for the given item index (e.g. title or title concatenated with genres, etc.)
     @abstractmethod
-    def get_item_index_description(self, item_index):
+    def get_item_index_description(self, item_index: int) -> str:
         pass
 
     # Return textual description for the given item id
     @abstractmethod
-    def get_item_id_description(self, item_id):
+    def get_item_id_description(self, item_id: int) -> str:
         pass
 
     # For a given item index, return list of its categories
     @abstractmethod
-    def get_item_index_categories(self, item_index):
+    def get_item_index_categories(self, item_index: int) -> list[str]:
         pass
 
     # Return all available categories in the dataset
     @abstractmethod
-    def get_all_categories(self):
+    def get_all_categories(self) -> set[str]:
         pass
 
     # Names have to be unique! Return data loader name that will be displayed to the user when creating user study using fastcompare plugin
     @classmethod
     @abstractmethod
-    def name(cls):
+    def name(cls) -> str:
         pass
 
     # Return list of parameters (see ParameterType type) that will be set by the user when creating the user study and passed to the
     # Data loader's constructor
     @classmethod
     @abstractmethod
-    def parameters(cls):
+    def parameters(cls) -> list[Parameter]:
         pass
 
     ### Serialization methods ###
@@ -228,7 +235,7 @@ class DataLoaderBase(ABC):
     # Instance_cache_path is for data specific for each instance (e.g. depends on parameters)
     # while class_cache_path is single cache for all combinations (useful for static data)
     # When in doubt, just use instance_cache_path and ignore class_cache_path
-    def load(self, instance_cache_path, class_cache_path):
+    def load(self, instance_cache_path: str, class_cache_path: str):
         with open(instance_cache_path, "rb") as f:
             attribs = pickle.load(f)
         vars(self).update(attribs)
@@ -238,12 +245,12 @@ class DataLoaderBase(ABC):
     # Instance_cache_path is for data specific for each instance (e.g. depends on parameters)
     # while class_cache_path is single cache for all combinations (useful for static data)
     # When in doubt, just use instance_cache_path and ignore class_cache_path
-    def save(self, instance_cache_path, class_cache_path):
+    def save(self, instance_cache_path: str, class_cache_path: str):
         with open(instance_cache_path, "wb") as f:
             pickle.dump(vars(self), f)
 
 
-def get_functions_and_methods(path):
+def get_functions_and_methods(path: str) -> list:
     """
     Given a .py file path - returns a list with all functions and methods in it.
 
@@ -276,3 +283,4 @@ def get_functions_and_methods(path):
         methods = [n for n in class_.body if isinstance(n, ast.FunctionDef)]
         for method in methods:
             result.append((class_.name + '.' + show_info(method)))
+    return result
