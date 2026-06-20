@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 import pickle
-from pandas import DataFrame
+import pandas as pd
+import numpy as np
+import numpy.typing as npt
 
 
 algorithm_registry = []
@@ -142,13 +144,13 @@ class PreferenceElicitationBase(ABC):
         pass
 
     @abstractmethod
-    def get_initial_data(self, movie_indices_to_ignore: list[int] | None = None):
+    def get_initial_data(self, movie_indices_to_ignore: list[int] | None = None) -> npt.NDArray[np.integer]:
         """Return the initial data shown to the user that the user is asked to select from."""
         pass
 
     @classmethod
     @abstractmethod
-    def name(cls):
+    def name(cls) -> str:
         """Return the unique name. Names have to be unique!
 
         Will be displayed to the users when creating a user study from the
@@ -158,7 +160,7 @@ class PreferenceElicitationBase(ABC):
 
     @classmethod
     @abstractmethod
-    def parameters(cls):
+    def parameters(cls) -> list[Parameter]:
         """Return the list of parameters (see ``Parameter``) set by the user when
         creating the user study and passed to the preference elicitation's constructor."""
         pass
@@ -213,7 +215,7 @@ class DataLoaderBase(ABC):
 
     @property
     @abstractmethod
-    def ratings_df(self) -> DataFrame:
+    def ratings_df(self) -> pd.DataFrame:
         """Return the dataframe with the interactions/ratings.
 
         Columns:
@@ -230,7 +232,7 @@ class DataLoaderBase(ABC):
 
     @property
     @abstractmethod
-    def items_df(self) -> DataFrame:
+    def items_df(self) -> pd.DataFrame:
         """Return the dataframe with information about items.
 
         Should have at least ``item_id`` and ``title`` columns. MLDataLoaderWrapper adds some more.
@@ -239,7 +241,7 @@ class DataLoaderBase(ABC):
 
     @property
     @abstractmethod
-    def items_df_indexed(self) -> DataFrame:
+    def items_df_indexed(self) -> pd.DataFrame:
         """Same as ``items_df``, but ``item_id`` is the index column."""
         pass
 

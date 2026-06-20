@@ -1,15 +1,15 @@
+import numpy as np
+from scipy.spatial.distance import squareform, pdist
 
 from plugins.fastcompare.algo.algorithm_base import Parameter, ParameterType, PreferenceElicitationBase
 from plugins.utils.multi_obj_sampling import MultiObjectiveSamplingFromBucketsElicitation
 from plugins.utils.popularity_sampling import PopularitySamplingElicitation, PopularitySamplingFromBucketsElicitation
 
-from scipy.spatial.distance import squareform, pdist
 
 class MultiObjectiveSamplingFromBucketsElicitationWrapper(PreferenceElicitationBase):
     # Objectives is a dictionary mapping objective name to its implementation (e.g. we can use different implementations of diversity etc..)
     def __init__(self, loader, *args, **kwargs):
         self.ratings_df = loader.ratings_df
-        self.elicitation = None
         self.args = args
         self.kwargs = kwargs
 
@@ -36,13 +36,10 @@ class MultiObjectiveSamplingFromBucketsElicitationWrapper(PreferenceElicitationB
             Parameter("n_samples_per_bucket", ParameterType.INT, 4, help_key="n_samples_per_bucket"),
         ]
 
-import numpy as np
-from plugins.fastcompare.algo.algorithm_base import PreferenceElicitationBase, Parameter, ParameterType
-
 class PopularitySamplingFromBucketsElicitationWrapper(PreferenceElicitationBase):
     def __init__(self, loader, *args, **kwargs):
         self.elicitation = PopularitySamplingFromBucketsElicitation(loader.ratings_df, *args, **kwargs)
-    
+
     def get_initial_data(self, movie_indices_to_ignore=[]):
         return self.elicitation.get_initial_data(movie_indices_to_ignore)
 
@@ -62,17 +59,17 @@ class PopularitySamplingFromBucketsElicitationWrapper(PreferenceElicitationBase)
             Parameter("k", ParameterType.FLOAT, 1.0, help_key="exp_k")
         ]
 
-# Popularity-sampling based implementation of preference elicitation
 class PopularitySamplingElicitationWrapper(PreferenceElicitationBase):
-    
+    """Popularity-sampling based implementation of preference elicitation"""
+
     def __init__(self, loader, *args, **kwargs):
         self.elicitation = PopularitySamplingElicitation(loader.ratings_df, *args, **kwargs)
 
     def _calculate_item_popularities(self, rating_matrix):
-        return np.power(np.sum(rating_matrix > 0.0, axis=0) / rating_matrix.shape[0], self.k)
+        return np.power(np.sum(rating_matrix > 0.0, axis=0) / rating_matrix.shape[0], self.elicitation.k)
 
     def fit(self):
-        # This elicitation is light weight, there is no expensive internal state that would have to be prepared upfront
+        # This elicitation is lightweight, there is no expensive internal state that would have to be prepared upfront
         pass
 
     def get_initial_data(self, movie_indices_to_ignore=[]):
