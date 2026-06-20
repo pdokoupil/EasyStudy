@@ -89,7 +89,7 @@ class EASE(AlgorithmBase, ABC):
             Parameter(
                 "l2",
                 ParameterType.FLOAT,
-                500,
+                500,  # the paper's recommended value for MovieLens-20M
                 help="L2-norm regularization",
                 help_key="ease_l2_help",
             ),
