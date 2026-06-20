@@ -10,7 +10,7 @@ from plugins.fastcompare.algo.algorithm_base import (
     Parameter,
     ParameterType,
 )
-from server.plugins.fastcompare.algo.wrappers.data_loadering import MLDataLoaderWrapper
+from plugins.fastcompare.algo.wrappers.data_loadering import MLDataLoaderWrapper
 
 
 class EASE(AlgorithmBase, ABC):
