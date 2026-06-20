@@ -1,10 +1,11 @@
-from abc import ABC
+# Disabled for ndbi021 branch to avoid dependency on tensorflow
 
-import numpy as np
-from plugins.fastcompare.algo.algorithm_base import AlgorithmBase, Parameter, ParameterType
+# from abc import ABC
+
+# import numpy as np
+# from plugins.fastcompare.algo.algorithm_base import AlgorithmBase, Parameter, ParameterType
 # from plugins.utils.tfrs_model import get_model_mf
 
-# Disabled for ndbi021 branch to avoid dependency on tensorflow
 
 # import tensorflow as tf
 
@@ -56,15 +57,15 @@ from plugins.fastcompare.algo.algorithm_base import AlgorithmBase, Parameter, Pa
 #             +
 #             [tf.constant(self.loader.items_df.loc[x].title) for x in filter_out_items]
 #         )
-        
+
 #         predictions = tf.squeeze(self.model.predict_for_user(new_user, seen_items_tensor, k)).numpy()
-        
+
 #         # The underlying model has to implement predict_for_user since it is not obvious how to do this in a generic way in TFRecommenders (models may behave very differently so just having generic predict() method is not enough because it is not obvious whetehr it will return scores, items or anything else)
 #         top_k = [self.loader.get_item_index(self.loader.items_df[self.loader.items_df.title == x.decode("UTF-8")].item_id.values[0]) for x in predictions]
 
 #         return top_k
 
-    
+
 #     # Custom saving and loading is needed for tensorflow
 #     # Instance_cache_path is for data specific for each instance (e.g. depends on parameters)
 #     # while class_cache_path is single cache for all combinations (useful for static data)

@@ -2,17 +2,17 @@ import os
 from pathlib import Path
 import time
 
-import pandas as pd
-import requests
+# import pandas as pd
+# import requests
 
 from plugins.fastcompare.algo.algorithm_base import DataLoaderBase
 from plugins.utils.ml_data_loader import MLDataLoader, RatingLowFilter, MovieFilterByYear, RatingFilterOld, RatingsPerYearFilter, RatingUserFilter, RatedMovieFilter, LinkFilter
 
 from common import get_abs_project_root_path
 
-from flask import url_for, has_app_context
-from PIL import Image
-from io import BytesIO
+# from flask import url_for, has_app_context
+# from PIL import Image
+# from io import BytesIO
 
 # A wrapper against MLDataLoader from utils plugin that satisfy the DataLoaderBase interface
 # The interface itself is specific to fastcompare so that is why
@@ -40,10 +40,17 @@ class MLDataLoaderWrapper(DataLoaderBase):
         # Ensure img dir path exists
         Path(img_dir_path).mkdir(parents=True, exist_ok=True)
 
-        self.loader = MLDataLoader(ratings_path, movies_path, tags_path, links_path,
-            [RatingLowFilter(4.0), MovieFilterByYear(1990), RatingFilterOld(2010), RatingsPerYearFilter(50.0), RatingUserFilter(100), RatedMovieFilter(), LinkFilter()],
-            rating_matrix_path=None, img_dir_path=img_dir_path
-        )
+        filters = [
+            RatingLowFilter(4.0),
+            MovieFilterByYear(1990),
+            RatingFilterOld(2010),
+            RatingsPerYearFilter(50.0),
+            RatingUserFilter(100),
+            RatedMovieFilter(),
+            LinkFilter(),
+        ]
+
+        self.loader = MLDataLoader(ratings_path, movies_path, tags_path, links_path, filters, img_dir_path=img_dir_path)
 
     def load_data(self):
         #cache_path = os.path.join(basedir, "static", "ml-latest", "data_cache.pckl")
@@ -112,11 +119,11 @@ class MLDataLoaderWrapper(DataLoaderBase):
         return self.all_categories
 
     @classmethod
-    def name(self):
+    def name(cls):
         return "Filtered ML-25M dataset"
 
     @classmethod
-    def parameters(self):
+    def parameters(cls):
         return []
 
 
