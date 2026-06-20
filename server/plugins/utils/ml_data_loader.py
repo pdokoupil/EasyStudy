@@ -158,7 +158,7 @@ class MLDataLoader:
         self.ratings_path = ratings_path
         self.movies_path = movies_path
         self.tags_path = tags_path
-        self.filters = filters
+        self.filters = filters or []
         self.links_path = links_path
         self.rating_matrix_path = rating_matrix_path
         self.img_dir_path = img_dir_path
