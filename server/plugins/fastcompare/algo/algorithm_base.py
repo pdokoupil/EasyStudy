@@ -25,7 +25,7 @@ class ParameterType:
     """Choose one out of k available options. TODO how to define the options?"""
     BOOL = "bool"
 
-class Parameter(dict):
+class Parameter(dict[str, object]):
     """A configurable parameter for an algorithm or data loader."""
 
     def __init__(self, param_name: str, param_type: str, param_default_value: object, help: str | None = None, help_key: str | None = None, **kwargs):
@@ -342,18 +342,18 @@ class DataLoaderBase(ABC):
             pickle.dump(vars(self), f)
 
 
-def get_functions_and_methods(path: str) -> list:
+def get_functions_and_methods(path: str) -> list[str]:
     """
     Given a .py file path - returns a list with all functions and methods in it.
 
-    Source: https://stackoverflow.com/q/73239026/256662
+    Source: https://stackoverflow.com/a/73239530
     """
     import ast
 
     with open(path) as file:
         node = ast.parse(file.read())
 
-    def show_info(functionNode):
+    def show_info(functionNode) -> str:
         function_rep = ''
         function_rep = functionNode.name + '('
 
@@ -364,7 +364,7 @@ def get_functions_and_methods(path: str) -> list:
         function_rep += ')'
         return function_rep
 
-    result = []
+    result: list[str] = []
     functions = [n for n in node.body if isinstance(n, ast.FunctionDef)]
     classes = [n for n in node.body if isinstance(n, ast.ClassDef)]
     print(classes)
