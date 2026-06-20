@@ -1,6 +1,7 @@
 from abc import ABC
 
 import numpy as np
+import numpy.typing as npt
 import pandas as pd
 from plugins.fastcompare.algo.algorithm_base import (
     AlgorithmBase,
@@ -24,9 +25,9 @@ class EASE(AlgorithmBase, ABC):
     def __init__(self, loader: MLDataLoaderWrapper, positive_threshold: float, l2: float, **kwargs):
         self._ratings_df = loader.ratings_df
         self._loader = loader
-        self._all_items = self._ratings_df.item.unique()
+        self._all_items: npt.NDArray[np.int64] = self._ratings_df.item.unique()
 
-        self._rating_matrix = (
+        self._rating_matrix: npt.NDArray[np.float32] = (
             self._loader.ratings_df.pivot(index="user", columns="item", values="rating")
             .fillna(0)
             .values
@@ -35,9 +36,7 @@ class EASE(AlgorithmBase, ABC):
         self._threshold = positive_threshold
         self._l2 = l2
 
-        self._items_count = np.shape(self._rating_matrix)[1]
-
-        self._weights = None
+        self._items_count: int = np.shape(self._rating_matrix)[1]
 
     # One-time fitting of the algorithm for a predefined number of iterations
     def fit(self):
