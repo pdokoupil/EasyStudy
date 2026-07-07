@@ -19,3 +19,5 @@ server/static/datasets/**/img/
 venv/
 .ruff_cache/
 .pytest_cache/
+# Local, private notes (publishing creds/workflow) — never committed
+*.local.md

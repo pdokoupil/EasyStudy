@@ -80,6 +80,7 @@ all = [
     "python3-discogs-client",
 ]
 dev = ["pytest", "ruff", "black", "locust"]
+docs = ["mkdocs-material", "mkdocs"]
 
 [project.urls]
 Homepage = "https://github.com/pdokoupil/EasyStudy"

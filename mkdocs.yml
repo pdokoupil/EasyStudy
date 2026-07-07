@@ -1,0 +1,48 @@
+site_name: EasyStudy
+site_description: A modular framework for quick & easy deployment of customizable user studies.
+site_url: https://pdokoupil.github.io/EasyStudy/
+repo_url: https://github.com/pdokoupil/EasyStudy
+repo_name: pdokoupil/EasyStudy
+edit_uri: edit/main/docs/
+
+theme:
+  name: material
+  features:
+    - navigation.sections
+    - navigation.top
+    - content.code.copy
+    - content.action.edit
+  palette:
+    - scheme: default
+      primary: indigo
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - scheme: slate
+      primary: indigo
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.highlight
+  - toc:
+      permalink: true
+  - tables
+
+nav:
+  - Home: index.md
+  - Getting started:
+      - Quickstart (15 min): quickstart.md
+      - Concepts: concepts.md
+  - Guides:
+      - Create a study (no code): create-a-study.md
+      - Extending fastcompare: extending.md
+      - Write your first plugin: first-plugin.md
+      - Data model & exporting results: data-model.md
+  - Operations:
+      - Deployment: deployment.md
+      - Troubleshooting: troubleshooting.md
