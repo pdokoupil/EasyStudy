@@ -1,6 +1,11 @@
 import numpy as np
-import tensorflow as tf
-tf.get_logger().setLevel('ERROR')
+# TensorFlow is an optional heavy extra; keep this module import-safe without it.
+# The tf.* helpers below only work if `pip install "easystudy[tensorflow]"` was run.
+try:
+    import tensorflow as tf
+    tf.get_logger().setLevel('ERROR')
+except ImportError:
+    tf = None
 
 def cos_sim_tf(a, b=None):
     if b is None:

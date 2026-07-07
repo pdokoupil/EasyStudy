@@ -5,8 +5,8 @@ from abc import ABC
 import numpy as np
 import numpy.typing as npt
 import pandas as pd
-import tensorflow as tf
-tf.get_logger().setLevel('ERROR')
+# EASE has a closed-form linear solution — no deep-learning framework needed. It is
+# implemented with NumPy so it ships in the lightweight core (no [tensorflow] extra).
 from plugins.fastcompare.algo.algorithm_base import (
     AlgorithmBase,
     Parameter,
@@ -44,16 +44,15 @@ class EASE(AlgorithmBase, ABC):
 
     # One-time fitting of the algorithm for a predefined number of iterations
     def fit(self):
-        X = tf.convert_to_tensor(
-            np.where(self._rating_matrix >= self._threshold, 1, 0), dtype=tf.float32
-        )
-        G = tf.transpose(X) @ X
-        G += self._l2 * tf.linalg.tensor_diag([1.0 for _ in range(self._items_count)])
+        X = np.where(self._rating_matrix >= self._threshold, 1, 0).astype(np.float32)
+        G = X.T @ X
+        G += self._l2 * np.identity(self._items_count, dtype=np.float32)
 
-        P = tf.linalg.inv(G)
+        P = np.linalg.inv(G)
 
-        B = P / (-tf.linalg.tensor_diag_part(P))
-        B = tf.linalg.set_diag(B, tf.zeros(B.shape[0]))
+        # B = P / (-diag(P)), column-wise; then zero the diagonal (closed-form EASE)
+        B = P / (-np.diag(P))
+        np.fill_diagonal(B, 0.0)
         self._weights = B
 
     # Predict for the user
@@ -71,9 +70,7 @@ class EASE(AlgorithmBase, ABC):
         for i in indices:
             user_vector[i] = 1.0
 
-        preds = tf.tensordot(
-            tf.convert_to_tensor(user_vector, dtype=tf.float32), self._weights, 1
-        ).numpy()
+        preds = np.tensordot(user_vector.astype(np.float32), self._weights, axes=1)
 
         candidates_by_prob = sorted(
             ((preds[cand], cand) for cand in candidates), reverse=True

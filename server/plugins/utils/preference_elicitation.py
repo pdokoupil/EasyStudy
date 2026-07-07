@@ -12,9 +12,15 @@ import numpy as np
 import pickle
 
 
-import tensorflow as tf
-tf.get_logger().setLevel('ERROR')
-tf.config.set_visible_devices([], 'GPU') # Disable GPU because of adagrad issues
+# TensorFlow is an optional heavy extra. Keep this module import-safe without it so the
+# lightweight core and non-TF preference-elicitation methods (e.g. popularity sampling)
+# work; TFRS-based methods require `pip install "easystudy[tensorflow]"`.
+try:
+    import tensorflow as tf
+    tf.get_logger().setLevel('ERROR')
+    tf.config.set_visible_devices([], 'GPU') # Disable GPU because of adagrad issues
+except ImportError:
+    tf = None
 # tf.random.set_seed(42)
 # np.random.seed(42)
 # random.seed(42)

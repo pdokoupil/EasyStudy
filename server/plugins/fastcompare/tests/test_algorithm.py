@@ -15,6 +15,13 @@ tested_algorithm_combinations = [
 
 @pytest.fixture(scope="session")
 def loader():
+    import os
+    ratings = os.path.join("static", "datasets", "ml-latest", "ratings.csv")
+    if not os.path.exists(ratings):
+        pytest.skip(
+            "MovieLens dataset not present — run `python scripts/fetch_data.py "
+            "--dataset ml-latest` to enable this test."
+        )
     print(f"Loading data, takes some time")
     loader = MLDataLoaderWrapper()
     loader.load_data()
