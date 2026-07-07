@@ -1,20 +1,40 @@
-FROM continuumio/miniconda3:4.12.0
+# EasyStudy image. Build context is the REPOSITORY ROOT (so pyproject.toml is visible):
+#   docker build -f server/Dockerfile -t easy-study .
+# or just use `docker compose up` (recommended).
+#
+# By default this installs the LIGHTWEIGHT core. To include heavy backends, pass extras:
+#   docker build -f server/Dockerfile --build-arg EASYSTUDY_EXTRAS="tensorflow,lenskit" -t easy-study .
+FROM python:3.12-slim
+
+# comma-separated pyproject extras, e.g. "tensorflow,lenskit,redis"; empty => core only
+ARG EASYSTUDY_EXTRAS=""
 
 WORKDIR /app
 
-COPY conda_requirements.txt conda_requirements.txt
-COPY pip_requirements.txt pip_requirements.txt
+# System build deps some scientific wheels may need; kept minimal.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends build-essential \
+    && rm -rf /var/lib/apt/lists/*
 
-RUN conda update conda --yes \ 
-    && conda config --add channels conda-forge \
-    && conda create --name app_env python=3.9 \
-    && conda install --yes --file conda_requirements.txt
+# Install dependencies first (better layer caching). pyproject.toml is the single manifest.
+COPY pyproject.toml README.md ./
+RUN pip install --no-cache-dir --upgrade pip \
+    && if [ -n "$EASYSTUDY_EXTRAS" ]; then pip install --no-cache-dir ".[$EASYSTUDY_EXTRAS]"; else pip install --no-cache-dir .; fi
 
-# Some packages are not available in conda
-RUN pip install --upgrade pip
-RUN pip install -r pip_requirements.txt
+# App source
+COPY server/ ./server/
+COPY scripts/ ./scripts/
+
+WORKDIR /app/server
 
 EXPOSE 5000
 
-ENTRYPOINT [ "python" ]
-CMD ["-m", "gunicorn", "-w", "1", "--bind", "0.0.0.0:5000", "--timeout", "0", "--preload", "--log-level", "debug", "--access-logfile", "/app/access_logfile.txt", "--error-logfile", "/app/error_logfile.txt", "app:create_app()"]
+# NOTE: default is a SINGLE worker on purpose — the current fine-tuning keeps per-participant
+# model state in worker memory, so raising GUNICORN_WORKERS requires the shared-state rework
+# (see 03_V2_TECHNICAL.md A3/B1). Timeout/worker count are overridable via env.
+CMD gunicorn -w ${GUNICORN_WORKERS:-1} \
+    --bind 0.0.0.0:5000 \
+    --timeout ${GUNICORN_TIMEOUT:-0} \
+    --preload \
+    --log-level ${LOG_LEVEL:-info} \
+    "app:create_app()"

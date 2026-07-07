@@ -1,0 +1,50 @@
+# One-command EasyStudy for local use:  docker compose up --build
+#
+# First time only, fetch datasets + images into ./server/static/datasets:
+#   docker compose run --rm fetch          # downloads MovieLens + goodbooks (CSVs + images)
+#
+# Optional heavy backends: set EASYSTUDY_EXTRAS (build arg) e.g. "tensorflow,lenskit".
+# Optional redis-backed sessions: `docker compose --profile redis up` and set
+# SESSION_TYPE=redis + REDIS_URL=redis://redis:6379 in your environment / .env.
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: server/Dockerfile
+      args:
+        EASYSTUDY_EXTRAS: "${EASYSTUDY_EXTRAS:-}"
+    ports:
+      - "${PORT:-5000}:5000"
+    environment:
+      SECRET_KEY: "${SECRET_KEY:-dev-only-change-me}"
+      DATABASE_URL: "${DATABASE_URL:-sqlite:///db.sqlite}"
+      SESSION_TYPE: "${SESSION_TYPE:-sqlalchemy}"
+      REDIS_URL: "${REDIS_URL:-}"
+      GUNICORN_WORKERS: "${GUNICORN_WORKERS:-1}"
+      GUNICORN_TIMEOUT: "${GUNICORN_TIMEOUT:-0}"
+    volumes:
+      # bind the source for quick iteration, and persist DB/datasets across restarts
+      - ./server:/app/server
+      - ./scripts:/app/scripts
+    restart: unless-stopped
+
+  # One-off helper to download datasets + images (not started by `up`).
+  fetch:
+    build:
+      context: .
+      dockerfile: server/Dockerfile
+    profiles: ["init"]
+    volumes:
+      - ./server:/app/server
+      - ./scripts:/app/scripts
+    working_dir: /app
+    entrypoint: ["python", "scripts/fetch_data.py", "--dataset", "all"]
+
+  # Optional shared session store; enable with `--profile redis`.
+  redis:
+    image: redis:7-alpine
+    profiles: ["redis"]
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
