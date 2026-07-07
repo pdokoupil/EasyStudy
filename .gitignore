@@ -10,3 +10,12 @@ server/instance/
 *.sqlite
 img
 cache
+
+# Datasets & their images are fetched via scripts/fetch_data.py, never committed
+# (they used to be git-LFS tracked, which caused clone-time quota errors).
+*.zip
+server/static/datasets/**/img/
+.venv/
+venv/
+.ruff_cache/
+.pytest_cache/

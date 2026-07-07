@@ -1,1 +1,4 @@
-*.zip filter=lfs diff=lfs merge=lfs -text
+# Dataset images are NOT tracked in git anymore (the `*.zip filter=lfs` rule that used
+# to live here caused git-LFS "over data quota" smudge errors on every clone).
+# Fetch dataset images with `python scripts/fetch_data.py`. See README "Setup".
+

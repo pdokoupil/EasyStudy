@@ -1,0 +1,32 @@
+cff-version: 1.2.0
+message: "If you use EasyStudy in your research, please cite the paper below."
+title: "EasyStudy: Framework for Easy Deployment of User Studies on Recommender Systems"
+type: software
+authors:
+  - family-names: Dokoupil
+    given-names: Patrik
+    email: patrik.dokoupil@matfyz.cuni.cz
+    affiliation: "Faculty of Mathematics and Physics, Charles University"
+  - family-names: Peska
+    given-names: Ladislav
+    email: ladislav.peska@matfyz.cuni.cz
+    affiliation: "Faculty of Mathematics and Physics, Charles University"
+repository-code: "https://github.com/pdokoupil/EasyStudy"
+license: MIT
+preferred-citation:
+  type: conference-paper
+  title: "EasyStudy: Framework for Easy Deployment of User Studies on Recommender Systems"
+  authors:
+    - family-names: Dokoupil
+      given-names: Patrik
+    - family-names: Peska
+      given-names: Ladislav
+    - family-names: Boratto
+      given-names: Ludovico
+  collection-title: "Proceedings of the 17th ACM Conference on Recommender Systems (RecSys '23)"
+  year: 2023
+  publisher:
+    name: "Association for Computing Machinery"
+  start: 1196
+  end: 1199
+  doi: "10.1145/3604915.3610640"

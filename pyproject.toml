@@ -1,0 +1,96 @@
+# EasyStudy packaging & dependency source of truth.
+#
+# Dependency philosophy: the CORE install is deliberately LIGHTWEIGHT (pure-Python
+# Flask stack + pandas/numpy/scikit-learn). Heavy / optional backends live behind
+# extras so nobody installs TensorFlow just to run a books-vs-movies study.
+#
+#   pip install easystudy                 # lightweight core (this is the default)
+#   pip install "easystudy[tensorflow]"   # TensorFlow + TF-Recommenders algorithms (VAE, TFRS)
+#   pip install "easystudy[lenskit]"      # LensKit baseline wrappers
+#   pip install "easystudy[redis]"        # Redis-backed sessions/queue
+#   pip install "easystudy[discogs]"      # Discogs metadata client (music domain)
+#   pip install "easystudy[all]"          # everything
+#   pip install "easystudy[dev]"          # tests + linters + load testing
+#
+# NOTE: full package layout (importable `easystudy` package + `easystudy` CLI entry
+# points + plugin discovery) is tracked as backlog item B3 in 01_ADOPTION_BACKLOG.md.
+# For now this file is the single, authoritative dependency manifest and replaces the
+# old split conda_requirements.txt / pip_requirements.txt.
+
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "easystudy"
+version = "2.0.0.dev0"
+description = "A modular framework for quick & easy deployment of customizable user studies — for recommender systems and any other item-based interactive system."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [
+    { name = "Patrik Dokoupil", email = "patrik.dokoupil@matfyz.cuni.cz" },
+    { name = "Ladislav Peska", email = "ladislav.peska@matfyz.cuni.cz" },
+]
+keywords = ["user studies", "recommender systems", "evaluation", "user-centric", "hci", "surveys"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Framework :: Flask",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3 :: Only",
+    "Topic :: Scientific/Engineering",
+]
+
+# --- CORE (lightweight) dependencies -----------------------------------------
+dependencies = [
+    "Flask>=3.0",
+    "Werkzeug>=3.0",
+    "Flask-Login",
+    "Flask-SQLAlchemy",
+    "Flask-Migrate",
+    "Flask-Session",
+    "Flask-WTF",
+    "Flask-PluginKit",
+    "bcrypt",
+    "is-safe-url",
+    "pandas",
+    "numpy",
+    "scikit-learn",
+    "scipy",
+    "Pillow",
+    "gunicorn",
+    "cachelib",
+    "requests",
+    "beautifulsoup4",
+    "cinemagoer",
+]
+
+[project.optional-dependencies]
+tensorflow = ["tensorflow>=2.15", "tensorflow-recommenders>=0.7.3"]
+lenskit = ["lenskit"]
+redis = ["redis"]
+discogs = ["python3-discogs-client"]
+# convenience aggregate
+all = [
+    "tensorflow>=2.15",
+    "tensorflow-recommenders>=0.7.3",
+    "lenskit",
+    "redis",
+    "python3-discogs-client",
+]
+dev = ["pytest", "ruff", "black", "locust"]
+
+[project.urls]
+Homepage = "https://github.com/pdokoupil/EasyStudy"
+Repository = "https://github.com/pdokoupil/EasyStudy"
+Paper = "https://doi.org/10.1145/3604915.3610640"
+
+# Minimal build config: today this project acts as the authoritative dependency
+# manifest (so `pip install ".[tensorflow]"` etc. work). Real package layout is B3.
+[tool.setuptools]
+py-modules = []
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"
