@@ -1,33 +1,23 @@
 import time
+import os
+import random
+import sys
+
 import flask
+import numpy as np
 from flask_pluginkit import PluginManager
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 from flask_login import LoginManager
 from flask_wtf.csrf import CSRFProtect
-
 from flask_session import Session
-
-import os
-import random
-import sys
-import numpy as np
-import tensorflow as tf
-
-#from werkzeug.middleware.profiler import ProfilerMiddleware
-import redis
-
-import os
-import random
-import sys
-import numpy as np
-import tensorflow as tf
-
-#from werkzeug.middleware.profiler import ProfilerMiddleware
-import redis
 
 from sqlalchemy import MetaData, event
 from sqlalchemy.engine import Engine
+
+#from werkzeug.middleware.profiler import ProfilerMiddleware
+
+from config import Config
 
 naming_convention = {
     "ix": 'ix_%(column_0_label)s',
@@ -43,7 +33,6 @@ pm = PluginManager(plugins_folder="plugins")
 csrf = CSRFProtect()
 
 sess = Session()
-rds = redis.Redis(host='localhost', port=6379)
 
 from models import *
 
@@ -51,67 +40,25 @@ from models import *
 # expected when SQLite is used as backend for SQLAlchemy
 @event.listens_for(Engine, "connect")
 def set_sqlite_pragma(dbapi_connection, connection_record):
-    cursor = dbapi_connection.cursor()
-    cursor.execute("PRAGMA foreign_keys=ON")
-    cursor.close()
-
-from models import *
-
-# This is needed to ensure foreign keys and corresponding cascade deletion work as
-# expected when SQLite is used as backend for SQLAlchemy
-@event.listens_for(Engine, "connect")
-def set_sqlite_pragma(dbapi_connection, connection_record):
-    cursor = dbapi_connection.cursor()
-    cursor.execute("PRAGMA foreign_keys=ON")
-    cursor.close()
+    # Only SQLite needs (and understands) this pragma; skip it for other backends
+    # (e.g. Postgres) so a production DATABASE_URL does not error on connect.
+    if dbapi_connection.__class__.__module__.startswith("sqlite3"):
+        cursor = dbapi_connection.cursor()
+        cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.close()
 
 # Insert/set all values that have to be set once (e.g. insert interaction types into DB)
 def initialize_db_tables():
     pass
-    # from models import InteractionType
-
-    # # If it has not been inserted yet, insert selected-item interaction type
-    # if db.session.query(
-    #     db.session.query(InteractionType).filter_by(name='selected-item').exists()
-    # ).scalar():
-    #     x = InteractionType()
-    #     x.name = "selected-item"
-    #     db.session.add(x)
-
-    # # If it has not been inserted yet, insert deselected-item interaction type
-    # if db.session.query(
-    #     db.session.query(InteractionType).filter_by(name='deselected-item').exists()
-    # ).scalar():
-    #     x = InteractionType()
-    #     x.name = "deselected-item"
-    #     db.session.add(x)
-
-    # # If it has not been inserted yet, insert changed-viewport type
-    # if db.session.query(
-    #     db.session.query(InteractionType).filter_by(name='changed-viewport').exists()
-    # ).scalar():
-    #     x = InteractionType()
-    #     x.name = "changed-viewport"
-    #     db.session.add(x)
-
-    # # If it has not been inserted yet, insert clicked-button type
-    # if db.session.query(
-    #     db.session.query(InteractionType).filter_by(name='clicked-button').exists()
-    # ).scalar():
-    #     x = InteractionType()
-    #     x.name = "clicked-button"
-    #     db.session.add(x)
 
 def create_app():
     app = flask.Flask(__name__)
     #app.wsgi_app = ProfilerMiddleware(app.wsgi_app)
 
-
-    app.config['SECRET_KEY'] = '8bf29bd88d0bfb94509f5fb0'
-    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///db.sqlite'
-    app.config['SESSION_COOKIE_NAME'] = "something"
-    app.config["SESSION_TYPE"] = "sqlalchemy"
-    app.config["SESSION_SQLALCHEMY"] = db
+    app.config.from_object(Config)
+    # Flask-Session (sqlalchemy backend) needs a handle to the db instance
+    if app.config.get("SESSION_TYPE") == "sqlalchemy":
+        app.config["SESSION_SQLALCHEMY"] = db
 
     sess.init_app(app)
 
@@ -122,7 +69,7 @@ def create_app():
     csrf.init_app(app)
 
     login_manager = LoginManager(app)
-    
+
     pm.init_app(app)
 
 
@@ -151,7 +98,12 @@ def create_app():
     seed = os.getpid() + time_int
     random.seed(seed)
     np.random.seed(seed)
-    tf.random.set_seed(seed)
+    # TensorFlow is an optional (heavy) extra; only seed it if it is installed.
+    try:
+        import tensorflow as tf
+        tf.random.set_seed(seed)
+    except ImportError:
+        pass
     print(f"Seeding with: {seed} ({time_int}, {os.getpid()})", file=sys.stderr)
 
     return app
