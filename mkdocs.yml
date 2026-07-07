@@ -24,6 +24,19 @@ theme:
         icon: material/weather-sunny
         name: Switch to light mode
 
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          paths: [server]   # so `plugins.fastcompare.algo.algorithm_base` resolves
+          options:
+            docstring_style: google
+            members_order: source
+            show_root_heading: true
+            show_source: false
+            heading_level: 3
+
 markdown_extensions:
   - admonition
   - pymdownx.details
@@ -43,6 +56,8 @@ nav:
       - Extending fastcompare: extending.md
       - Write your first plugin: first-plugin.md
       - Data model & exporting results: data-model.md
+  - Reference:
+      - Base classes (API): api.md
   - Operations:
       - Deployment: deployment.md
       - Troubleshooting: troubleshooting.md

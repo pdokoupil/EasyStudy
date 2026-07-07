@@ -47,6 +47,11 @@ EasyStudy's niche: the only tool that is **self-contained (batteries included)**
 
 ## Quickstart (Docker, recommended)
 
+> **Try it in the browser (zero local setup):**
+> [![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/pdokoupil/EasyStudy?quickstart=1)
+> — launches a cloud dev container that installs the core and fetches a demo dataset; then run
+> `cd server && flask --debug run`.
+
 ```bash
 git clone https://github.com/pdokoupil/EasyStudy.git
 cd EasyStudy

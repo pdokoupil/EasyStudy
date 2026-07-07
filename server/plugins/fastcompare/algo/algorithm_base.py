@@ -1,29 +1,50 @@
 from abc import ABC, abstractmethod
+from typing import Any
 import pickle
 
 
-# Class for hyperparamters/configurable parameters of the algorithms
 class ParameterType:
+    """Types of hyperparameters / configurable parameters exposed by a component.
+
+    Used as the ``param_type`` of a `Parameter`. ``OPTIONS`` lets the user choose
+    one out of several predefined options.
+    """
     STRING = "string"
     INT = "int"
     FLOAT = "float"
-    OPTIONS = "options" # Choose one out of k available options
+    OPTIONS = "options"  # Choose one out of k available options
     BOOL = "bool"
 
+
 class Parameter(dict):
-    def __init__(self, param_name, param_type, param_default_value, help=None, help_key=None, **kwargs):
+    """A single configurable parameter surfaced in the study-creation UI.
+
+    Args:
+        param_name: Parameter name (also the keyword passed to the component constructor).
+        param_type: One of the `ParameterType` values.
+        param_default_value: Default value shown in the UI.
+        help: Inline help text shown next to the field.
+        help_key: Key into the translations ``.json`` file, so that the help text is
+            translatable (takes precedence over ``help`` when translations are available).
+    """
+    def __init__(self, param_name: str, param_type: str, param_default_value: Any, help: str = None, help_key: str = None, **kwargs):
         self.name = param_name
         self.type = param_type
         self.default = param_default_value
         self.help = help
-        self.help_key = help_key # help_key refers to .json with translations, so that kind of help is translatable
+        self.help_key = help_key
         self.__dict__.update(kwargs)
         dict.__init__(self, self.__dict__)
 
-# Base classes must take **kwargs in __init__
+
 class AlgorithmBase(ABC):
-    
-    _my_id = "821e13b63f5a4df4ca54c30b6b0cf48f" # MD5 hash of "AlgorithmBase"
+    """Base class for recommendation algorithms.
+
+    Subclasses are discovered automatically and offered in the fastcompare study-creation
+    UI. Implementations must accept ``**kwargs`` in ``__init__``.
+    """
+
+    _my_id = "821e13b63f5a4df4ca54c30b6b0cf48f"  # MD5 hash of "AlgorithmBase"
 
     # Initialize method that is called after preference elicitation may be useful for some algorithms
     # TODO think if this is useful for anything except for RLprop
@@ -32,53 +53,70 @@ class AlgorithmBase(ABC):
     #     pass
 
     @abstractmethod
-    # Data should be specified when algorithm is constructed, not passed to fit
-    # the reason is that some models have structure dependent on the underlying data (e.g. string lookups in tensorflow etc.)
-    # so it makes sense to expect fitting is done at same data as construction
-    # This method should perform initial training on the dataset
     def fit():
+        """Perform the initial training of the algorithm on the dataset.
+
+        The data is supplied when the algorithm is constructed rather than passed to
+        ``fit``, because some models have structure that depends on the underlying data
+        (e.g. string lookups in TensorFlow). It therefore makes sense to expect that
+        fitting is done on the same data the model was constructed with.
+        """
         pass
 
-    # Performs prediction for new, previously unknown user, by simulating his history using a list of selected items.
-    # It should return list of item indices of the k recommended items. Note, that none of the filter_out_items can be present in the result
     @abstractmethod
     def predict(selected_items, filter_out_items, k):
+        """Recommend for a new, previously unseen user.
+
+        The user's history is simulated from ``selected_items``. Returns a list of item
+        indices for the ``k`` recommended items. None of the ``filter_out_items`` may
+        appear in the result.
+        """
         pass
 
-    # Names have to be unique!
     @classmethod
     @abstractmethod
     def name():
+        """Return the algorithm's display name. Names must be unique."""
         pass
 
-    # Return list of parameters (see ParameterType type) that will be set by the user when creating the user study and passed to the
-    # Algorithm's constructor
     @classmethod
     @abstractmethod
     def parameters():
+        """Return the list of `Parameter` objects for this algorithm.
+
+        These are set by the researcher when creating the user study and are passed to
+        the algorithm's constructor as keyword arguments.
+        """
         pass
 
     ### Serialization methods ###
 
-    # Load internal state, default implementation using pickle
-    # more complex models may need to override this behavior (e.g. tensorflow models)
-    # Instance_cache_path is for data specific for each instance (e.g. depends on parameters)
-    # while class_cache_path is single cache for all combinations (useful for static data)
-    # When in doubt, just use instance_cache_path and ignore class_cache_path
-    # semi_local_cache_path is "per-dataset", but for whole class (other config params are ignored)
-    def load(self, instance_cache_path, class_cache_path, semi_local_cache_path):
+    def load(self, instance_cache_path: str, class_cache_path: str, semi_local_cache_path: str):
+        """Load internal state (default implementation uses pickle).
+
+        More complex models may need to override this (e.g. TensorFlow models).
+
+        Args:
+            instance_cache_path: Cache for data specific to this instance (i.e. depends on
+                its parameters).
+            class_cache_path: A single cache shared across all parameter combinations
+                (useful for static data).
+            semi_local_cache_path: A per-dataset cache for the whole class (other config
+                parameters are ignored).
+
+        When in doubt, just use ``instance_cache_path`` and ignore the others.
+        """
         with open(instance_cache_path, "rb") as f:
             attribs = pickle.load(f)
         self.__dict__.update(attribs)
         return self
 
-    # Save internal state, default implementation using pickle
-    # more complex models may need to override this behavior
-    # Instance_cache_path is for data specific for each instance (e.g. depends on parameters)
-    # while class_cache_path is single cache for all combinations (useful for static data)
-    # When in doubt, just use instance_cache_path and ignore class_cache_path
-    # semi_local_cache_path is "per-dataset", but for whole class (other config params are ignored)
-    def save(self, instance_cache_path, class_cache_path, semi_local_cache_path):
+    def save(self, instance_cache_path: str, class_cache_path: str, semi_local_cache_path: str):
+        """Save internal state (default implementation uses pickle).
+
+        More complex models may need to override this. See `load` for the meaning of
+        the cache-path arguments.
+        """
         with open(instance_cache_path, "wb") as f:
             # Filter out "private" (starts with _) members
             pickle.dump({a: b for a, b in self.__dict__.items()
@@ -86,54 +124,64 @@ class AlgorithmBase(ABC):
                             (not type(a).__name__.startswith("_thread.")) and\
                             (not type(b).__name__.startswith("_thread."))}, f)
 
-# Base classes must take **kwargs in __init__
-class PreferenceElicitationBase(ABC):
-    _my_id = "e1d213e443d64bf0d6bfe9a7f6f26290" # MD5 hash of "PreferenceElicitationBase"
 
-    # Perform any sort of dataset-dependent initialization (most of the preference elicitation methods does not really need this)
+class PreferenceElicitationBase(ABC):
+    """Base class for preference-elicitation methods.
+
+    Implementations must accept ``**kwargs`` in ``__init__``.
+    """
+    _my_id = "e1d213e443d64bf0d6bfe9a7f6f26290"  # MD5 hash of "PreferenceElicitationBase"
+
     @abstractmethod
     def fit():
+        """Perform any dataset-dependent initialization.
+
+        Most preference-elicitation methods do not really need this.
+        """
         pass
 
-    # Returns the initial data shown to the user that the user is asked to select from
     @abstractmethod
     def get_initial_data(movie_indices_to_ignore=[]):
+        """Return the initial set of items shown to the user to select from."""
         pass
 
-    # Names have to be unique! Will be displayed to the users when creating user study from fastcompare plugin
     @classmethod
     @abstractmethod
     def name():
+        """Return the method's display name.
+
+        Names must be unique; the name is shown to researchers when creating a user study
+        from the fastcompare plugin.
+        """
         pass
-    
-    # Return list of parameters (see ParameterType type) that will be set by the user when creating the user study and passed to the
-    # Preference elicitation's constructor
+
     @classmethod
     @abstractmethod
     def parameters():
+        """Return the list of `Parameter` objects for this method.
+
+        These are set by the researcher when creating the user study and are passed to the
+        preference-elicitation constructor as keyword arguments.
+        """
         pass
 
     ### Serialization methods ###
 
-    # Load internal state, default implementation using pickle
-    # more complex models may need to override this behavior (e.g. tensorflow models)
-    # Instance_cache_path is for data specific for each instance (e.g. depends on parameters)
-    # while class_cache_path is single cache for all combinations (useful for static data)
-    # When in doubt, just use instance_cache_path and ignore class_cache_path
-    # semi_local_cache_path is "per-dataset", but for whole class (other config params are ignored)
-    def load(self, instance_cache_path, class_cache_path, semi_local_cache_path):
+    def load(self, instance_cache_path: str, class_cache_path: str, semi_local_cache_path: str):
+        """Load internal state (default implementation uses pickle).
+
+        See `AlgorithmBase.load` for the meaning of the cache-path arguments.
+        """
         with open(instance_cache_path, "rb") as f:
             attribs = pickle.load(f)
         self.__dict__.update(attribs)
         return self
 
-    # Save internal state, default implementation using pickle
-    # more complex models may need to override this behavior
-    # Instance_cache_path is for data specific for each instance (e.g. depends on parameters)
-    # while class_cache_path is single cache for all combinations (useful for static data)
-    # When in doubt, just use instance_cache_path and ignore class_cache_path
-    # semi_local_cache_path is "per-dataset", but for whole class (other config params are ignored)
-    def save(self, instance_cache_path, class_cache_path, semi_local_cache_path):
+    def save(self, instance_cache_path: str, class_cache_path: str, semi_local_cache_path: str):
+        """Save internal state (default implementation uses pickle).
+
+        See `AlgorithmBase.load` for the meaning of the cache-path arguments.
+        """
         with open(instance_cache_path, "wb") as f:
             # Filter out "private" (starts with _) members
             pickle.dump({a: b for a, b in self.__dict__.items()
@@ -141,125 +189,142 @@ class PreferenceElicitationBase(ABC):
                             (not type(a).__name__.startswith("_thread.")) and\
                             (not type(b).__name__.startswith("_thread."))}, f)
 
-# Base classes must take **kwargs in __init__
-# there should be user, item columns in the ratings_df
-# there should also be title column in the items_df
-# Item id is possibily non-zero based id, while item_index is strictly zero based
-class DataLoaderBase(ABC):
-    _my_id = "60169475d436925316ff7a2b03b52253" # MD5 hash of "DataLoaderBase"
 
-    # Load the data, here you can perform long running stuff
+class DataLoaderBase(ABC):
+    """Base class for dataset/domain loaders.
+
+    Implementations must accept ``**kwargs`` in ``__init__``. Conventions:
+
+    - ``ratings_df`` must contain ``user`` and ``item`` columns.
+    - ``items_df`` must contain a ``title`` column.
+    - An item **id** may be non-zero-based, whereas an item **index** is strictly
+      zero-based. Use `get_item_index` / `get_item_id` to convert between them.
+    """
+    _my_id = "60169475d436925316ff7a2b03b52253"  # MD5 hash of "DataLoaderBase"
+
     @abstractmethod
     def load_data():
+        """Load the data. Long-running work belongs here."""
         pass
 
-    # Returns dataframe with the interactions/ratings (be aware that implicit feedback is now considered)
-    # There should be "user", "item", and "item_id" (zero-based) columns in the dataframe
     @property
     @abstractmethod
     def ratings_df():
+        """Dataframe of interactions/ratings.
+
+        Should contain ``user``, ``item``, and ``item_id`` (zero-based) columns. Note that
+        interactions are treated as implicit feedback.
+        """
         pass
 
-    # Returns dataframe with information about items. Should have item_id, and title columns
     @property
     @abstractmethod
     def items_df():
+        """Dataframe with item metadata. Should have ``item_id`` and ``title`` columns."""
         pass
 
-    # Same as items_df but using item as an index
     @property
     @abstractmethod
     def items_df_indexed():
+        """Same as `items_df` but indexed by ``item``."""
         pass
 
     @property
     @abstractmethod
     def distance_matrix():
+        """Pairwise item distance matrix (used e.g. by the ILD metric)."""
         pass
 
     @property
     @abstractmethod
     def rating_matrix():
+        """User-by-item rating matrix."""
         pass
-    # Return image url for the given item id
-    # Either remote URL (http://) (could be slow)
-    # Or local, already processed via flask's url_for (if you place images into server/static/datasets/x/img/*.jpg)
+
     @abstractmethod
     def get_item_id_image_url(item_id):
+        """Return the image URL for the given item id.
+
+        Either a remote URL (``http://…``, which can be slow) or a local one produced via
+        Flask's ``url_for`` (if you place images under ``server/static/datasets/<x>/img/*.jpg``).
+        """
         pass
 
-    # Same as above, but for given item index instead of item id
-    @abstractmethod    
+    @abstractmethod
     def get_item_index_image_url(item_index):
+        """Same as `get_item_id_image_url`, but for an item index instead of an id."""
         pass
 
-    # Map item id to item index
     @abstractmethod
     def get_item_index(item_id):
+        """Map an item id to its (zero-based) item index."""
         pass
 
-    # Map item index to item id
     @abstractmethod
     def get_item_id(item_index):
+        """Map an item index to its item id."""
         pass
 
-    # Return textual description for the given item index (e.g. title or title concatenated with genres, etc.)
     @abstractmethod
     def get_item_index_description(item_index):
+        """Return a textual description for the item index (e.g. title, or title + genres)."""
         pass
 
-    # Return textual description for the given item id
     @abstractmethod
     def get_item_id_description(item_id):
+        """Return a textual description for the given item id."""
         pass
-    
-    # For a given item index, return list of its categories
+
     @abstractmethod
     def get_item_index_categories(item_index):
+        """Return the list of categories for the given item index."""
         pass
 
-    # Return all available categories in the dataset
     @abstractmethod
     def get_all_categories():
+        """Return all categories available in the dataset."""
         pass
 
-    # Names have to be unique! Return data loader name that will be displayed to the user when creating user study using fastcompare plugin
     @classmethod
     @abstractmethod
     def name():
+        """Return the data loader's display name.
+
+        Names must be unique; the name is shown to researchers when creating a user study
+        from the fastcompare plugin.
+        """
         pass
 
-    # Return list of parameters (see ParameterType type) that will be set by the user when creating the user study and passed to the
-    # Data loader's constructor
-    # NOTE: Currently all data loaders do not have any parameters
-    # if this changes at any point in time, we may have to adjust path in semi_local cache
-    # to include parameter values
     @classmethod
     @abstractmethod
     def parameters():
+        """Return the list of `Parameter` objects for this data loader.
+
+        These are set by the researcher when creating the user study and are passed to the
+        data loader's constructor as keyword arguments.
+
+        Note: currently no data loaders take any parameters. If this changes, the
+        semi-local cache path may need to include the parameter values.
+        """
         pass
 
     ### Serialization methods ###
 
-    # Load internal state, default implementation using pickle
-    # more complex models may need to override this behavior (e.g. tensorflow models)
-    # Instance_cache_path is for data specific for each instance (e.g. depends on parameters)
-    # while class_cache_path is single cache for all combinations (useful for static data)
-    # When in doubt, just use instance_cache_path and ignore class_cache_path
-    # semi_local_cache_path is "per-dataset", but for whole class (other config params are ignored)
-    def load(self, instance_cache_path, class_cache_path, semi_local_cache_path):
+    def load(self, instance_cache_path: str, class_cache_path: str, semi_local_cache_path: str):
+        """Load internal state (default implementation uses pickle).
+
+        See `AlgorithmBase.load` for the meaning of the cache-path arguments.
+        """
         with open(instance_cache_path, "rb") as f:
             attribs = pickle.load(f)
         self.__dict__.update(attribs)
         return self
 
-    # Save internal state, default implementation using pickle
-    # more complex models may need to override this behavior
-    # Instance_cache_path is for data specific for each instance (e.g. depends on parameters)
-    # while class_cache_path is single cache for all combinations (useful for static data)
-    # When in doubt, just use instance_cache_path and ignore class_cache_path
-    # semi_local_cache_path is "per-dataset", but for whole class (other config params are ignored)
-    def save(self, instance_cache_path, class_cache_path, semi_local_cache_path):
+    def save(self, instance_cache_path: str, class_cache_path: str, semi_local_cache_path: str):
+        """Save internal state (default implementation uses pickle).
+
+        See `AlgorithmBase.load` for the meaning of the cache-path arguments.
+        """
         with open(instance_cache_path, "wb") as f:
             # Filter out "private" (starts with _) members
             pickle.dump({a: b for a, b in self.__dict__.items()
@@ -268,19 +333,21 @@ class DataLoaderBase(ABC):
                             (not type(b).__name__.startswith("_thread."))}, f)
 
 
-# Base class for evaluation metrics
 class EvaluationMetricBase(ABC):
-    _my_id = "02afcb1d17b8eb52a4ac71f722badf5a" # MD5 hash of "EvaluationMetricBase"
+    """Base class for evaluation metrics shown in the study Results view."""
+    _my_id = "02afcb1d17b8eb52a4ac71f722badf5a"  # MD5 hash of "EvaluationMetricBase"
 
-    # Abstract method that has to be implemented by actual implementations
-    # It takes shown_items (list of item indexes) and selected_items (list of item indexes)
-    # at the input and should return numeric evaluation result
     @abstractmethod
     def evaluate(shown_items, selected_items):
+        """Compute the metric for one observation.
+
+        Takes ``shown_items`` (a list of item indices) and ``selected_items`` (a list of
+        item indices) and returns a numeric evaluation result.
+        """
         pass
 
-    # Abstract method that should return UNIQUE name of the given metric
     @classmethod
     @abstractmethod
     def name():
+        """Return a unique display name for the metric."""
         pass

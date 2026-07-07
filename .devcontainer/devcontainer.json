@@ -1,0 +1,17 @@
+{
+  "name": "EasyStudy",
+  "image": "mcr.microsoft.com/devcontainers/python:3.12",
+  // Install the lightweight core + dev tools and fetch a small dataset (goodbooks) so
+  // the environment is ready to run a study immediately. Use fetch_data.py --dataset all
+  // later if you also want MovieLens.
+  "postCreateCommand": "pip install -e '.[dev]' && python scripts/fetch_data.py --dataset goodbooks-10k",
+  "forwardPorts": [5000],
+  "portsAttributes": {
+    "5000": { "label": "EasyStudy", "onAutoForward": "openBrowser" }
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": ["ms-python.python"]
+    }
+  }
+}
