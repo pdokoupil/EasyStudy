@@ -57,6 +57,7 @@ nav:
       - Create a study (no code): create-a-study.md
       - Extending fastcompare: extending.md
       - Write your first plugin: first-plugin.md
+      - Testing your components: testing-components.md
       - Data model & exporting results: data-model.md
   - Reference:
       - Base classes (API): api.md

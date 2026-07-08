@@ -73,3 +73,31 @@ pip install "easystudy[redis]"        # redis-backed sessions
 ```
 
 An algorithm whose extra is missing simply won't appear in the study-creation UI.
+
+## Item ids vs. item indices (and users)
+
+This distinction trips up everyone writing a data loader, so learn it once:
+
+| Term | What it is | Example | Used for |
+|------|-----------|---------|----------|
+| **`item_id`** | The identifier from the **underlying dataset** — arbitrary, often non-contiguous, not necessarily zero-based. | a MovieLens `movieId` like `260`, a Goodreads book id | image file paths (`img/{item_id}.jpg`), joining external metadata, anything user-facing/original |
+| **`item_index`** (a.k.a. `item_idx`, and the `item` column) | A **dense, zero-based** integer EasyStudy assigns so items map to rows/columns of NumPy arrays. | `0, 1, 2, …, n-1` | all algorithm math: the rating matrix, distance matrix, model weights — anything indexed into an array |
+
+Why both exist: algorithms work with NumPy matrices, which need contiguous 0-based indices, but
+datasets ship messy real ids. So EasyStudy keeps a **bijection** between them:
+
+- `get_item_index(item_id) -> item_index`
+- `get_item_id(item_index) -> item_id`
+
+(Internally these are backed by maps like `movie_id_to_index` / `movie_index_to_id`.) **Users** follow
+the same pattern: the raw `userId` from the dataset vs. a zero-based `user_index` used for the rating
+matrix rows.
+
+Rules of thumb when implementing a `DataLoaderBase`:
+
+- `ratings_df` exposes the **dense** space: a `user` column and an `item` column (both zero-based
+  indices) plus `rating`. This is what algorithms like EASE pivot into a matrix.
+- Return **`item_id`** from image/description helpers keyed on ids, and convert with `get_item_index` /
+  `get_item_id` whenever you cross between the two worlds.
+- Never assume `item_id == item_index`; the [test harness](testing-components.md)'s `TinyDataLoader`
+  deliberately uses ids `100..107` for indices `0..7` to catch that bug.
