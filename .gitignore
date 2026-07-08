@@ -21,3 +21,6 @@ venv/
 .pytest_cache/
 # Local, private notes (publishing creds/workflow) — never committed
 *.local.md
+
+# Hypothesis property-testing cache
+.hypothesis/
