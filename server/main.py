@@ -106,8 +106,8 @@ def get_vars(x):
 def get_results(parent_plugin, guid):
     try:
         url = flask.url_for(f"{parent_plugin}.results", guid=guid)
-    except:
-        # Failed, fallback to default results
+    except Exception:
+        # Plugin exposes no custom results endpoint; fall back to the default one
         url = flask.url_for("utils.results", guid=guid)
     return flask.redirect(url)
 
