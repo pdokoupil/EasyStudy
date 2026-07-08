@@ -48,9 +48,11 @@ markdown_extensions:
 
 nav:
   - Home: index.md
+  - Gallery: gallery.md
   - Getting started:
       - Quickstart (15 min): quickstart.md
       - Concepts: concepts.md
+      - Live demo & hosted instance: live-demo.md
   - Guides:
       - Create a study (no code): create-a-study.md
       - Extending fastcompare: extending.md

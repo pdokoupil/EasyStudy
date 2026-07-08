@@ -145,8 +145,10 @@ Start from [empty_template](./server/plugins/empty_template). See [CONTRIBUTING.
 
 ## Links
 
-- Hosted **[Administration](https://tinyurl.com/EasyStudyAdmin)** · **[Database](https://tinyurl.com/EasyStudyDb)**
-  (access details in the paper) · **[Walkthrough recording](https://tinyurl.com/EasyStudyDemo)**
+- **[Live demo & hosted instance](https://pdokoupil.github.io/EasyStudy/live-demo/)** — hosted
+  administration/database (access details in the paper) and the walkthrough video. Hosted URLs can
+  change, so they live on that page rather than in short links here.
+- **[Walkthrough recording](https://youtu.be/xogcaJDOcFw)** (YouTube).
 
 ## Citation
 

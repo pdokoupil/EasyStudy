@@ -4,6 +4,10 @@ on:
   push:
     branches: [main, "adoption/**"]
   pull_request:
+  schedule:
+    # Weekly "dependency drift" run: catches breakage from newly released deps or a new
+    # Python before it bites you by hand (this is the fix for "every python upgrade is pain").
+    - cron: "0 6 * * 1"
 
 jobs:
   test:
@@ -11,7 +15,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.10", "3.11", "3.12"]
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -28,9 +32,47 @@ jobs:
         working-directory: server
         run: pytest -q
 
+  # Reproducible-install check: resolve the lightweight core into a fully pinned lock with
+  # uv, install exactly that, and run the tests against it. The resolved lock is uploaded as
+  # an artifact — commit it as `requirements.lock` to freeze a known-good set (regenerate by
+  # re-running this job or `uv pip compile pyproject.toml -o requirements.lock`).
+  lock:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compile pinned lock from pyproject (core only)
+        run: uv pip compile pyproject.toml -o requirements.lock
+      - name: Install from the lock into a clean venv
+        run: |
+          uv venv .venv
+          uv pip install --python .venv -r requirements.lock -e . --no-deps
+      - name: Smoke test against the locked env
+        working-directory: server
+        run: ../.venv/bin/python -m pytest -q
+      - uses: actions/upload-artifact@v4
+        with:
+          name: requirements-lock
+          path: requirements.lock
+
   docker:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - name: Build image (lightweight core)
         run: docker build -f server/Dockerfile -t easy-study:ci .
+
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Build docs (strict)
+        run: |
+          pip install -e ".[docs]"
+          mkdocs build --strict
