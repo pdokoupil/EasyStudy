@@ -1,6 +1,6 @@
 import datetime
 import time
-from imdb import Cinemagoer
+from plugins.utils import imdb_client
 
 import pandas as pd
 import numpy as np
@@ -166,7 +166,6 @@ class MLDataLoader:
         self.movie_index_to_description = None
         self.tag_counts_per_movie = None
 
-        self.access = Cinemagoer()
         self.movie_index_to_url = dict()
         self.similarity_matrix = None
 
@@ -177,21 +176,9 @@ class MLDataLoader:
         self.plots = None
 
     def _get_image(self, imdbId):
-        try:
-            return self.access.get_movie(imdbId)["full-size cover url"]
-        except Exception as e:
-            print(f"@@ Exception e={e}")
-            return ""
-
-    def __getstate__(self):
-        state = self.__dict__.copy()
-        # Don't pickle imdb
-        del state["access"]
-        return state
-
-    def __setstate__(self, state):
-        self.__dict__.update(state)
-        self.access = Cinemagoer()
+        # imdbinfo.get_movie is stateless, so (unlike the old cinemagoer client) there is
+        # nothing unpicklable to strip in __getstate__/__setstate__ anymore.
+        return imdb_client.get_cover_url(imdbId)
 
     def get_trailer_url(self, movie_idx):
         movie_id = str(self.movie_index_to_id[movie_idx])

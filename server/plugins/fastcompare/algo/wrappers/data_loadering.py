@@ -22,7 +22,7 @@ from io import BytesIO
 
 import multiprocessing
 import tqdm
-from imdb import Cinemagoer
+from plugins.utils import imdb_client
 
 from plugins.utils.helpers import cos_sim_np
 
@@ -161,27 +161,6 @@ class MLGenomeDataLoader(DataLoaderBase):
         # Ensure img dir path exists
         Path(self.img_dir_path).mkdir(parents=True, exist_ok=True)
 
-    def _get_imdb_subset(self, dat):
-        
-        # Try to find URL of a cover with largest resolution
-        if dat.has_key("full-size cover url"):
-            url = dat["full-size cover url"]
-        elif dat.has_key("cover url"):
-            url = dat["cover url"]
-        elif dat.has_key("cover"):
-            url = dat["cover"]
-        else:
-            url = None
-
-        return {
-                "plot": dat["plot"]  if "plot" in dat else [],
-                "cast": [x["name"] for x in dat["cast"]] if "cast" in dat else [],
-                "genres": dat["genres"] if "genres" in dat else [],
-                "rating": dat["rating"] if "rating" in dat else -1,
-                "year": dat["year"] if "year" in dat else -1,
-                "cover": url
-        }
-
     def _download_movie_data(self, unique_item_ids):
         print("Preparing download")
         #unique_item_ids = list(self.item_id_to_index.keys()) #df_merged_new.item_id.unique()
@@ -190,27 +169,11 @@ class MLGenomeDataLoader(DataLoaderBase):
             imdb_id = self.metadata_df_indexed.loc[i].imdbId
             unique_id_pairs.append((i, imdb_id))
 
-        access = Cinemagoer()
-
-
-
         def get_imdb_info(id_pair):
             item_id, imdb_id = id_pair
-            
-            reps = 0
-            while reps < 2:
-                try:
-                    res = self._get_imdb_subset(access.get_movie(imdb_id))
-                    break
-                except Exception as e:
-                    print(f"Error for {imdb_id}: {e}")
-                    d = 1.0 + 3 * np.random.random()
-                    print(f"Adding random delay of: {d} seconds")
-                    time.sleep(d)
-                    reps += 1
-                    res = None
-                
-            
+            # imdb_client.get_movie_subset degrades gracefully (returns safe defaults) and
+            # never raises, so no retry/backoff loop is needed here anymore.
+            res = imdb_client.get_movie_subset(imdb_id)
             return item_id, imdb_id, res
 
         pool = multiprocessing.Pool(processes=N_PROCESSES)

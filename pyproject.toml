@@ -63,7 +63,6 @@ dependencies = [
     "cachelib",
     "requests",
     "beautifulsoup4",
-    "cinemagoer",
 ]
 
 [project.optional-dependencies]
@@ -71,6 +70,9 @@ tensorflow = ["tensorflow>=2.15", "tensorflow-recommenders>=0.7.3"]
 lenskit = ["lenskit"]
 redis = ["redis"]
 discogs = ["python3-discogs-client"]
+# IMDb cover images / metadata for the MovieLens loaders (imdbinfo replaces cinemagoer,
+# whose IMDb web-page parsing was removed in April 2026). Lazily imported, so optional.
+imdb = ["imdbinfo"]
 # convenience aggregate
 all = [
     "tensorflow>=2.15",
@@ -78,6 +80,7 @@ all = [
     "lenskit",
     "redis",
     "python3-discogs-client",
+    "imdbinfo",
 ]
 dev = ["pytest", "ruff", "black", "locust"]
 docs = ["mkdocs-material>=9,<10", "mkdocs", "mkdocstrings[python]"]
