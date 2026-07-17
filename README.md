@@ -145,6 +145,8 @@ Start from [empty_template](./server/plugins/empty_template). See [CONTRIBUTING.
 
 ## Links
 
+- **[Studies built with EasyStudy](https://pdokoupil.github.io/EasyStudy/publications/)** — peer-reviewed
+  publications whose user studies were run on EasyStudy (recommender systems & data visualization).
 - **[Live demo & hosted instance](https://pdokoupil.github.io/EasyStudy/live-demo/)** — hosted
   administration/database (access details in the paper) and the walkthrough video. Hosted URLs can
   change, so they live on that page rather than in short links here.
