@@ -69,6 +69,10 @@ dependencies = [
 # VAE/RBM plugin backend: TensorFlow + TF-Recommenders + Microsoft `recommenders`.
 tensorflow = ["tensorflow>=2.15", "tensorflow-recommenders>=0.7.3", "recommenders"]
 lenskit = ["lenskit"]
+# PyTorch + RecBole backend (better-maintained than TF-Recommenders). Enables the `recbole`
+# plugin's algorithms (BPR, LightGCN, NeuMF, …). See server/plugins/recbole/.
+torch = ["torch", "recbole"]
+recbole = ["torch", "recbole"]  # alias for `torch`
 redis = ["redis"]
 discogs = ["python3-discogs-client"]
 # IMDb cover images / metadata for the MovieLens loaders (imdbinfo replaces cinemagoer,
@@ -80,6 +84,8 @@ all = [
     "tensorflow-recommenders>=0.7.3",
     "recommenders",
     "lenskit",
+    "torch",
+    "recbole",
     "redis",
     "python3-discogs-client",
     "imdbinfo",

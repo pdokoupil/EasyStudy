@@ -3,7 +3,9 @@
 # First time only, fetch datasets + images into ./server/static/datasets:
 #   docker compose run --rm fetch          # downloads MovieLens + goodbooks (CSVs + images)
 #
-# Optional heavy backends: set EASYSTUDY_EXTRAS (build arg) e.g. "tensorflow,lenskit".
+# Optional heavy backends: set EASYSTUDY_EXTRAS (build arg), e.g.
+#   EASYSTUDY_EXTRAS="tensorflow,lenskit,recbole" docker compose up --build
+#   (recbole => PyTorch + RecBole model zoo: BPR, LightGCN, NeuMF, …)
 # Optional redis-backed sessions: `docker compose --profile redis up` and set
 # SESSION_TYPE=redis + REDIS_URL=redis://redis:6379 in your environment / .env.
 
@@ -47,4 +49,9 @@ services:
     profiles: ["redis"]
     ports:
       - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
     restart: unless-stopped
