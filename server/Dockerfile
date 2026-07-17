@@ -27,13 +27,13 @@ COPY scripts/ ./scripts/
 
 WORKDIR /app/server
 
-EXPOSE 5000
+EXPOSE 8000
 
 # NOTE: default is a SINGLE worker on purpose — the current fine-tuning keeps per-participant
 # model state in worker memory, so raising GUNICORN_WORKERS requires the shared-state rework
 # (see 03_V2_TECHNICAL.md A3/B1). Timeout/worker count are overridable via env.
 CMD gunicorn -w ${GUNICORN_WORKERS:-1} \
-    --bind 0.0.0.0:5000 \
+    --bind 0.0.0.0:8000 \
     --timeout ${GUNICORN_TIMEOUT:-0} \
     --preload \
     --log-level ${LOG_LEVEL:-info} \
