@@ -265,8 +265,11 @@ class MLDataLoader:
                     img = img.resize((TARGET_WIDTH, new_height), Image.LANCZOS).convert('RGB')
                     img.save(local_path, quality=90)
 
-            # Use local (cached) version of the image
-            return url_for('static', filename=f'datasets/ml-latest/img/{movie_id}.jpg')
+            # Use local (cached) version of the image. Derive the static-relative path from
+            # img_dir_path so this works for any dataset dir (ml-latest, ml-latest-small, …),
+            # not just a hardcoded "ml-latest".
+            static_rel = self.img_dir_path.replace(os.sep, "/").split("/static/", 1)[-1]
+            return url_for('static', filename=f'{static_rel}/{movie_id}.jpg')
 
         return self.movie_index_to_url[movie_idx]
         #movie_id = self.movie_index_to_id[movie_idx]

@@ -35,30 +35,41 @@ N_PROCESSES = 6
 
 class MLDataLoaderWrapper(DataLoaderBase):
 
+    # Subdirectory under server/static/datasets/ holding ratings/movies/tags/links.csv + img/.
+    # Subclasses override this (and _build_filters / name) to serve a different MovieLens dump.
+    DATASET_DIR = "ml-latest"
+
+    def _build_filters(self):
+        # Filters tuned to shrink the large ml-latest catalog into a usable, image-backed
+        # subset (recent, sufficiently-rated movies with IMDb links).
+        return [RatingLowFilter(4.0), MovieFilterByYear(1990), RatingFilterOld(2010),
+                RatingsPerYearFilter(50.0), RatingUserFilter(100), RatedMovieFilter(), LinkFilter()]
+
     def __init__(self, **kwargs):
 
         datasets_base_dir = os.path.join(get_abs_project_root_path(), 'static', 'datasets')
+        dataset_dir = os.path.join(datasets_base_dir, self.DATASET_DIR)
 
         if not os.path.exists(datasets_base_dir):
             assert False, f"Datasets base dir ({datasets_base_dir}) does not exist"
-        
-        if not os.path.exists(os.path.join(datasets_base_dir, "ml-latest")):
-            assert False, f"ml-latest dataset is missing in the dataset base directory ({datasets_base_dir})"
+
+        if not os.path.exists(dataset_dir):
+            assert False, f"{self.DATASET_DIR} dataset is missing in the dataset base directory ({datasets_base_dir})"
 
         for f in ["ratings.csv", "movies.csv", "tags.csv", "links.csv", "img"]:
-            if not os.path.exists(os.path.join(datasets_base_dir, "ml-latest", f)):
-                assert False, f"{f} is missing in the {os.path.join(datasets_base_dir, 'ml-latest')} directory"
+            if not os.path.exists(os.path.join(dataset_dir, f)):
+                assert False, f"{f} is missing in the {dataset_dir} directory"
 
-        ratings_path = os.path.join(datasets_base_dir, "ml-latest", "ratings.csv")
-        movies_path = os.path.join(datasets_base_dir, "ml-latest", "movies.csv")
-        tags_path = os.path.join(datasets_base_dir, "ml-latest", "tags.csv")
-        links_path = os.path.join(datasets_base_dir, "ml-latest", "links.csv")
-        img_dir_path = os.path.join(datasets_base_dir, "ml-latest", "img")
+        ratings_path = os.path.join(dataset_dir, "ratings.csv")
+        movies_path = os.path.join(dataset_dir, "movies.csv")
+        tags_path = os.path.join(dataset_dir, "tags.csv")
+        links_path = os.path.join(dataset_dir, "links.csv")
+        img_dir_path = os.path.join(dataset_dir, "img")
         # Ensure img dir path exists
         Path(img_dir_path).mkdir(parents=True, exist_ok=True)
 
         self.loader = MLDataLoader(ratings_path, movies_path, tags_path, links_path,
-            [RatingLowFilter(4.0), MovieFilterByYear(1990), RatingFilterOld(2010), RatingsPerYearFilter(50.0), RatingUserFilter(100), RatedMovieFilter(), LinkFilter()],
+            self._build_filters(),
             rating_matrix_path=None, img_dir_path=img_dir_path
         )
 
@@ -135,7 +146,29 @@ class MLDataLoaderWrapper(DataLoaderBase):
     @classmethod
     def parameters(self):
         return []
-    
+
+
+class MLLatestSmallDataLoader(MLDataLoaderWrapper):
+    """Small, fast MovieLens demo (~9k movies, ~100k ratings, ~600 users).
+
+    Ideal "instant" demo: `python scripts/fetch_data.py --dataset ml-latest-small` downloads
+    ~1 MB of CSVs (titles/genres/links included); posters are fetched on demand via imdbinfo
+    (thumbnail-sized + cached on disk). Uses light filtering so the small catalog isn't
+    emptied — only "keep positively-rated movies that have an IMDb link (for images)".
+
+    NOTE: needs one live smoke test with the data downloaded (filters/pipeline can't be
+    exercised without the CSVs present).
+    """
+
+    DATASET_DIR = "ml-latest-small"
+
+    def _build_filters(self):
+        return [RatingLowFilter(4.0), RatedMovieFilter(), LinkFilter()]
+
+    @classmethod
+    def name(self):
+        return "MovieLens Latest Small (demo)"
+
 
 class MLGenomeDataLoader(DataLoaderBase):
 

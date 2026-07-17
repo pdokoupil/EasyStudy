@@ -33,6 +33,13 @@ SOURCES = {
         "csv_strip_prefix": "ml-latest/",
         "img_url": "http://herkules.ms.mff.cuni.cz/ligan/easystudy/ml_latest_img.zip",
     },
+    "ml-latest-small": {
+        # ~1 MB demo dataset. Posters are fetched on demand via imdbinfo, so there is no
+        # image archive — img_url=None just creates an empty img/ dir for runtime caching.
+        "csv_url": "https://files.grouplens.org/datasets/movielens/ml-latest-small.zip",
+        "csv_strip_prefix": "ml-latest-small/",
+        "img_url": None,
+    },
     "goodbooks-10k": {
         "csv_url": "https://github.com/zygmuntz/goodbooks-10k/archive/refs/heads/master.zip",
         "csv_strip_prefix": "goodbooks-10k-master/",
@@ -104,7 +111,11 @@ def fetch(dataset, images=True, force=False):
 
     if images:
         img_dir = os.path.join(dataset_dir, "img")
-        if force or not os.path.isdir(img_dir) or not os.listdir(img_dir):
+        if not cfg.get("img_url"):
+            # No prebuilt image archive: images are fetched on demand at runtime (imdbinfo).
+            os.makedirs(img_dir, exist_ok=True)
+            print("  images fetched on demand at runtime (no archive); created empty img/")
+        elif force or not os.path.isdir(img_dir) or not os.listdir(img_dir):
             _extract_images(_download(cfg["img_url"]), dataset_dir)
         else:
             print("  images already present (use --force to re-download)")
