@@ -60,9 +60,13 @@ def create_app():
     if app.config.get("SESSION_TYPE") == "sqlalchemy":
         app.config["SESSION_SQLALCHEMY"] = db
 
-    sess.init_app(app)
-
+    # IMPORTANT: db must be initialized BEFORE the session. Flask-Session >= 0.8's
+    # sqlalchemy backend accesses `db.engine` during its own init_app(), which raises
+    # "The current Flask app is not registered with this 'SQLAlchemy' instance" if db
+    # has not been registered with this app yet.
     db.init_app(app)
+
+    sess.init_app(app)
 
     migrate.init_app(app, db, render_as_batch=True)
 

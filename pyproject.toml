@@ -61,6 +61,8 @@ dependencies = [
     "Pillow",
     "gunicorn",
     "cachelib",
+    "cachetools",
+    "tqdm",
     "requests",
     "beautifulsoup4",
 ]
