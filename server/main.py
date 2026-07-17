@@ -24,13 +24,11 @@ def administration():
     else:
         return flask.redirect(flask.url_for('auth.login'))
     
-# @main.route("/", methods=["GET"])
-# def index():
-#     if current_user.is_authenticated:
-#         current_email = current_user.email
-#     else:
-#         current_email = ""
-#     return flask.render_template("index.html", is_authenticated=current_user.is_authenticated, current_user=current_email)
+# Landing: send the bare root to the administration UI (which itself redirects to the
+# login page when the visitor isn't authenticated) so `http://localhost:<port>/` just works.
+@main.route("/", methods=["GET"])
+def index():
+    return flask.redirect(flask.url_for("main.administration"))
 
 @main.route("/notify")
 # @login_required

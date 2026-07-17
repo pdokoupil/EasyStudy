@@ -65,6 +65,10 @@ dependencies = [
     "tqdm",
     "requests",
     "beautifulsoup4",
+    # imdbinfo powers MovieLens cover images at runtime. It's in the core (not an extra)
+    # because item posters are central to the RS study experience — without it the demo
+    # shows no images. It replaces cinemagoer, whose IMDb parsing was removed in April 2026.
+    "imdbinfo",
 ]
 
 [project.optional-dependencies]
@@ -77,8 +81,7 @@ torch = ["torch", "recbole"]
 recbole = ["torch", "recbole"]  # alias for `torch`
 redis = ["redis"]
 discogs = ["python3-discogs-client"]
-# IMDb cover images / metadata for the MovieLens loaders (imdbinfo replaces cinemagoer,
-# whose IMDb web-page parsing was removed in April 2026). Lazily imported, so optional.
+# Back-compat alias: imdbinfo is now a core dependency (see above), so this extra is a no-op.
 imdb = ["imdbinfo"]
 # convenience aggregate
 all = [

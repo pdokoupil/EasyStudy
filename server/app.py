@@ -14,6 +14,8 @@ from flask_session import Session
 
 from sqlalchemy import MetaData, event
 from sqlalchemy.engine import Engine
+from werkzeug.security import generate_password_hash
+import click
 
 #from werkzeug.middleware.profiler import ProfilerMiddleware
 
@@ -50,6 +52,19 @@ def set_sqlite_pragma(dbapi_connection, connection_record):
 # Insert/set all values that have to be set once (e.g. insert interaction types into DB)
 def initialize_db_tables():
     pass
+
+
+def _seed_user(email, password, admin=True):
+    """Idempotently create an EasyStudy login user. Returns True if newly created.
+
+    Must be called within an application context. Passwords are hashed (never stored plain).
+    """
+    from models import User
+    if User.query.get(email):
+        return False
+    db.session.add(User(email=email, password=generate_password_hash(password), admin=admin))
+    db.session.commit()
+    return True
 
 def create_app():
     app = flask.Flask(__name__)
@@ -95,6 +110,27 @@ def create_app():
     with app.app_context():
         db.create_all()
         initialize_db_tables()
+
+        # Optional zero-friction dev login: set EASYSTUDY_DEV_USER="email:password" to
+        # auto-create an admin on startup. Unset by default (safety). NEVER use in production.
+        dev_user = os.environ.get("EASYSTUDY_DEV_USER")
+        if dev_user and ":" in dev_user:
+            email, password = dev_user.split(":", 1)
+            if _seed_user(email, password, admin=True):
+                print(f"[EASYSTUDY_DEV_USER] created admin {email!r} — DO NOT use in production",
+                      file=sys.stderr)
+
+    # `flask create-user EMAIL PASSWORD [--admin/--no-admin]` — safe, explicit account creation
+    # (no default credentials are ever baked in). Run e.g.:
+    #   docker compose exec app flask create-user me@example.com secret
+    @app.cli.command("create-user")
+    @click.argument("email")
+    @click.argument("password")
+    @click.option("--admin/--no-admin", default=True, help="Grant admin rights (default: yes).")
+    def create_user_command(email, password, admin):
+        """Create an EasyStudy user for logging into the administration UI."""
+        created = _seed_user(email, password, admin=admin)
+        click.echo(f"{'Created' if created else 'Already exists'}: {email} (admin={admin})")
 
     # Seed setting in the case we use --preload with multiple workers and want to improve randomization on the first iteration
     # Otherwise we can just assume that this will be random enough given that users are distributed to workers randomly

@@ -239,39 +239,26 @@ class MLDataLoader:
             i += 1
 
     def get_image(self, movie_idx):
-        if self.img_dir_path and has_app_context():
-            movie_id = self.movie_index_to_id[movie_idx]
-            local_path = os.path.join(self.img_dir_path, f'{movie_id}.jpg')
-            # Cache: only fetch/download if we haven't already cached this image on disk.
-            if not os.path.exists(local_path):
-                # Download it first if it is missing
-                imdbId = self.links_df.loc[movie_id].imdbId
-                remote_url = self._get_image(imdbId)
+        if not (self.img_dir_path and has_app_context()):
+            return self.movie_index_to_url[movie_idx]
 
-                err = False
-                try:
-                    resp = requests.get(remote_url, stream=True)
-                except:
-                    err = True
+        movie_id = self.movie_index_to_id[movie_idx]
+        local_path = os.path.join(self.img_dir_path, f'{movie_id}.jpg')
 
-                if err or resp.status_code != 200:
-                    print(f"Failed download image for movie with id={movie_id}")
-                else:
-                    img = Image.open(BytesIO(resp.content))
-                    width, height = img.size
-                    TARGET_WIDTH = 200
-                    coef = TARGET_WIDTH / width
-                    new_height = int(height * coef)
-                    img = img.resize((TARGET_WIDTH, new_height), Image.LANCZOS).convert('RGB')
-                    img.save(local_path, quality=90)
-
-            # Use local (cached) version of the image. Derive the static-relative path from
-            # img_dir_path so this works for any dataset dir (ml-latest, ml-latest-small, …),
-            # not just a hardcoded "ml-latest".
+        # Prefer a locally cached image if present (fast, offline, reproducible). These are
+        # populated by download_images() — useful to pre-cache before running a real study.
+        if os.path.exists(local_path):
+            # Derive the static-relative path from img_dir_path so this works for any dataset
+            # dir (ml-latest, ml-latest-small, …), not just a hardcoded "ml-latest".
             static_rel = self.img_dir_path.replace(os.sep, "/").split("/static/", 1)[-1]
             return url_for('static', filename=f'{static_rel}/{movie_id}.jpg')
 
-        return self.movie_index_to_url[movie_idx]
+        # Not cached locally: return the remote (thumbnail-sized) CDN URL so the browser loads
+        # it directly, in parallel — instead of a slow, serial server-side download during page
+        # render (and no more broken /static/... URLs when the download failed). Returns "" if
+        # no poster is available, which the frontend renders as a placeholder.
+        imdbId = self.links_df.loc[movie_id].imdbId
+        return self._get_image(imdbId) or ""
         #movie_id = self.movie_index_to_id[movie_idx]
         #return self._get_image(self.links_df.loc[movie_id].imdbId)
 
