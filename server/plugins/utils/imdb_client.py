@@ -17,8 +17,28 @@ lookup fails, these helpers degrade gracefully (empty cover / safe defaults).
 from __future__ import annotations
 
 import os
+import re
 
 _warned = False
+
+# In-memory memo so repeated lookups for the same movie (across study iterations) don't
+# re-hit the network. Keyed by (imdb_id, width) for covers and imdb_id for subsets.
+_cover_cache: dict = {}
+_subset_cache: dict = {}
+
+
+def _resize_amazon(url: str, width: int) -> str:
+    """Downscale a media-amazon cover URL by rewriting its ``._V1_….jpg`` size suffix.
+
+    imdbinfo's ``cover_url`` points at the full-resolution image (often several MB). IMDb's
+    CDN supports on-the-fly resizing via the filename suffix, so ``._V1_SX300.jpg`` yields a
+    ~40 KB, 300px-wide thumbnail. Non-amazon URLs (e.g. TMDB, already sized) are left as-is.
+    """
+    if not url or "media-amazon.com" not in url:
+        return url
+    resized = re.sub(r"\._V1_[^/]*?\.jpg$", f"._V1_SX{width}.jpg", url)
+    # If the URL had no recognizable suffix, append one so we still get a thumbnail.
+    return resized if resized != url else f"{url}._V1_SX{width}.jpg"
 
 
 # --- imdbinfo (token-free default) ------------------------------------------------------
@@ -75,12 +95,24 @@ def _tmdb_cover(imdb_id) -> str:
 
 # --- public API -------------------------------------------------------------------------
 
-def get_cover_url(imdb_id) -> str:
-    """Return the poster/cover image URL for the given IMDb id, or ``""`` on failure.
+def get_cover_url(imdb_id, width: int = 300) -> str:
+    """Return a (thumbnail-sized) poster URL for the given IMDb id, or ``""`` on failure.
 
-    Prefers TMDB (if ``TMDB_API_KEY`` is set), otherwise falls back to imdbinfo.
+    Prefers TMDB (if ``TMDB_API_KEY`` is set), otherwise falls back to imdbinfo, downscaled
+    to ``width`` px. Results are memoized in-process. Pass ``width=0`` for full resolution.
     """
-    return _tmdb_cover(imdb_id) or (getattr(_get_movie(imdb_id), "cover_url", "") or "")
+    key = (str(imdb_id), width)
+    if key in _cover_cache:
+        return _cover_cache[key]
+    tmdb = _tmdb_cover(imdb_id)  # TMDB URLs are already sized (w342)
+    if tmdb:
+        _cover_cache[key] = tmdb
+        return tmdb
+    cover = getattr(_get_movie(imdb_id), "cover_url", "") or ""
+    if cover and width:
+        cover = _resize_amazon(cover, width)
+    _cover_cache[key] = cover
+    return cover
 
 
 def get_movie_subset(imdb_id) -> dict:
@@ -90,11 +122,16 @@ def get_movie_subset(imdb_id) -> dict:
     defaults so callers never have to guard individual fields. Metadata comes from imdbinfo;
     the cover prefers TMDB when a key is configured.
     """
+    key = str(imdb_id)
+    if key in _subset_cache:
+        return _subset_cache[key]
     movie = _get_movie(imdb_id)
     tmdb_cover = _tmdb_cover(imdb_id)
     if movie is None:
-        return {"plot": [], "cast": [], "genres": [], "rating": -1, "year": -1,
-                "cover": tmdb_cover or None}
+        result = {"plot": [], "cast": [], "genres": [], "rating": -1, "year": -1,
+                  "cover": tmdb_cover or None}
+        _subset_cache[key] = result
+        return result
 
     def _safe(attr, default):
         try:
@@ -113,11 +150,14 @@ def get_movie_subset(imdb_id) -> dict:
     except Exception:
         cast = []
 
-    return {
+    imdb_cover = _safe("cover_url", None)
+    result = {
         "plot": _safe("plot", []),
         "cast": cast,
         "genres": _safe("genres", []),
         "rating": _safe("rating", -1),
         "year": _safe("year", -1),
-        "cover": tmdb_cover or _safe("cover_url", None),
+        "cover": tmdb_cover or (_resize_amazon(imdb_cover, 300) if imdb_cover else None),
     }
+    _subset_cache[key] = result
+    return result

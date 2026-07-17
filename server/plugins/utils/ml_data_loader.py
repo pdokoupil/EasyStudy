@@ -240,12 +240,14 @@ class MLDataLoader:
 
     def get_image(self, movie_idx):
         if self.img_dir_path and has_app_context():
-            if movie_idx not in self.movie_index_to_url:
+            movie_id = self.movie_index_to_id[movie_idx]
+            local_path = os.path.join(self.img_dir_path, f'{movie_id}.jpg')
+            # Cache: only fetch/download if we haven't already cached this image on disk.
+            if not os.path.exists(local_path):
                 # Download it first if it is missing
-                movie_id = self.movie_index_to_id[movie_idx]
                 imdbId = self.links_df.loc[movie_id].imdbId
                 remote_url = self._get_image(imdbId)
-                
+
                 err = False
                 try:
                     resp = requests.get(remote_url, stream=True)
@@ -261,11 +263,10 @@ class MLDataLoader:
                     coef = TARGET_WIDTH / width
                     new_height = int(height * coef)
                     img = img.resize((TARGET_WIDTH, new_height), Image.LANCZOS).convert('RGB')
-                    img.save(os.path.join(self.img_dir_path, f'{movie_id}.jpg'), quality=90)
+                    img.save(local_path, quality=90)
 
-            # Use local version of images
-            item_id = self.movie_index_to_id[movie_idx]
-            return url_for('static', filename=f'datasets/ml-latest/img/{item_id}.jpg')
+            # Use local (cached) version of the image
+            return url_for('static', filename=f'datasets/ml-latest/img/{movie_id}.jpg')
 
         return self.movie_index_to_url[movie_idx]
         #movie_id = self.movie_index_to_id[movie_idx]
