@@ -6,20 +6,29 @@
 #   docker build -f server/Dockerfile --build-arg EASYSTUDY_EXTRAS="tensorflow,lenskit" -t easy-study .
 FROM python:3.12-slim
 
-# comma-separated pyproject extras, e.g. "tensorflow,lenskit,redis"; empty => core only
+# comma-separated pyproject extras, e.g. "recbole,tensorflow,lenskit,redis"; empty => core only
 ARG EASYSTUDY_EXTRAS=""
 
+# uv-managed environment (fast, reproducible from uv.lock). Put it on PATH so gunicorn/python
+# resolve to it.
+ENV UV_PROJECT_ENVIRONMENT=/opt/venv \
+    UV_COMPILE_BYTECODE=1 \
+    PATH="/opt/venv/bin:$PATH"
+
 WORKDIR /app
+
+# uv binary (pinned via the official distroless image).
+COPY --from=ghcr.io/astral-sh/uv:0.11 /uv /uvx /bin/
 
 # System build deps some scientific wheels may need; kept minimal.
 RUN apt-get update \
     && apt-get install -y --no-install-recommends build-essential \
     && rm -rf /var/lib/apt/lists/*
 
-# Install dependencies first (better layer caching). pyproject.toml is the single manifest.
-COPY pyproject.toml README.md ./
-RUN pip install --no-cache-dir --upgrade pip \
-    && if [ -n "$EASYSTUDY_EXTRAS" ]; then pip install --no-cache-dir ".[$EASYSTUDY_EXTRAS]"; else pip install --no-cache-dir .; fi
+# Install dependencies first (better layer caching). uv.lock pins the exact resolution.
+COPY pyproject.toml uv.lock README.md ./
+RUN EXTRA_ARGS=""; for e in $(echo "$EASYSTUDY_EXTRAS" | tr ',' ' '); do EXTRA_ARGS="$EXTRA_ARGS --extra $e"; done; \
+    uv sync --frozen --no-dev $EXTRA_ARGS
 
 # App source
 COPY server/ ./server/

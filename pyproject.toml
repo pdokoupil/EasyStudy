@@ -69,6 +69,13 @@ dependencies = [
     # because item posters are central to the RS study experience — without it the demo
     # shows no images. It replaces cinemagoer, whose IMDb parsing was removed in April 2026.
     "imdbinfo",
+    # Python 3.13 removed the stdlib `cgi` module, which Flask-PluginKit still imports.
+    # legacy-cgi backports it so the app runs on 3.13/3.14.
+    "legacy-cgi; python_version >= '3.13'",
+    # Flask-PluginKit shells out to `pip list` at startup to enumerate plugins, so pip must
+    # be present in the runtime environment. pip ships with pip-based installs but NOT with
+    # uv-managed venvs, so declare it explicitly.
+    "pip",
 ]
 
 [project.optional-dependencies]

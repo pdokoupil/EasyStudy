@@ -41,7 +41,12 @@ This populates `server/static/datasets/{ml-latest,goodbooks-10k}/`.
     ```bash
     docker compose up --build
     ```
-=== "Python"
+=== "Python (uv, recommended)"
+    ```bash
+    uv sync --extra dev                    # creates .venv from uv.lock (core + dev tools)
+    cd server && uv run flask --debug run
+    ```
+=== "Python (pip)"
     ```bash
     python -m venv .venv && source .venv/bin/activate
     pip install -e ".[dev]"                # lightweight core + dev tools
