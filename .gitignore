@@ -24,3 +24,7 @@ venv/
 
 # Hypothesis property-testing cache
 .hypothesis/
+
+# Build/uv artifacts
+*.egg-info/
+.cache/
