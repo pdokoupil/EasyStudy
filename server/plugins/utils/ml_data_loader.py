@@ -244,21 +244,32 @@ class MLDataLoader:
 
         movie_id = self.movie_index_to_id[movie_idx]
         local_path = os.path.join(self.img_dir_path, f'{movie_id}.jpg')
+        # Static-relative path derived from img_dir_path so this works for any dataset dir
+        # (ml-latest, ml-latest-small, …), not just a hardcoded "ml-latest".
+        static_rel = self.img_dir_path.replace(os.sep, "/").split("/static/", 1)[-1]
 
-        # Prefer a locally cached image if present (fast, offline, reproducible). These are
-        # populated by download_images() — useful to pre-cache before running a real study.
-        if os.path.exists(local_path):
-            # Derive the static-relative path from img_dir_path so this works for any dataset
-            # dir (ml-latest, ml-latest-small, …), not just a hardcoded "ml-latest".
-            static_rel = self.img_dir_path.replace(os.sep, "/").split("/static/", 1)[-1]
-            return url_for('static', filename=f'{static_rel}/{movie_id}.jpg')
+        # Download + resize to a consistent width on first use, then serve the local copy.
+        # Resizing server-side keeps every poster the same size so the item grid lays out
+        # correctly (raw IMDb posters vary and are much larger). Pre-fetch the whole set with
+        # scripts/fetch_images.py to avoid the first-render download entirely.
+        if not os.path.exists(local_path):
+            imdbId = self.links_df.loc[movie_id].imdbId
+            remote_url = self._get_image(imdbId)
+            if not remote_url:
+                return ""  # no poster; frontend renders a placeholder
+            try:
+                resp = requests.get(remote_url, timeout=15)
+                if resp.status_code != 200:
+                    return remote_url  # fallback: let the browser load it directly
+                img = Image.open(BytesIO(resp.content))
+                w, h = img.size
+                TARGET_WIDTH = 200
+                img = img.resize((TARGET_WIDTH, int(h * TARGET_WIDTH / w)), Image.LANCZOS).convert("RGB")
+                img.save(local_path, quality=90)
+            except Exception:
+                return remote_url  # fallback
 
-        # Not cached locally: return the remote (thumbnail-sized) CDN URL so the browser loads
-        # it directly, in parallel — instead of a slow, serial server-side download during page
-        # render (and no more broken /static/... URLs when the download failed). Returns "" if
-        # no poster is available, which the frontend renders as a placeholder.
-        imdbId = self.links_df.loc[movie_id].imdbId
-        return self._get_image(imdbId) or ""
+        return url_for('static', filename=f'{static_rel}/{movie_id}.jpg')
         #movie_id = self.movie_index_to_id[movie_idx]
         #return self._get_image(self.links_df.loc[movie_id].imdbId)
 

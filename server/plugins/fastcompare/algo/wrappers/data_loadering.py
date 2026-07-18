@@ -12,7 +12,7 @@ import requests
 from cachetools import cached
 
 from plugins.fastcompare.algo.algorithm_base import DataLoaderBase
-from plugins.utils.ml_data_loader import MLDataLoader, RatingLowFilter, MovieFilterByYear, RatingFilterOld, RatingsPerYearFilter, RatingUserFilter, RatedMovieFilter, LinkFilter
+from plugins.utils.ml_data_loader import MLDataLoader, RatingLowFilter, RatingMovieFilter, MovieFilterByYear, RatingFilterOld, RatingsPerYearFilter, RatingUserFilter, RatedMovieFilter, LinkFilter
 
 from common import get_abs_project_root_path
 
@@ -89,7 +89,9 @@ class MLDataLoaderWrapper(DataLoaderBase):
         self.all_categories = set()
         for cats in self.loader.movies_df.genres.unique():
             self.all_categories.update(cats.split("|"))
-        self.all_categories.remove("(no genres listed)")
+        # discard (not remove): after strong filtering, no movie may carry this placeholder
+        # genre, and remove() would raise KeyError.
+        self.all_categories.discard("(no genres listed)")
 
     # Returns dataframe with the interactions/ratings (be aware that implicit feedback is now considered)
     # There should be "user" and "item" columns in the dataframe
@@ -149,21 +151,22 @@ class MLDataLoaderWrapper(DataLoaderBase):
 
 
 class MLLatestSmallDataLoader(MLDataLoaderWrapper):
-    """Small, fast MovieLens demo (~9k movies, ~100k ratings, ~600 users).
+    """Small, fast MovieLens **demo** (~1.2k curated movies).
 
-    Ideal "instant" demo: `python scripts/fetch_data.py --dataset ml-latest-small` downloads
-    ~1 MB of CSVs (titles/genres/links included); posters are fetched on demand via imdbinfo
-    (thumbnail-sized + cached on disk). Uses light filtering so the small catalog isn't
-    emptied — only "keep positively-rated movies that have an IMDb link (for images)".
-
-    NOTE: needs one live smoke test with the data downloaded (filters/pipeline can't be
-    exercised without the CSVs present).
+    `python scripts/fetch_data.py --dataset ml-latest-small` downloads ~1 MB of CSVs
+    (titles/genres/links). The raw dump has ~9.7k movies; we filter down to the popular,
+    well-rated subset (~1.2k) so the poster set is small enough to pre-fetch in a couple of
+    minutes with `python scripts/fetch_images.py --dataset ml-latest-small`. Posters are
+    otherwise fetched on demand and cached (resized) on disk.
     """
 
     DATASET_DIR = "ml-latest-small"
 
     def _build_filters(self):
-        return [RatingLowFilter(4.0), RatedMovieFilter(), LinkFilter()]
+        # Keep positively-rated (>=4), reasonably popular (>=10 such ratings) movies that have
+        # an IMDb link (for images). On ml-latest-small this yields ~1.2k items — a snappy demo
+        # whose full poster set is cheap to download. Tune RatingMovieFilter to trade size.
+        return [RatingLowFilter(4.0), RatingMovieFilter(10), RatedMovieFilter(), LinkFilter()]
 
     @classmethod
     def name(self):

@@ -45,6 +45,18 @@ shows people *items*, records how they *interact*, and asks them *questions*, Ea
 EasyStudy's niche: the only tool that is **self-contained (batteries included)**, **fully open/self-hostable**,
 *and* built around **reusable study-flow components**.
 
+## Used in research
+
+EasyStudy has powered the user studies behind peer-reviewed publications in recommender systems and data
+visualization — see **[Studies built with EasyStudy](https://pdokoupil.github.io/EasyStudy/publications/)**.
+
+**Using EasyStudy in your research or teaching?** We'd genuinely love to know — it helps us understand
+where it's useful (labs, courses, companies) and what to improve:
+
+- 📄 Add your paper: open a [pull request or issue](https://github.com/pdokoupil/EasyStudy/issues/new).
+- 💬 Share feedback, ask questions, or say hi in [GitHub Discussions](https://github.com/pdokoupil/EasyStudy/discussions).
+- ✉️ Or email <patrik.dokoupil@matfyz.cuni.cz>.
+
 ## Quickstart (Docker, recommended)
 
 > **Try it in the browser (zero local setup):**
