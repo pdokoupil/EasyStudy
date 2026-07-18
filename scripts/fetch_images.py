@@ -8,22 +8,24 @@ imdbinfo), which is slow on the first render. This script pre-fetches them all i
 It is **resumable** (skips images already on disk) and **threaded**.
 
 Usage:
-    python scripts/fetch_images.py --dataset ml-latest-small          # ~9.7k movies
+    python scripts/fetch_images.py --dataset ml-latest-small          # ~1.2k after filtering
     python scripts/fetch_images.py --dataset ml-latest --workers 16
     python scripts/fetch_images.py --dataset ml-latest-small --limit 500   # just the first N
 
-Notes:
-    * Requires imdbinfo + Pillow:  pip install "easystudy[imdb]"  (imdbinfo is in core).
-    * IMDb may throttle a large burst of requests; the run is resumable, so just re-run it
-      to continue. Use --workers 8 (default) to stay polite.
+Dependencies: only **imdbinfo** (`pip install imdbinfo`, or it's in the EasyStudy core) — the
+rest is the Python standard library. Requests images at ~200px straight from IMDb's CDN, so no
+Pillow/requests needed. If you'd rather not install anything, run it inside the container:
+    docker compose run --rm app python scripts/fetch_images.py --dataset ml-latest-small
+
+Note: IMDb may throttle a large burst; the run is resumable, so just re-run to continue.
 """
 import argparse
 import csv
 import os
 import re
 import sys
+import urllib.request
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from io import BytesIO
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 DATASETS_DIR = os.path.join(HERE, "..", "server", "static", "datasets")
@@ -43,10 +45,13 @@ def _cover_url(imdb_id, width):
     return _resize_amazon(getattr(movie, "cover_url", "") or "", width)
 
 
-def _fetch_one(movie_id, imdb_id, img_dir, width, target_px):
-    import requests
-    from PIL import Image
+def _download(url):
+    req = urllib.request.Request(url, headers={"User-Agent": "easystudy-fetch/1.0"})
+    with urllib.request.urlopen(req, timeout=20) as resp:  # noqa: S310 (documented CDN URL)
+        return resp.read()
 
+
+def _fetch_one(movie_id, imdb_id, img_dir, width):
     out_path = os.path.join(img_dir, f"{movie_id}.jpg")
     if os.path.exists(out_path):
         return movie_id, "skip"
@@ -54,13 +59,9 @@ def _fetch_one(movie_id, imdb_id, img_dir, width, target_px):
         url = _cover_url(imdb_id, width)
         if not url:
             return movie_id, "no-poster"
-        resp = requests.get(url, timeout=15)
-        if resp.status_code != 200:
-            return movie_id, f"http-{resp.status_code}"
-        img = Image.open(BytesIO(resp.content))
-        w, h = img.size
-        img = img.resize((target_px, int(h * target_px / w)), Image.LANCZOS).convert("RGB")
-        img.save(out_path, quality=90)
+        data = _download(url)  # already ~width px wide from the CDN — no local resize needed
+        with open(out_path, "wb") as f:
+            f.write(data)
         return movie_id, "ok"
     except Exception as e:  # noqa: BLE001
         return movie_id, f"err:{type(e).__name__}"
@@ -71,8 +72,7 @@ def main(argv=None):
     p.add_argument("--dataset", default="ml-latest-small",
                    help="dataset dir under server/static/datasets/ (must contain links.csv)")
     p.add_argument("--workers", type=int, default=8, help="parallel downloads (default 8)")
-    p.add_argument("--width", type=int, default=300, help="IMDb thumbnail width to request")
-    p.add_argument("--target-px", type=int, default=200, help="saved image width in px")
+    p.add_argument("--width", type=int, default=200, help="poster width in px to request/save")
     p.add_argument("--limit", type=int, default=0, help="only the first N movies (0 = all)")
     args = p.parse_args(argv)
 
@@ -86,7 +86,8 @@ def main(argv=None):
     try:
         import imdbinfo  # noqa: F401
     except Exception as e:  # noqa: BLE001
-        sys.exit(f"imdbinfo unavailable ({e}); install with: pip install \"easystudy[imdb]\"")
+        sys.exit(f"imdbinfo unavailable ({e}); install with: pip install imdbinfo   (or run "
+                 f"this inside the container: docker compose run --rm app python scripts/fetch_images.py …)")
 
     # links.csv columns: movieId,imdbId,tmdbId
     rows = []
@@ -99,11 +100,9 @@ def main(argv=None):
 
     total = len(rows)
     print(f"[{args.dataset}] {total} movies -> {img_dir} ({args.workers} workers)")
-    counts = {}
-    done = 0
+    counts, done = {}, 0
     with ThreadPoolExecutor(max_workers=args.workers) as ex:
-        futs = [ex.submit(_fetch_one, mid, iid, img_dir, args.width, args.target_px)
-                for mid, iid in rows]
+        futs = [ex.submit(_fetch_one, mid, iid, img_dir, args.width) for mid, iid in rows]
         for fut in as_completed(futs):
             _, status = fut.result()
             key = status.split(":")[0]
