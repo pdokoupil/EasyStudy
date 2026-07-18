@@ -495,7 +495,7 @@
                       let pVal = this.selectedAlgorithmsParameters[i][j].value;
                       let algoIdx = this.availableAlgorithmNames.indexOf(this.selectedAlgorithms[i]);
                       let algoParams = this.availableAlgorithmsData[algoIdx]["parameters"];
-                      result = result && pVal != null && pVal !== '';
+                      result = result && pVal !== null && pVal !== '';
                       if (result) {
                         let pType = this.findParamType(algoParams, j);
                         if (pType == "int") {
@@ -528,7 +528,7 @@
                   let origParams = this.preferenceElicitationData[elIdx]["parameters"];
                   for (let p in elicitationParams) {
                     let pVal = elicitationParams[p].value;
-                    result = result && pVal != null && pVal != '';
+                    result = result && pVal !== null && pVal !== '';
                     if (result) {
                       let pType = this.findParamType(origParams, p);
                       if (pType == "int") {
@@ -544,7 +544,7 @@
                   let dataLoaderParams = this.dataLoadersParameters[loaderIdx];
                   for (let p in dataLoaderParams) {
                     let pVal = dataLoaderParams[p].value;
-                    result = result && pVal != null && pVal != '';
+                    result = result && pVal !== null && pVal !== '';
                     if (result) {
                       let pType = this.findParamType(loaderParams, p);
                       if (pType == "int") {

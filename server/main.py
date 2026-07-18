@@ -121,13 +121,22 @@ def get_user_study():
 
 @main.route("/user-study/<id>", methods=["DELETE"])
 def delete_user_study(id):
-    x = UserStudy.query.filter(UserStudy.id == id)
-    guid = x.first().guid
-    parent_plugin = x.first().parent_plugin
-    x.delete()
+    study = UserStudy.query.filter(UserStudy.id == id).first()
+    if study is None:
+        return "OK"  # already gone
+    guid = study.guid
+    parent_plugin = study.parent_plugin
+    # Remove the DB record FIRST so a study whose initialization was interrupted (server
+    # stopped mid-computation -> initialized=false, no error) is always deletable (issue #7),
+    # even if the plugin has no dispose endpoint or its disposal fails.
+    UserStudy.query.filter(UserStudy.id == id).delete()
     db.session.commit()
-    # Trigger plugin-specific disposal procedure 
-    return flask.redirect(flask.url_for(f"{parent_plugin}.dispose", guid=guid))
+    # Best-effort plugin-specific cleanup (files/caches); never block deletion on it.
+    try:
+        return flask.redirect(flask.url_for(f"{parent_plugin}.dispose", guid=guid))
+    except Exception as e:
+        print(f"[delete_user_study] dispose skipped for plugin={parent_plugin}: {e}")
+        return "OK"
 
 @main.route("/user-study-active", methods=["POST"])
 def set_user_study_active():
