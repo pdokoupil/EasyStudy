@@ -26,7 +26,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "easystudy"
-version = "2.0.0.dev0"
+version = "1.0.0"
 description = "A modular framework for quick & easy deployment of customizable user studies — for recommender systems and any other item-based interactive system."
 readme = "README.md"
 requires-python = ">=3.10"
