@@ -32,8 +32,12 @@ See the [README](README.md) for the Docker / `docker compose up` path.
   for individual papers and are kept for reference only.
 
 ## Pull request checklist
-- [ ] Code is formatted (`black .`) and lint-clean (`ruff check .`).
-- [ ] Tests pass (`cd server && uv run pytest`), and new behavior has a test.
+- [ ] `bash scripts/check_diff.sh` passes locally — formats/lints **only the Python files your
+  branch changes** (vs. `origin/main`) with black + ruff, then runs the full test suite. This is
+  exactly what the CI `lint-diff` job re-checks on your PR (scoped the same way, so it won't
+  fail you for pre-existing style debt elsewhere in the repo). Use `--fix` to auto-format;
+  `--no-tests` to skip the test run for a fast lint-only loop.
+- [ ] Tests pass, and new behavior has a test.
 - [ ] If you changed models, you added a migration (`flask db migrate`).
 - [ ] Docs/README updated if you changed user-facing behavior.
 - [ ] New heavy dependencies go behind an extra in `pyproject.toml`, not into core.

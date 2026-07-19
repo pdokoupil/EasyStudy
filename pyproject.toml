@@ -12,10 +12,13 @@
 #   pip install "easystudy[all]"          # everything
 #   pip install "easystudy[dev]"          # tests + linters + load testing
 #
-# NOTE: full package layout (importable `easystudy` package + `easystudy` CLI entry
-# points + plugin discovery) is tracked as backlog item B3 in 01_ADOPTION_BACKLOG.md.
-# For now this file is the single, authoritative dependency manifest and replaces the
-# old split conda_requirements.txt / pip_requirements.txt.
+# Package layout: `easystudy` (src/easystudy) is a thin CLI; the actual Flask app/plugins
+# (server/) and helper scripts (scripts/) are vendored verbatim as `easystudy._vendor_server`
+# / `easystudy._vendor_scripts` and put on sys.path at runtime — see
+# src/easystudy/_bootstrap.py for why (their ~40 files use flat, CWD-relative imports that
+# predate this packaging). `easystudy serve` / `fetch-data` / `create-user` are the CLI.
+# This file is also the single, authoritative dependency manifest, replacing the old split
+# conda_requirements.txt / pip_requirements.txt.
 
 [build-system]
 requires = ["setuptools>=64"]
@@ -110,10 +113,59 @@ Homepage = "https://github.com/pdokoupil/EasyStudy"
 Repository = "https://github.com/pdokoupil/EasyStudy"
 Paper = "https://doi.org/10.1145/3604915.3610640"
 
-# Minimal build config: today this project acts as the authoritative dependency
-# manifest (so `pip install ".[tensorflow]"` etc. work). Real package layout is B3.
+[project.scripts]
+easystudy = "easystudy.cli:main"
+
+# Package layout: `easystudy` lives under src/; the Flask app (server/) and helper
+# scripts (scripts/) are vendored verbatim as separate mapped packages (see the note
+# above and src/easystudy/_bootstrap.py). Not zip-safe: Flask apps need real files on
+# disk for templates/static.
 [tool.setuptools]
-py-modules = []
+zip-safe = false
+packages = [
+    "easystudy",
+    "easystudy._vendor_server",
+    "easystudy._vendor_server.plugins",
+    "easystudy._vendor_server.plugins.empty_template",
+    "easystudy._vendor_server.plugins.fastcompare",
+    "easystudy._vendor_server.plugins.fastcompare.algo",
+    "easystudy._vendor_server.plugins.fastcompare.algo.wrappers",
+    "easystudy._vendor_server.plugins.fastcompare.tests",
+    "easystudy._vendor_server.plugins.layoutshuffling",
+    "easystudy._vendor_server.plugins.recbole",
+    "easystudy._vendor_server.plugins.utils",
+    "easystudy._vendor_server.plugins.vae",
+    "easystudy._vendor_scripts",
+]
+
+[tool.setuptools.package-dir]
+"" = "src"
+"easystudy._vendor_server" = "server"
+"easystudy._vendor_scripts" = "scripts"
+
+# Explicit (not "static/**/*") on purpose: server/static/datasets/ is runtime-fetched data
+# (CSVs/images), never something to bundle into the wheel.
+[tool.setuptools.package-data]
+"easystudy._vendor_server" = [
+    "templates/**/*",
+    "static/*.js", "static/*.js.map", "static/*.css", "static/*.css.map", "static/*.svg",
+    "static/languages/**/*",
+    "static/tinymce/**/*",
+    "*.json",
+    "migrations/*",
+    "migrations/versions/*",
+]
+"easystudy._vendor_server.plugins.utils" = [
+    "static/**/*", "templates/**/*",
+    # PEP 420 namespace packages (no __init__.py) that plugins/utils/preference_elicitation.py
+    # imports as top-level names via its own sys.path.append(dirname(__file__)) — these aren't
+    # discovered by the explicit `packages` list above (which only covers real packages), so
+    # they must be listed as data or they silently go missing from the wheel.
+    "support/*.py", "normalization/*.py", "mandate_allocation/*.py",
+]
+"easystudy._vendor_server.plugins.fastcompare" = ["static/**/*", "templates/**/*"]
+"easystudy._vendor_server.plugins.layoutshuffling" = ["static/**/*", "templates/**/*"]
+"easystudy._vendor_server.plugins.empty_template" = ["templates/**/*"]
 
 [tool.ruff]
 line-length = 120

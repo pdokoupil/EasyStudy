@@ -43,7 +43,7 @@ from mandate_allocation.weighted_average_strategy import weighted_average_strate
 
 from data_loading import load_ml_dataset, MLDataLoader
 
-from common import get_abs_project_root_path
+from common import get_data_root
 
 MOST_RATED_MOVIES_THRESHOLD = 200
 USERS_RATING_RATIO_THRESHOLD = 0.75
@@ -130,7 +130,7 @@ def prepare_tf_model(loader):
     unique_user_ids, unique_movie_titles, movies, cached_train, train = prepare_tf_data(loader)
     model = get_model_mf(unique_user_ids, unique_movie_titles, movies)
     #cache_path = os.path.join(Path(__file__).parent.absolute(), 'cache', 'utils', 'ml-latest', 'tf_weights_cache')
-    cache_path = os.path.join(get_abs_project_root_path(), 'cache', 'utils', 'ml-latest', 'tf_weights_cache')
+    cache_path = os.path.join(get_data_root(), 'cache', 'utils', 'ml-latest', 'tf_weights_cache')
 
     # Try load
     try:

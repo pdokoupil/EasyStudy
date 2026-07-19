@@ -14,7 +14,7 @@ from cachetools import cached
 from plugins.fastcompare.algo.algorithm_base import DataLoaderBase, Parameter, ParameterType
 from plugins.utils.ml_data_loader import MLDataLoader, RatingLowFilter, RatingMovieFilter, MovieFilterByYear, RatingFilterOld, RatingsPerYearFilter, RatingUserFilter, RatedMovieFilter, LinkFilter
 
-from common import get_abs_project_root_path
+from common import get_data_root
 
 from flask import url_for, has_app_context
 from PIL import Image
@@ -47,7 +47,7 @@ class MLDataLoaderWrapper(DataLoaderBase):
 
     def __init__(self, **kwargs):
 
-        datasets_base_dir = os.path.join(get_abs_project_root_path(), 'static', 'datasets')
+        datasets_base_dir = os.path.join(get_data_root(), 'static', 'datasets')
         dataset_dir = os.path.join(datasets_base_dir, self.DATASET_DIR)
 
         if not os.path.exists(datasets_base_dir):
@@ -195,7 +195,7 @@ class MLGenomeDataLoader(DataLoaderBase):
     MIN_MOVIE_RATINGS = 10
 
     def __init__(self, **kwargs):
-        datasets_base_dir = os.path.join(get_abs_project_root_path(), 'static', 'datasets')
+        datasets_base_dir = os.path.join(get_data_root(), 'static', 'datasets')
 
         if not os.path.exists(datasets_base_dir):
             assert False, f"Datasets base dir ({datasets_base_dir}) does not exist"
@@ -525,7 +525,7 @@ class MLGenomeDataLoader(DataLoaderBase):
 class GoodbooksDataLoader(DataLoaderBase):
 
     def __init__(self, **kwargs):
-        datasets_base_dir = os.path.join(get_abs_project_root_path(), 'static', 'datasets')
+        datasets_base_dir = os.path.join(get_data_root(), 'static', 'datasets')
 
         if not os.path.exists(datasets_base_dir):
             assert False, f"Datasets base dir ({datasets_base_dir}) does not exist"
@@ -679,7 +679,7 @@ class GoodbooksDataLoader(DataLoaderBase):
 class GoodBooksFilteredDataLoader(DataLoaderBase):
 
     def __init__(self, **kwargs):
-        datasets_base_dir = os.path.join(get_abs_project_root_path(), 'static', 'datasets')
+        datasets_base_dir = os.path.join(get_data_root(), 'static', 'datasets')
 
         if not os.path.exists(datasets_base_dir):
             assert False, f"Datasets base dir ({datasets_base_dir}) does not exist"

@@ -7,15 +7,15 @@ sys.path.append(os.path.dirname(os.path.realpath(__file__)))
 
 from ml_data_loader import MLDataLoader, RatingUserFilter, RatedMovieFilter, MovieFilterByYear, RatingFilterOld, RatingsPerYearFilter, RatingLowFilter, LinkFilter
 
-from common import get_abs_project_root_path
+from common import get_data_root
 from pathlib import Path
 
 # Loads the movielens dataset
 @functools.lru_cache(maxsize=None)
 def load_ml_dataset(ml_variant="ml-latest"):
-    basedir = os.path.join(get_abs_project_root_path(), 'static', 'datasets')
+    basedir = os.path.join(get_data_root(), 'static', 'datasets')
     #cache_base_dir = os.path.join(Path(__file__).parent.absolute(), "cache", 'utils', ml_variant)
-    cache_base_dir = os.path.join(get_abs_project_root_path(), "cache", 'utils', ml_variant)
+    cache_base_dir = os.path.join(get_data_root(), "cache", 'utils', ml_variant)
     Path(cache_base_dir).mkdir(parents=True, exist_ok=True)
 
     cache_path = os.path.join(cache_base_dir, "data_cache.pckl")

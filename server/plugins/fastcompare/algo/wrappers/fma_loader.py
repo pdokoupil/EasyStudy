@@ -11,10 +11,10 @@ import pandas as pd
 import requests
 
 from plugins.fastcompare.algo.algorithm_base import DataLoaderBase
-from common import get_abs_project_root_path
+from common import get_data_root
 
 # from algorithm_base import DataLoaderBase
-# from common import get_abs_project_root_path
+# from common import get_data_root
 
 from flask import url_for, has_app_context
 from PIL import Image
@@ -27,7 +27,7 @@ class FMADataLoader(DataLoaderBase):
     SEED = 'NEVERGONNAGIVEYOUUP'
 
     def __init__(self, **kwargs):
-        datasets_base_dir: Path = get_abs_project_root_path() / 'static' / 'datasets'
+        datasets_base_dir: Path = get_data_root() / 'static' / 'datasets'
 
         # Assert that source data exist
         assert datasets_base_dir.exists(), f"Dataset's base dir ({datasets_base_dir}) does not exist"

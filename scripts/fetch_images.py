@@ -28,7 +28,10 @@ import urllib.request
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-DATASETS_DIR = os.path.join(HERE, "..", "server", "static", "datasets")
+# EASYSTUDY_DATASETS_DIR lets the installed `easystudy` CLI point this at the bundled
+# server/static/datasets directory (a different relative layout than a repo checkout);
+# unset (the default, repo-checkout usage) keeps today's sibling-relative behavior.
+DATASETS_DIR = os.environ.get("EASYSTUDY_DATASETS_DIR") or os.path.join(HERE, "..", "server", "static", "datasets")
 
 
 def _resize_amazon(url, width):

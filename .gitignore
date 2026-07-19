@@ -29,6 +29,8 @@ venv/
 # Build/uv artifacts
 *.egg-info/
 .cache/
+/dist/
+/build/
 
 # RecBole training artifacts (should stay confined to its per-fit tempdir, but ignore as a
 # defense-in-depth in case something writes them to the working directory anyway).

@@ -69,6 +69,28 @@ jobs:
           uv sync --frozen --extra dev
           cd server && "$GITHUB_WORKSPACE/.venv/bin/python" -m pytest -q
 
+  # Blocking format/lint gate, scoped to ONLY the files a PR actually changes (vs. the
+  # PR's base branch) — not the whole repo, which has years of pre-existing style debt that
+  # would make a whole-repo check permanently red. Run the exact same check locally before
+  # pushing: scripts/check_diff.sh (this job and that script share the same logic).
+  lint-diff:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0   # full history, needed to compute the merge-base
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - run: uv sync --extra dev
+      - name: Fetch PR base branch
+        run: git fetch origin "${{ github.event.pull_request.base.ref }}" --depth=1
+      - name: Lint only the changed Python files (tests already covered by the `test` job)
+        run: |
+          source .venv/bin/activate
+          bash scripts/check_diff.sh "origin/${{ github.event.pull_request.base.ref }}" --no-tests
+
   docker:
     runs-on: ubuntu-latest
     steps:

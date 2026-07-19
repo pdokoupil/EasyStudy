@@ -1,8 +1,7 @@
 # Gallery — studies built with EasyStudy
 
 Real studies deployed with EasyStudy, as evidence that it scales from a class exercise to published
-research. (Mirrors how [Informfully](https://informfully.ch) showcases its CH'20/CH'22/DE'22/NL'23
-deployments.) See also **[Studies built with EasyStudy](publications.md)** for the full, regularly
+research. See also **[Studies built with EasyStudy](publications.md)** for the full, regularly
 updated list of peer-reviewed papers.
 
 <!-- Maintainer note: keep each entry to the schema below — a one-line *what was studied*, the

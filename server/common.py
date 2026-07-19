@@ -16,6 +16,20 @@ def get_abs_project_root_path():
     return Path(__file__).parent.absolute()
 
 
+def get_data_root():
+    """Root directory for WRITABLE runtime data (static/datasets/, cache/, …).
+
+    Historically this was always ``get_abs_project_root_path()`` (i.e. wherever this file's
+    directory lives). For the installed `easystudy` package that directory is inside
+    site-packages — not an appropriate place to write fetched datasets or caches (read-only
+    on some installs; wiped on every reinstall/upgrade). The `easystudy` CLI sets
+    ``EASYSTUDY_DATA_ROOT`` to the user's chosen project directory (their CWD) so fetched
+    data lands there instead. Unset (source checkouts, Docker) keeps the original behavior.
+    """
+    override = os.environ.get("EASYSTUDY_DATA_ROOT")
+    return Path(override).absolute() if override else get_abs_project_root_path()
+
+
 def gen_url_prefix():
     p = urlparse(request.url, ".")
     return f"{p.scheme}://{p.netloc}"

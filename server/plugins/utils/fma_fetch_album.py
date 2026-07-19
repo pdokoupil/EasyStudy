@@ -12,7 +12,7 @@ import requests
 import imghdr
 import os
 
-from common import get_abs_project_root_path
+from common import get_data_root
 
 
 def get_album_covers(tracks_path: Path, images_path: Path):
@@ -112,7 +112,7 @@ def get_album_covers(tracks_path: Path, images_path: Path):
 
 
 if __name__ == '__main__':
-    dataset_path = os.path.join(get_abs_project_root_path(), 'static', 'datasets')
+    dataset_path = os.path.join(get_data_root(), 'static', 'datasets')
     img_data_path = Path(f'{dataset_path}/fma/img')
     tracks_path = Path(f'{dataset_path}/fma/tracks.csv')
     get_album_covers(tracks_path, img_data_path)
