@@ -16,7 +16,14 @@ import numpy as np
 [sys.path.append(i) for i in ['.', '..']]
 [sys.path.append(i) for i in ['../.', '../..', '../../.']]
 
-from plugins.utils.preference_elicitation import load_data, enrich_results
+# NOTE: load_data / enrich_results (from plugins.utils.preference_elicitation) are imported
+# locally, inside the few functions that use them, rather than here at module level. That
+# module eagerly imports TensorFlow if it's installed (even though most of its own code
+# doesn't need it) — and since THIS file is imported the moment the app boots (fastcompare is
+# not optional), a top-level import here would pay TensorFlow's multi-second import cost on
+# every single command (`easystudy create-user`, `fetch-data`, ...), not just when a study
+# actually runs. Deferring it means that cost is only paid once someone actually starts a
+# study's preference elicitation.
 from plugins.fastcompare.loading import load_algorithms, load_preference_elicitations, load_data_loaders, load_evaluation_metrics
 from plugins.utils.interaction_logging import log_interaction, study_ended
 from plugins.utils.helpers import cos_sim_np
@@ -170,6 +177,7 @@ def available_data_loaders():
 
 @bp.route("/get-initial-data", methods=["GET"])
 def get_initial_data():
+    from plugins.utils.preference_elicitation import load_data
     # Get already shown movies
     el_movies = session["elicitation_movies"]
 
@@ -216,6 +224,7 @@ def on_joined():
     ))
 
 def search_for_item(pattern, loader, tr=None):
+    from plugins.utils.preference_elicitation import enrich_results
     # If we have a translate function
     if tr:
         found_items = loader.items_df[loader.items_df.item_id.astype(str).map(tr).str.contains(pattern, case=False)]
@@ -249,6 +258,7 @@ def item_search():
     return jsonify(res)
 
 def prepare_recommendations(loader, conf, recommendations, selected_movies, filter_out_movies, k):
+    from plugins.utils.preference_elicitation import enrich_results
     algorithm_factories = load_algorithms()
     algorithms = conf["selected_algorithms"]
     print(f"Algorithm factories = {algorithm_factories}")

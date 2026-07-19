@@ -1,21 +1,27 @@
-# TFRS-based matrix-factorization retrieval model. TensorFlow / TF-Recommenders are an
-# OPTIONAL heavy extra (`pip install "easystudy[tensorflow]"`). This module stays
-# import-safe without them so the lightweight core (and non-TF preference elicitation)
-# can be imported; the actual TFRS model is only defined when the extra is present.
-try:
-    import tensorflow as tf
-    import tensorflow_recommenders as tfrs
-    tf.get_logger().setLevel('ERROR')
-    _TF_AVAILABLE = True
-except ImportError:
-    tf = None
-    tfrs = None
-    _TF_AVAILABLE = False
+"""TFRS-based matrix-factorization retrieval model.
 
+TensorFlow / TF-Recommenders are an OPTIONAL heavy extra (`pip install "easystudy[tensorflow]"`).
+Both the import AND the TF-dependent class definition are deferred until `get_model_mf()` is
+actually **called** — not merely guarded by a module-level try/except, which still pays the full
+TensorFlow import cost (many seconds) whenever it succeeds. This module gets pulled in
+transitively every time the `fastcompare` plugin loads (i.e. on every app boot, including
+`easystudy create-user`/`fetch-data`, which have nothing to do with algorithms at all), so a
+merely-import-safe guard isn't good enough — the import has to not happen until genuinely needed.
+"""
 from typing import Dict, Text
 
 
-if _TF_AVAILABLE:
+def get_model_mf(unique_user_ids, unique_item_titles, items, embedding_dimension=32, learning_rate=0.1):
+    try:
+        import tensorflow as tf
+        import tensorflow_recommenders as tfrs
+        tf.get_logger().setLevel('ERROR')
+    except ImportError as e:
+        raise ImportError(
+            "TFRS-based recommenders require the optional 'tensorflow' extra. "
+            "Install with: pip install 'easystudy[tensorflow]'"
+        ) from e
+
     class MFRetrievalModel(tfrs.models.Model):
 
         def __init__(self, user_model, item_model, task, items):
@@ -94,37 +100,29 @@ if _TF_AVAILABLE:
 
             return scores[:, :k], titles[:, :k]
 
-    def get_model_mf(unique_user_ids, unique_item_titles, items, embedding_dimension = 32, learning_rate = 0.1):
-        user_model = tf.keras.Sequential([
-            tf.keras.layers.StringLookup(
-            vocabulary=unique_user_ids, mask_token=None),
-            # We add an additional embedding to account for unknown tokens.
-            tf.keras.layers.Embedding(len(unique_user_ids) + 1, embedding_dimension)
-        ])
+    user_model = tf.keras.Sequential([
+        tf.keras.layers.StringLookup(
+        vocabulary=unique_user_ids, mask_token=None),
+        # We add an additional embedding to account for unknown tokens.
+        tf.keras.layers.Embedding(len(unique_user_ids) + 1, embedding_dimension)
+    ])
 
-        item_model = tf.keras.Sequential([
-            tf.keras.layers.StringLookup(
-                vocabulary=unique_item_titles, mask_token=None),
-            tf.keras.layers.Embedding(len(unique_item_titles) + 1, embedding_dimension)
-        ])
+    item_model = tf.keras.Sequential([
+        tf.keras.layers.StringLookup(
+            vocabulary=unique_item_titles, mask_token=None),
+        tf.keras.layers.Embedding(len(unique_item_titles) + 1, embedding_dimension)
+    ])
 
-        metrics = tfrs.metrics.FactorizedTopK(
-            candidates=items.batch(128).map(item_model)
-        )
+    metrics = tfrs.metrics.FactorizedTopK(
+        candidates=items.batch(128).map(item_model)
+    )
 
-        task = tfrs.tasks.Retrieval(
-            metrics=metrics,
-            #batch_metrics=[tfr.keras.metrics.NDCGMetric()]
-        )
+    task = tfrs.tasks.Retrieval(
+        metrics=metrics,
+        #batch_metrics=[tfr.keras.metrics.NDCGMetric()]
+    )
 
-        model = MFRetrievalModel(user_model, item_model, task, items)
-        model.compile(optimizer=tf.keras.optimizers.legacy.Adagrad(learning_rate))
+    model = MFRetrievalModel(user_model, item_model, task, items)
+    model.compile(optimizer=tf.keras.optimizers.legacy.Adagrad(learning_rate))
 
-        return model
-
-else:
-    def get_model_mf(*args, **kwargs):
-        raise ImportError(
-            "TFRS-based recommenders require the optional 'tensorflow' extra. "
-            "Install with: pip install 'easystudy[tensorflow]'"
-        )
+    return model

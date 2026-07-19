@@ -32,10 +32,14 @@ Put a reverse proxy (nginx/Caddy/Traefik) in front for TLS.
 
 ## From source (uWSGI/Gunicorn)
 
+The `easystudy` CLI wraps this for you: `easystudy serve --prod` (see the
+[Quickstart](quickstart.md)) runs the same gunicorn invocation without needing to `cd server`
+or hand-write the command. Equivalent, if you'd rather run it directly:
+
 ```bash
 uv sync --extra tensorflow         # or just `uv sync` for the lightweight core
 cd server
-uv run gunicorn -w 1 --bind 0.0.0.0:5000 "app:create_app()"
+uv run gunicorn -w 1 --bind 0.0.0.0:8000 "app:create_app()"
 ```
 
 !!! warning "Concurrency & the single worker"

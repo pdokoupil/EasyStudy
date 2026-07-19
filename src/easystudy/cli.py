@@ -59,8 +59,26 @@ def _run_vendored_script(script_name: str, argv: list) -> None:
 
 def _cmd_serve(args):
     _use_cwd_as_data_root()
-    from ._bootstrap import ensure_server_on_path
+    from ._bootstrap import ensure_server_on_path, server_dir
     ensure_server_on_path()
+
+    if args.prod:
+        # gunicorn is already a core dependency (the same one Docker's image runs) — this
+        # just saves looking up the raw invocation in docs/deployment.md. `--chdir` makes
+        # gunicorn import `app:create_app()` from the vendored server dir; EASYSTUDY_DATA_ROOT
+        # / DATABASE_URL (set above as absolute paths) still point at the original CWD
+        # regardless of gunicorn's own chdir, so datasets/DB still land in the user's project.
+        import subprocess
+        cmd = [
+            "gunicorn",
+            "--workers", str(args.workers),
+            "--bind", f"{args.host}:{args.port}",
+            "--chdir", server_dir(),
+            "app:create_app()",
+        ]
+        print(f">> {' '.join(cmd)}")
+        raise SystemExit(subprocess.call(cmd))
+
     from app import create_app  # the vendored server/app.py, now importable
     app = create_app()
     app.run(host=args.host, port=args.port, debug=args.debug)
@@ -106,8 +124,15 @@ def main(argv=None):
     p_serve = sub.add_parser(
         "serve", help="Run the development server in the current directory")
     p_serve.add_argument("--host", default="127.0.0.1")
-    p_serve.add_argument("--port", type=int, default=5000)
+    p_serve.add_argument("--port", type=int, default=8000)
     p_serve.add_argument("--debug", action="store_true")
+    p_serve.add_argument("--prod", action="store_true",
+                          help="serve with gunicorn instead of Flask's dev server "
+                               "(same server Docker uses)")
+    p_serve.add_argument("--workers", type=int, default=1,
+                          help="gunicorn workers for --prod (default 1 — the app keeps some "
+                               "per-process state, so more workers needs the shared-state "
+                               "rework described in docs/deployment.md first)")
     p_serve.set_defaults(func=_cmd_serve)
 
     # Listed here only so they show up in --help; actually handled above.
