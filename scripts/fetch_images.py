@@ -18,6 +18,13 @@ Pillow/requests needed. If you'd rather not install anything, run it inside the 
     docker compose run --rm app python scripts/fetch_images.py --dataset ml-latest-small
 
 Note: IMDb may throttle a large burst; the run is resumable, so just re-run to continue.
+
+If you've ALSO installed the `easystudy` CLI and use `easystudy serve` from this same
+checkout directory: use `easystudy fetch-images` instead of this raw script from then on. This
+script always writes to server/static/datasets (relative to itself); the CLI instead redirects
+everything to your current directory, so mixing the two silently produces two different image
+caches — `easystudy serve` won't find anything this script fetched, and re-fetches from IMDb
+live (slowly) on every render instead.
 """
 import argparse
 import csv

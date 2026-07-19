@@ -26,10 +26,18 @@ python scripts/fetch_data.py --dataset ml-latest-small
 This populates `server/static/datasets/ml-latest-small/`. Other options:
 `goodbooks-10k`, `ml-latest` (the full, much larger MovieLens dump), or `all`.
 
+!!! warning "Going with pip/uv below (not Docker)? Use the CLI equivalents instead"
+    This script always writes to `server/static/datasets`. Once you install and use `easystudy serve`
+    in step 3, that CLI redirects data to your *current directory* instead — a different location, so
+    `easystudy serve` won't see anything fetched this way. Run `easystudy fetch-data --dataset
+    ml-latest-small` (and `easystudy fetch-images`, below) after installing instead, and skip this raw
+    script entirely. This step as written is for the Docker path (which doesn't have that CWD
+    redirection) or for previewing the data before installing anything at all.
+
 !!! tip "Pre-fetch item posters (optional)"
     Posters are fetched from IMDb and cached to disk the first time each item is shown. To avoid that
     first-view delay, pre-fetch them all up front (~1 minute for `ml-latest-small`):
-    `python scripts/fetch_images.py --dataset ml-latest-small`
+    `python scripts/fetch_images.py --dataset ml-latest-small` (or `easystudy fetch-images` — see above).
 
 ## 3. Install & start the server
 

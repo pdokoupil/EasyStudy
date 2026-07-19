@@ -152,6 +152,13 @@ python scripts/fetch_data.py --dataset ml-latest --no-images
 python scripts/fetch_images.py --dataset ml-latest-small  # pre-cache all posters (optional, ~1 min)
 ```
 
+Once you've `pip install`-ed and use `easystudy serve` from this same checkout directory, switch to
+`easystudy fetch-data`/`easystudy fetch-images` for anything after that. The raw scripts always write
+to `server/static/datasets`; the CLI redirects everything (including these) to your current directory
+instead — mixing the two silently produces two different data directories, and `easystudy serve` won't
+see anything the raw scripts fetched (it'll look empty and re-fetch slowly from IMDb/MovieLens on
+every request instead of using the cache).
+
 Sources: [ml-latest-small / ml-latest](https://files.grouplens.org/datasets/movielens/),
 [goodbooks-10k](https://github.com/zygmuntz/goodbooks-10k). Images mirror:
 [ml_latest_img.zip](http://herkules.ms.mff.cuni.cz/ligan/easystudy/ml_latest_img.zip),

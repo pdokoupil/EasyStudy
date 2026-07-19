@@ -12,6 +12,12 @@ Usage:
     python scripts/fetch_data.py --dataset all --force       # re-download
 
 Only the Python standard library is used, so this runs before any pip install.
+
+If you've ALSO installed the `easystudy` CLI and use `easystudy serve` from this same
+checkout directory: use `easystudy fetch-data` instead of this raw script from then on. This
+script always writes to server/static/datasets (relative to itself); the CLI instead redirects
+everything to your current directory, so mixing the two silently produces two different data
+directories — `easystudy serve` won't see anything this script fetched.
 """
 import argparse
 import io

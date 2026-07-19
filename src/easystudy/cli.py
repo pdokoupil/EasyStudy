@@ -41,6 +41,23 @@ def _use_cwd_as_data_root() -> str:
     os.environ.setdefault("EASYSTUDY_DATA_ROOT", cwd)
     os.environ.setdefault("EASYSTUDY_DATASETS_DIR", os.path.join(cwd, "static", "datasets"))
     os.environ.setdefault("DATABASE_URL", f"sqlite:///{os.path.join(cwd, 'db.sqlite')}")
+
+    # If CWD looks like an EasyStudy source checkout itself (as opposed to a separate project
+    # directory — the intended use), warn: `python scripts/fetch_data.py`/`fetch_images.py`,
+    # run directly rather than via `easystudy fetch-data`/`fetch-images`, ignore this CWD
+    # redirection entirely and fall back to their own server/static/datasets — a SILENT,
+    # completely different location. Mixing the two styles here means whatever those raw
+    # scripts fetched never gets found by this CLI (it looks empty and re-fetches live,
+    # slowly, from IMDb/MovieLens on every request) — a real bug found the hard way.
+    if os.path.exists(os.path.join(cwd, "server", "app.py")):
+        print(
+            "NOTE: this looks like an EasyStudy checkout, not a separate project directory. "
+            "Use `easystudy fetch-data`/`easystudy fetch-images` here (not the raw "
+            "`python scripts/fetch_data.py`/`fetch_images.py`) — the raw scripts ignore this "
+            "CWD redirection and write to server/static/datasets instead, which this CLI "
+            "won't see.",
+            file=sys.stderr,
+        )
     return cwd
 
 
