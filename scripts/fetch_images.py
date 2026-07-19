@@ -87,12 +87,6 @@ def main(argv=None):
         sys.exit(f"links.csv not found at {links_path} — run scripts/fetch_data.py --dataset {args.dataset} first")
     os.makedirs(img_dir, exist_ok=True)
 
-    try:
-        import imdbinfo  # noqa: F401
-    except Exception as e:  # noqa: BLE001
-        sys.exit(f"imdbinfo unavailable ({e}); install with: pip install imdbinfo   (or run "
-                 f"this inside the container: docker compose run --rm app python scripts/fetch_images.py …)")
-
     # Optionally restrict to the popular subset the demo loader actually shows (so we don't
     # fetch ~9.7k posters when the demo only uses ~1.2k). Counts positive ratings per movie.
     keep_ids = None
@@ -122,17 +116,36 @@ def main(argv=None):
 
     total = len(rows)
     subset = f" (filtered to >={args.min_ratings} positive ratings)" if args.min_ratings else ""
-    print(f"[{args.dataset}] {total} movies{subset} -> {img_dir} ({args.workers} workers)")
+    # Split into already-cached vs to-fetch up front so the progress bar reflects *real work*
+    # (and a fully-cached folder finishes instantly with a clear message, not a confusing
+    # "800/1182 skip" partial count).
+    todo = [(mid, iid) for mid, iid in rows
+            if not os.path.exists(os.path.join(img_dir, f"{mid}.jpg"))]
+    cached = total - len(todo)
+    print(f"[{args.dataset}] {total} movies{subset}: {cached} already cached, {len(todo)} to fetch "
+          f"-> {img_dir} ({args.workers} workers)")
+    if not todo:
+        print("all posters already on disk — nothing to do.")
+        return
+
+    # imdbinfo is only needed to look up the posters we still have to fetch.
+    try:
+        import imdbinfo  # noqa: F401
+    except Exception as e:  # noqa: BLE001
+        sys.exit(f"imdbinfo unavailable ({e}); install with: pip install imdbinfo   (or run "
+                 f"this inside the container: docker compose run --rm app python scripts/fetch_images.py …)")
+
+    n = len(todo)
     counts, done = {}, 0
     with ThreadPoolExecutor(max_workers=args.workers) as ex:
-        futs = [ex.submit(_fetch_one, mid, iid, img_dir, args.width) for mid, iid in rows]
+        futs = [ex.submit(_fetch_one, mid, iid, img_dir, args.width) for mid, iid in todo]
         for fut in as_completed(futs):
             _, status = fut.result()
             key = status.split(":")[0]
             counts[key] = counts.get(key, 0) + 1
             done += 1
-            if done % 100 == 0 or done == total:
-                print(f"\r  {done}/{total}  {counts}", end="", flush=True)
+            if done % 100 == 0 or done == n:
+                print(f"\r  {done}/{n} fetched  {counts}", end="", flush=True)
     print(f"\ndone: {counts}")
 
 
