@@ -40,10 +40,10 @@ def test_ml_latest_small_is_registered_dataloader():
     assert issubclass(MLLatestSmallDataLoader, MLDataLoaderWrapper)
     assert issubclass(MLLatestSmallDataLoader, DataLoaderBase)
     assert MLLatestSmallDataLoader.DATASET_DIR == "ml-latest-small"
-    # distinct, non-empty display name; parameters() is the documented empty list
+    # distinct, non-empty display name; exposes the min_ratings_per_movie study-creation param
     assert MLLatestSmallDataLoader.name() and isinstance(MLLatestSmallDataLoader.name(), str)
     assert MLLatestSmallDataLoader.name() != MLDataLoaderWrapper.name()
-    assert MLLatestSmallDataLoader.parameters() == []
+    assert [p.name for p in MLLatestSmallDataLoader.parameters()] == ["min_ratings_per_movie"]
 
 
 def test_ml_latest_small_uses_light_filters():

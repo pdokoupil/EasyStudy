@@ -11,7 +11,7 @@ import requests
 
 from cachetools import cached
 
-from plugins.fastcompare.algo.algorithm_base import DataLoaderBase
+from plugins.fastcompare.algo.algorithm_base import DataLoaderBase, Parameter, ParameterType
 from plugins.utils.ml_data_loader import MLDataLoader, RatingLowFilter, RatingMovieFilter, MovieFilterByYear, RatingFilterOld, RatingsPerYearFilter, RatingUserFilter, RatedMovieFilter, LinkFilter
 
 from common import get_abs_project_root_path
@@ -162,15 +162,32 @@ class MLLatestSmallDataLoader(MLDataLoaderWrapper):
 
     DATASET_DIR = "ml-latest-small"
 
+    def __init__(self, min_ratings_per_movie=10, **kwargs):
+        # Exposed as a study-creation parameter so it matches what you pre-fetched with
+        # `scripts/fetch_images.py --min-ratings N` (set the same N here).
+        self._min_ratings = int(min_ratings_per_movie)
+        super().__init__(**kwargs)
+
     def _build_filters(self):
-        # Keep positively-rated (>=4), reasonably popular (>=10 such ratings) movies that have
-        # an IMDb link (for images). On ml-latest-small this yields ~1.2k items — a snappy demo
-        # whose full poster set is cheap to download. Tune RatingMovieFilter to trade size.
-        return [RatingLowFilter(4.0), RatingMovieFilter(10), RatedMovieFilter(), LinkFilter()]
+        # Keep positively-rated (>=4), reasonably popular (>=min_ratings such ratings) movies
+        # that have an IMDb link (for images). On ml-latest-small the default (10) yields ~1.2k
+        # items — a snappy demo whose full poster set is cheap to download.
+        return [RatingLowFilter(4.0), RatingMovieFilter(getattr(self, "_min_ratings", 10)),
+                RatedMovieFilter(), LinkFilter()]
 
     @classmethod
     def name(self):
         return "MovieLens Latest Small (demo)"
+
+    @classmethod
+    def parameters(self):
+        return [
+            Parameter("min_ratings_per_movie", ParameterType.INT, 10,
+                      help="Keep only movies with at least this many positive (>=4) ratings. "
+                           "Set the same value you passed to "
+                           "`scripts/fetch_images.py --min-ratings` so the shown items match the "
+                           "pre-fetched posters. Higher = fewer, more popular items."),
+        ]
 
 
 class MLGenomeDataLoader(DataLoaderBase):
