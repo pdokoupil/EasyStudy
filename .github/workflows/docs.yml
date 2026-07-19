@@ -3,7 +3,7 @@ name: docs
 on:
   push:
     branches: [main]
-    paths: [docs/**, mkdocs.yml, .github/workflows/docs.yml]
+    paths: [docs/**, mkdocs.yml, pyproject.toml, .github/workflows/docs.yml]
   workflow_dispatch:
 
 permissions:
@@ -13,12 +13,15 @@ jobs:
   build-deploy:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
           cache: pip
-      - run: pip install mkdocs-material
+      # Install from the `docs` extra (mkdocs-material + mkdocs + mkdocstrings[python]) so the
+      # autodoc API reference (docs/api.md, via the `plugins:` block in mkdocs.yml) actually
+      # builds — installing only mkdocs-material here previously made this job fail.
+      - run: pip install -e ".[docs]"
       # Publishes the built site to the gh-pages branch. Enable Pages
       # (Settings -> Pages -> source: gh-pages) once, then this keeps it updated.
-      - run: mkdocs gh-deploy --force
+      - run: mkdocs gh-deploy --force --strict

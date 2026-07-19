@@ -18,23 +18,26 @@ python scripts/fetch_data.py --dataset all
 Files land in `server/static/datasets/<dataset>/`.
 
 ## An algorithm I expected isn't in the create-study dropdown
-Its optional dependency isn't installed. TensorFlow-based (VAE, TFRS) and LensKit algorithms need
-extras:
-```bash
-pip install "easystudy[tensorflow]"   # or [lenskit]
-```
+Its optional dependency isn't installed. RecBole, TensorFlow-based (VAE, RBM), and LensKit algorithms
+need extras — install from a clone with `uv sync --extra recbole` (or `--extra tensorflow` /
+`--extra lenskit`; pip equivalent `pip install -e ".[recbole]"`). If you're running via Docker, rebuild
+with `EASYSTUDY_EXTRAS="recbole" docker compose up --build` (the `recbole` extra needs
+`PYTHON_VERSION=3.11` too — see the README).
+
 The server log prints a line like `[loading] skipping 'plugins…' — optional dependency missing: …` for
-each skipped module. **EASE** and the popularity/multi-objective elicitations are always available in
-the lightweight core.
+each skipped module. **EASE**, **Popularity**, and **Random** are always available in the lightweight core.
 
 ## `ImportError: TFRS-based recommenders require the optional 'tensorflow' extra`
-You selected a TensorFlow-based component without the extra installed. Install
-`easystudy[tensorflow]` (or pick EASE / a non-TF method).
+You selected a TensorFlow-based component without the extra installed. Install the `tensorflow` extra
+(or pick EASE / a non-TF method).
 
-## Item images don't show up
-Fetch images (`fetch_data.py` without `--no-images`) so they exist under
-`server/static/datasets/<dataset>/img/`. Custom datasets must return valid `get_item_*_image_url(...)`
-(a `static` URL is fastest; remote `http://…` works but is slow).
+## Item images don't show up, or show a "No poster" placeholder
+For MovieLens loaders, posters are fetched from IMDb on first view and cached to
+`server/static/datasets/<dataset>/img/`; pre-fetch them all with
+`python scripts/fetch_images.py --dataset <dataset>`. A small number of items have no usable IMDb cover
+(dead/invalid URL) — those show the shared `no_poster.svg` placeholder by design, not an error.
+Custom datasets must return valid `get_item_*_image_url(...)` (a `static` URL is fastest; remote
+`http://…` works but is slow).
 
 ## Sessions reset / users logged out after restart
 Set a fixed `SECRET_KEY` (see [Deployment](deployment.md)); the default is randomized per boot.

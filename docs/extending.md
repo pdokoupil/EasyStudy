@@ -74,7 +74,10 @@ class EASE(AlgorithmBase):
 (how many to return). It must return `k` item ids, none of them filtered out.
 
 Existing wrappers (`plugins/fastcompare/algo/wrappers/`) show how to wrap LensKit and TF-Recommenders
-models — a good reference if your algorithm needs an extra.
+models — a good reference if your algorithm needs an extra. `plugins/recbole/algorithms.py` is a good
+reference for wrapping a *family* of models: it declares **one `AlgorithmBase` subclass per RecBole
+model** (BPR, LightGCN, NGCF, NeuMF, DMF) so each exposes only its own hyperparameters in the UI, sharing
+training/prediction logic via a plain (non-`AlgorithmBase`) mixin class that discovery ignores.
 
 ## Datasets
 
@@ -104,7 +107,7 @@ with `pm.emit_assets('yourPluginName', filename)` (import `pm` from `app`, and c
 
 Subclass `PreferenceElicitationBase` (implement `fit()`, the elicitation logic, `name()`,
 `parameters()`). Popularity sampling (`plugins/utils/popularity_sampling.py`) is a dependency-free
-reference; the TFRS-based method requires `easystudy[tensorflow]`.
+reference; the TFRS-based method requires the `tensorflow` extra.
 
 ## Metrics
 

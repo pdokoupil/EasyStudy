@@ -14,26 +14,22 @@ cd EasyStudy
     Datasets/images are no longer stored in git, so the clone is fast and never hits the old
     "git-LFS over data quota" error.
 
-## 2. Fetch datasets (first time only)
+## 2. Fetch a dataset (first time only)
 
-The framework ships loaders for **MovieLens** and **goodbooks-10k**; the data itself is downloaded on
-demand:
+`fetch_data.py` is pure standard-library, so it runs even before any install. Start with
+**`ml-latest-small`** — a small (~1 MB), fast MovieLens subset that's ideal for a first study:
 
-=== "Docker"
-    ```bash
-    docker compose run --rm fetch          # CSVs + item images
-    ```
-=== "Python"
-    ```bash
-    python scripts/fetch_data.py --dataset all
-    # or just one: python scripts/fetch_data.py --dataset goodbooks-10k
-    ```
+```bash
+python scripts/fetch_data.py --dataset ml-latest-small
+```
 
-This populates `server/static/datasets/{ml-latest,goodbooks-10k}/`.
+This populates `server/static/datasets/ml-latest-small/`. Other options:
+`goodbooks-10k`, `ml-latest` (the full, much larger MovieLens dump), or `all`.
 
-!!! tip "Faster first run"
-    MovieLens `ml-latest` is large. To try things quickly, fetch only goodbooks:
-    `python scripts/fetch_data.py --dataset goodbooks-10k`.
+!!! tip "Pre-fetch item posters (optional)"
+    Posters are fetched from IMDb and cached to disk the first time each item is shown. To avoid that
+    first-view delay, pre-fetch them all up front (~1 minute for `ml-latest-small`):
+    `python scripts/fetch_images.py --dataset ml-latest-small`
 
 ## 3. Start the server
 
@@ -41,24 +37,29 @@ This populates `server/static/datasets/{ml-latest,goodbooks-10k}/`.
     ```bash
     docker compose up --build
     ```
+    Open **<http://localhost:8000>**. To unlock more algorithms (RecBole, TensorFlow, LensKit), rebuild
+    with extras — see the [README Quickstart](https://github.com/pdokoupil/EasyStudy#quickstart-docker-recommended).
 === "Python (uv, recommended)"
     ```bash
     uv sync --extra dev                    # creates .venv from uv.lock (core + dev tools)
     cd server && uv run flask --debug run
     ```
+    Open **<http://localhost:5000>**.
 === "Python (pip)"
     ```bash
     python -m venv .venv && source .venv/bin/activate
     pip install -e ".[dev]"                # lightweight core + dev tools
     cd server && flask --debug run
     ```
-
-Open **http://localhost:5000**.
+    Open **<http://localhost:5000>**.
 
 ## 4. Create an administrator account
 
-On first run there are no users. Go to **`/signup`**, create an account, then log in at **`/login`**.
-You land on the **administration** page, which lists study templates (plugins) and existing studies.
+The root URL redirects straight to the administration UI, which redirects to `/login` if you're not
+signed in yet. Either:
+
+- click **Sign up** and create an account through the web form, or
+- (Docker) run `docker compose exec app flask create-user you@example.com yourpassword`.
 
 ## 5. Create a study with `fastcompare`
 
@@ -66,18 +67,17 @@ You land on the **administration** page, which lists study templates (plugins) a
 
 1. Click **Create** on the *fastcompare* plugin.
 2. Fill the form (every field has a `?` help tooltip):
-   - **Data loader** — e.g. *Goodbooks-10k dataset*.
+   - **Data loader** — e.g. *MovieLens Latest Small (demo)*.
    - **Preference elicitation** — e.g. *Popularity Sampling* (works in the lightweight core).
-   - **Algorithms** — pick 2–3, e.g. **EASE** and a baseline. Algorithm parameters appear as
+   - **Algorithms** — pick 2–3, e.g. **EASE** and **Popularity**. Algorithm parameters appear as
      editable fields automatically.
    - Recommendation size, number of iterations, layout, prompts, optional Prolific code.
 3. Submit. The study **initializes in the background** (training the algorithms); when done it becomes
    **active** and you get a **join URL**.
 
 !!! note "Lightweight core"
-    With just `pip install easystudy` (no extras), TensorFlow/LensKit algorithms won't appear —
-    **EASE** and the popularity/multi-objective elicitations are available out of the box. Install
-    `easystudy[tensorflow]` or `[lenskit]` to unlock the rest.
+    With just the core install (no extras), only **EASE**, **Popularity**, and **Random** appear.
+    Install `easystudy[recbole]` / `[tensorflow]` / `[lenskit]` to unlock more algorithms.
 
 ## 6. Take the study as a participant
 

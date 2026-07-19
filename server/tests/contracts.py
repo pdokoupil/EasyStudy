@@ -4,8 +4,8 @@ Students/researchers writing a custom **algorithm**, **data loader**, **preferen
 elicitation** or **evaluation metric** shouldn't have to spin up the web UI to know their
 component behaves. This module provides:
 
-* :class:`TinyDataLoader` — a fully in-memory, download-free ``DataLoaderBase`` (6 users x
-  8 items) you can fit any algorithm against in milliseconds; and
+* :class:`TinyDataLoader` — a fully in-memory, download-free ``DataLoaderBase`` (30 users x
+  50 items) you can fit any algorithm against in milliseconds; and
 * ``assert_*_contract`` helpers that check a component honours the base-class contract.
 
 Use them from your own ``pytest`` file — see ``docs/testing-components.md``. Example::

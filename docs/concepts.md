@@ -64,13 +64,16 @@ dependency** (e.g. TensorFlow) isn't installed are skipped, so the lightweight c
 
 ## Lightweight core vs extras
 
-`pip install easystudy` gives a small pure-Python install. Heavy backends are opt-in:
+EasyStudy isn't on PyPI yet — install from a clone (`uv sync`, or `pip install -e .`). Either way you get
+a small, pure-Python install by default; heavy backends are opt-in extras:
 
 ```bash
-pip install "easystudy[tensorflow]"   # VAE / TF-Recommenders algorithms
-pip install "easystudy[lenskit]"      # LensKit baselines
-pip install "easystudy[redis]"        # redis-backed sessions
+uv sync --extra recbole        # RecBole model zoo (BPR, LightGCN, NGCF, NeuMF, DMF)
+uv sync --extra tensorflow     # VAE / RBM / TF-Recommenders algorithms
+uv sync --extra lenskit        # LensKit baselines
+uv sync --extra redis          # redis-backed sessions
 ```
+(or `pip install -e ".[recbole]"`, etc.)
 
 An algorithm whose extra is missing simply won't appear in the study-creation UI.
 

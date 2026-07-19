@@ -8,34 +8,37 @@ researchers, students, and practitioners.
   methods**, or **evaluation metrics** — see the "Development" section of the [README](README.md).
 - **Bug fixes and core improvements.**
 - **Docs and tutorials.**
-- **Student projects** — see [`04_STUDENT_CONTRIBUTIONS.md`](https://github.com/pdokoupil/EasyStudy)
-  (planning docs) for well-scoped tasks.
 
 ## Development setup
 ```bash
 git clone https://github.com/pdokoupil/EasyStudy.git
 cd EasyStudy
-python -m venv .venv && source .venv/bin/activate
-pip install -e ".[dev]"            # lightweight core + dev tools
+uv sync --extra dev                # lightweight core + dev tools (creates .venv from uv.lock)
 # optional heavy backends:
-# pip install -e ".[tensorflow]"   # VAE / TFRS algorithms
-# pip install -e ".[lenskit]"      # LensKit wrappers
-python scripts/fetch_data.py --dataset all   # download datasets + images
-cd server && flask --debug run
+# uv sync --extra recbole          # RecBole model zoo (BPR, LightGCN, NGCF, NeuMF, DMF)
+# uv sync --extra tensorflow       # VAE / RBM / TF-Recommenders algorithms
+# uv sync --extra lenskit          # LensKit wrappers
+python scripts/fetch_data.py --dataset ml-latest-small   # small, fast demo dataset
+cd server && uv run flask --debug run
 ```
+No [uv](https://docs.astral.sh/uv/)? `python -m venv .venv && source .venv/bin/activate && pip install -e ".[dev]"` works too.
 See the [README](README.md) for the Docker / `docker compose up` path.
 
 ## Branch model
 - `main` is the canonical, most up-to-date branch — target your PRs here unless told otherwise.
-- Study-specific branches (`feature/journal`, `feature/grs2024`, `ndbi021`, …) hold the plugins
-  used for individual papers/courses; they are kept for reference. **Core fixes belong on `main`.**
+- `ndbi021` is the actively-maintained lightweight branch used for teaching (fewer dependencies);
+  core fixes generally land on both.
+- Other study-specific branches (`feature/journal`, `feature/grs2024`, …) hold the plugins used
+  for individual papers and are kept for reference only.
 
 ## Pull request checklist
 - [ ] Code is formatted (`black .`) and lint-clean (`ruff check .`).
-- [ ] Tests pass (`cd server && pytest`), and new behavior has a test.
+- [ ] Tests pass (`cd server && uv run pytest`), and new behavior has a test.
 - [ ] If you changed models, you added a migration (`flask db migrate`).
 - [ ] Docs/README updated if you changed user-facing behavior.
 - [ ] New heavy dependencies go behind an extra in `pyproject.toml`, not into core.
+- [ ] If you changed dependencies, `uv.lock` is regenerated (`uv lock`) and committed — CI fails
+  otherwise (`uv lock --check`).
 
 ## Reporting bugs
 Open an issue using the bug template. Include your OS, Python version, install extras, and steps to

@@ -12,15 +12,17 @@ From Administration, click **Create** under *fastcompare*. You get a parameter f
 `?` help tooltip.
 
 ## Step 2 — choose data & elicitation
-- **Data loader** — the domain/dataset participants will see (e.g. *Goodbooks-10k*, *Filtered ML-25M*).
+- **Data loader** — the domain/dataset participants will see (e.g. *MovieLens Latest Small (demo)* for a
+  quick first try, or *Goodbooks-10k*, *Filtered ML-25M*).
 - **Preference elicitation** — how you gather initial signal to personalize. *Popularity Sampling*
   works in the lightweight core and needs no extras.
 
 ## Step 3 — choose algorithms to compare
 - Pick **2–3 algorithms** (e.g. **EASE** + a baseline). Their **parameters appear as editable fields**
   automatically (this is the annotation-driven UI — e.g. EASE exposes `l2` and `positive_threshold`).
-- Only algorithms whose dependencies are installed appear. Install `easystudy[tensorflow]` /
-  `[lenskit]` to unlock more.
+- Only algorithms whose dependencies are installed appear. Install the `recbole` / `tensorflow` /
+  `lenskit` extra (`uv sync --extra recbole`, etc. — see [Concepts](concepts.md#lightweight-core-vs-extras))
+  to unlock more.
 
 ## Step 4 — configure the flow
 - **Recommendation size (K)** — items shown per algorithm per round.

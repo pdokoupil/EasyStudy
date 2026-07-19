@@ -1,5 +1,9 @@
 site_name: EasyStudy
-site_description: A modular framework for quick & easy deployment of customizable user studies.
+site_description: >-
+  EasyStudy is an open-source, plugin-based framework for deploying customizable user studies on
+  recommender systems (and beyond). Create A/B comparisons of recommendation algorithms in a few
+  clicks, or extend it via Python plugins for any item-based interactive experiment — HCI,
+  information retrieval, data visualization, and social science research.
 site_url: https://pdokoupil.github.io/EasyStudy/
 repo_url: https://github.com/pdokoupil/EasyStudy
 repo_name: pdokoupil/EasyStudy

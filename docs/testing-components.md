@@ -6,7 +6,7 @@ You should be able to know your custom **algorithm**, **data loader**, **prefere
 
 It gives you two things:
 
-- **`TinyDataLoader`** — a fully in-memory `DataLoaderBase` (6 users × 8 items, no files, no network) you
+- **`TinyDataLoader`** — a fully in-memory `DataLoaderBase` (30 users × 50 items, no files, no network) you
   can fit any algorithm against in milliseconds.
 - **`assert_*_contract` helpers** — one call that checks your component honours its base-class contract.
 
@@ -76,3 +76,12 @@ you haven't run `python scripts/fetch_data.py --dataset ml-latest`.
 !!! tip "Add your parameter combinations"
     `test_algorithm.py` has a `tested_algorithm_combinations` list — drop your `(AlgorithmClass, params)`
     there to also exercise it against real data once you're happy with the tiny-dataset contract.
+
+## End-to-end study-creation coverage
+
+[`server/tests/test_creation.py`](https://github.com/pdokoupil/EasyStudy/blob/main/server/tests/test_creation.py)
+exercises everything a study creation actually triggers, on `TinyDataLoader`: building the data loader,
+then **fit + predict** for every shipped algorithm and **fit + get_initial_data** for every shipped
+elicitation, using each component's own declared parameter defaults — so a new algorithm or elicitation
+is covered automatically without editing the test. RecBole models are included too, gated behind
+`pytest.mark.skipif` so they only run when the `recbole` extra is installed.

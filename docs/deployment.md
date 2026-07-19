@@ -10,19 +10,21 @@ EasyStudy is a Flask app. Configuration is entirely via environment variables (s
 | `DATABASE_URL` | `sqlite:///db.sqlite` | Use Postgres for real deployments, e.g. `postgresql+psycopg://user:pass@host/db`. |
 | `SESSION_TYPE` | `sqlalchemy` | `redis` (+ `REDIS_URL`) for a shared, faster session store. |
 | `REDIS_URL` | unset | Only needed if `SESSION_TYPE=redis`. |
-| `PORT` | `5000` | HTTP port. |
+| `PORT` | `8000` (Docker) | Host-side port for `docker compose up`; the container always listens on 8000 internally. |
 | `GUNICORN_WORKERS` | `1` | **Keep at 1** unless you've done the shared-state rework (see note). |
 | `GUNICORN_TIMEOUT` | `0` | Gunicorn worker timeout (seconds). |
-| `EASYSTUDY_EXTRAS` | empty | Build-time: heavy extras baked into the Docker image (`tensorflow,lenskit`). |
+| `EASYSTUDY_EXTRAS` | empty | Build-time: heavy extras baked into the Docker image (`recbole`, `tensorflow`, `lenskit`, …). |
+| `PYTHON_VERSION` | `3.12` | Build-time: the `recbole` extra needs an older wheel-only dependency, so build it on `3.11`. |
 
 ## Docker (recommended)
 
 ```bash
 docker compose run --rm fetch      # first run: fetch datasets
-docker compose up --build          # http://localhost:5000
+docker compose up --build          # http://localhost:8000
 ```
 
-- Include heavy backends: `EASYSTUDY_EXTRAS="tensorflow,lenskit" docker compose up --build`.
+- Include heavy backends: `EASYSTUDY_EXTRAS="recbole" docker compose up --build` (needs
+  `PYTHON_VERSION=3.11` too), or `EASYSTUDY_EXTRAS="tensorflow,lenskit"`.
 - Redis sessions: `docker compose --profile redis up` and set `SESSION_TYPE=redis`,
   `REDIS_URL=redis://redis:6379`.
 
@@ -31,9 +33,9 @@ Put a reverse proxy (nginx/Caddy/Traefik) in front for TLS.
 ## From source (uWSGI/Gunicorn)
 
 ```bash
-pip install ".[tensorflow]"        # or just "." for the lightweight core
+uv sync --extra tensorflow         # or just `uv sync` for the lightweight core
 cd server
-gunicorn -w 1 --bind 0.0.0.0:5000 "app:create_app()"
+uv run gunicorn -w 1 --bind 0.0.0.0:5000 "app:create_app()"
 ```
 
 !!! warning "Concurrency & the single worker"

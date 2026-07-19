@@ -20,8 +20,8 @@ while complex designs stay fully programmable via **plugins**.
   *questions*, EasyStudy fits.
 - **Extensible by design.** Add datasets, algorithms, elicitation methods, metrics, or whole study flows
   by subclassing a base class or dropping in a plugin.
-- **Lightweight core.** `pip install easystudy` pulls a small pure-Python stack; heavy backends
-  (TensorFlow, LensKit) are opt-in extras.
+- **Lightweight core.** `uv sync` (or `pip install -e .` from a clone — not yet on PyPI) pulls a small
+  pure-Python stack; heavy backends (RecBole, TensorFlow, LensKit) are opt-in extras.
 
 ## Where to go next
 

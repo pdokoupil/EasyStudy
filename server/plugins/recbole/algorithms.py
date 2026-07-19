@@ -19,6 +19,7 @@ pseudo-user profile as the mean of the selected items' learned embeddings and ra
 by similarity to it — a standard, model-agnostic cold-start approximation.
 """
 import os
+import shutil
 import tempfile
 
 import numpy as np
@@ -127,13 +128,23 @@ class _RecBoleAlgorithm:
         config = Config(model=self.MODEL, dataset=name, config_dict=config_dict)
         init_seed(config["seed"], config["reproducibility"])
 
-        dataset = create_dataset(config)
-        train_data, _valid_data, _test_data = data_preparation(config, dataset)
+        # RecBole writes several artifacts (log/, log_tensorboard/, saved/) to *relative* paths
+        # under the process's current working directory, regardless of `checkpoint_dir` — so
+        # without this they'd pollute wherever the app happens to be run from. Redirect into our
+        # own tmpdir (which we remove afterward) instead.
+        prev_cwd = os.getcwd()
+        os.chdir(tmpdir)
+        try:
+            dataset = create_dataset(config)
+            train_data, _valid_data, _test_data = data_preparation(config, dataset)
 
-        train_dataset = getattr(train_data, "dataset", None) or getattr(train_data, "_dataset")
-        model = get_model(config["model"])(config, train_dataset).to(config["device"])
-        trainer = get_trainer(config["MODEL_TYPE"], config["model"])(config, model)
-        trainer.fit(train_data, valid_data=None, saved=False, show_progress=False)
+            train_dataset = getattr(train_data, "dataset", None) or getattr(train_data, "_dataset")
+            model = get_model(config["model"])(config, train_dataset).to(config["device"])
+            trainer = get_trainer(config["MODEL_TYPE"], config["model"])(config, model)
+            trainer.fit(train_data, valid_data=None, saved=False, show_progress=False)
+        finally:
+            os.chdir(prev_cwd)
+            shutil.rmtree(tmpdir, ignore_errors=True)
 
         self._model = model.eval()
         self._dataset = dataset

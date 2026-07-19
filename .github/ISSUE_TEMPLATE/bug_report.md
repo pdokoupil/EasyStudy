@@ -17,8 +17,8 @@ What you expected to happen.
 **Environment**
 - OS:
 - Python version:
-- Install method: [ ] `pip install easystudy[...]`  [ ] Docker / docker compose  [ ] from source
-- Extras installed (tensorflow / lenskit / redis / …):
+- Install method: [ ] Docker / docker compose  [ ] from source (`uv sync`)  [ ] from source (`pip install -e .`)
+- Extras installed (recbole / tensorflow / lenskit / redis / …):
 - Branch / commit:
 
 **Logs / traceback**
