@@ -16,6 +16,7 @@ lookup fails, these helpers degrade gracefully (empty cover / safe defaults).
 """
 from __future__ import annotations
 
+import concurrent.futures
 import os
 import re
 
@@ -25,6 +26,15 @@ _warned = False
 # re-hit the network. Keyed by (imdb_id, width) for covers and imdb_id for subsets.
 _cover_cache: dict = {}
 _subset_cache: dict = {}
+
+# imdbinfo's get_movie() takes no timeout argument, and internally makes a plain
+# `niquests.get(url, ...)` call with none set either — a slow/hung response (IMDb's WAF, a
+# network hiccup) blocks forever with nothing to stop it except gunicorn's own worker-timeout
+# SIGKILL, which takes down the whole request (and, with the default single worker, the app)
+# with it. Running the call in a bounded thread means a hang just times out here instead —
+# same graceful-degradation-to-None this module already does for every other failure mode.
+_IMDB_TIMEOUT_S = float(os.environ.get("IMDB_REQUEST_TIMEOUT", "8"))
+_executor = concurrent.futures.ThreadPoolExecutor(max_workers=4, thread_name_prefix="imdb-fetch")
 
 
 def _resize_amazon(url: str, width: int) -> str:
@@ -61,7 +71,12 @@ def _get_movie(imdb_id):
             _warned = True
         return None
     try:
-        return get_movie(f"tt{int(imdb_id):07d}")
+        future = _executor.submit(get_movie, f"tt{int(imdb_id):07d}")
+        return future.result(timeout=_IMDB_TIMEOUT_S)
+    except concurrent.futures.TimeoutError:
+        print(f"[imdb_client] imdbinfo lookup timed out after {_IMDB_TIMEOUT_S}s for "
+              f"imdbId={imdb_id} — giving up on this cover/metadata for now")
+        return None
     except Exception as e:  # network error, not found, IMDb layout change, …
         print(f"[imdb_client] imdbinfo lookup failed for imdbId={imdb_id}: {e}")
         return None

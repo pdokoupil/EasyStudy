@@ -68,11 +68,17 @@ def _cmd_serve(args):
         # gunicorn import `app:create_app()` from the vendored server dir; EASYSTUDY_DATA_ROOT
         # / DATABASE_URL (set above as absolute paths) still point at the original CWD
         # regardless of gunicorn's own chdir, so datasets/DB still land in the user's project.
+        #
+        # --timeout defaults to 0 (disabled), matching server/Dockerfile's gunicorn CMD exactly
+        # — some in-request work is genuinely slow but not stuck (e.g. fetching an IMDb poster
+        # on a cache miss), and gunicorn's own default 30s timeout SIGKILLs the worker mid
+        # request for that, not just for actually-hung ones.
         import subprocess
         cmd = [
             "gunicorn",
             "--workers", str(args.workers),
             "--bind", f"{args.host}:{args.port}",
+            "--timeout", str(args.timeout),
             "--chdir", server_dir(),
             "app:create_app()",
         ]
@@ -133,6 +139,10 @@ def main(argv=None):
                           help="gunicorn workers for --prod (default 1 — the app keeps some "
                                "per-process state, so more workers needs the shared-state "
                                "rework described in docs/deployment.md first)")
+    p_serve.add_argument("--timeout", type=int, default=0,
+                          help="gunicorn worker timeout in seconds for --prod, 0 = disabled "
+                               "(default — matches Docker; some in-request work, like an "
+                               "IMDb poster fetch on a cache miss, is slow but not stuck)")
     p_serve.set_defaults(func=_cmd_serve)
 
     # Listed here only so they show up in --help; actually handled above.
