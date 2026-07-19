@@ -25,6 +25,5 @@ interactions are stored:
 
 ## Prefer to run it yourself?
 
-It's a two-command start — see the **[Quickstart](quickstart.md)** — or open the repository directly in
-a cloud dev container with the "Open in GitHub Codespaces" button in the
-[README](https://github.com/pdokoupil/EasyStudy#quickstart-docker-recommended).
+See the **[Quickstart](quickstart.md)** — a handful of commands with `pip` or `uv`, or `docker compose up`
+if you'd rather not install any Python locally.

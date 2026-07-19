@@ -41,69 +41,109 @@ where it's useful (labs, courses, companies) and what to improve:
 - 💬 Share feedback, ask questions, or say hi in [GitHub Discussions](https://github.com/pdokoupil/EasyStudy/discussions).
 - ✉️ Or email <patrik.dokoupil@matfyz.cuni.cz>.
 
-## Quickstart (Docker, recommended)
+## Quickstart
 
-> **No local setup?** The badge below opens a free, temporary browser-based VS Code (GitHub Codespaces)
-> with the lightweight Python environment already installed and a small demo dataset fetched. Once it's
-> ready, run `cd server && flask --debug run` in its terminal and open the forwarded port.
->
-> [![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/pdokoupil/EasyStudy?quickstart=1)
+Not on PyPI yet, so install from a clone — the core install is deliberately lightweight (Flask +
+pandas/numpy/scikit-learn); heavy backends live behind extras so nobody installs TensorFlow or
+PyTorch just to run a books-vs-movies study:
 
 ```bash
 git clone https://github.com/pdokoupil/EasyStudy.git
 cd EasyStudy
-python scripts/fetch_data.py --dataset ml-latest-small   # small, fast demo dataset (~1MB of CSVs)
-docker compose up --build                                # http://localhost:8000
+pip install -e ".[dev]"                             # lightweight core + dev tools
+easystudy fetch-data --dataset ml-latest-small       # small, fast demo dataset (~1 MB of CSVs)
+easystudy create-user you@example.com yourpassword
+easystudy serve --debug                              # http://localhost:8000
 ```
 
-Open **http://localhost:8000** — it redirects straight to the administration UI. Create an account at
-`/signup` (or run `docker compose exec app flask create-user you@example.com yourpassword`), log in, and
-create a study.
+Open **http://localhost:8000**, log in with the account you just created, and create a study from
+the *fastcompare* template. `easystudy fetch-data`/`create-user`/`serve` all use whichever directory
+you run them from for the dataset/DB — no need to `cd` into `server/`.
 
-Item posters are fetched from IMDb on first view and cached to disk; to pre-fetch them all up front
-(so the first study has no delay), run `python scripts/fetch_images.py --dataset ml-latest-small`.
+`easystudy serve` uses Flask's own dev server (single-process, auto-reloads with `--debug`) —
+good for trying things out, not for a real deployment. Gunicorn (same server Docker below uses)
+is already installed alongside the core package; run `easystudy serve --prod` to use it directly,
+no Docker required.
 
-By default only the lightweight-core algorithms appear (**EASE**, **Popularity**, **Random**). To unlock
-more — RecBole's model zoo, TensorFlow-based VAE/RBM, or LensKit baselines — rebuild with extras:
+Item posters are fetched from IMDb on first view and cached to disk; to pre-fetch them all up front,
+run `easystudy fetch-images --dataset ml-latest-small`.
+
+By default only the lightweight-core algorithms appear (**EASE**, **Popularity**, **Random**).
+Install an extra to unlock more:
 ```bash
-EASYSTUDY_EXTRAS="recbole" docker compose up --build       # BPR, LightGCN, NGCF, NeuMF, DMF
-# the `recbole` extra needs a dependency with no Python 3.12 wheel yet, so build it on 3.11:
-PYTHON_VERSION=3.11 EASYSTUDY_EXTRAS="recbole" docker compose up --build
+pip install -e ".[recbole]"       # RecBole model zoo: BPR, LightGCN, NGCF, NeuMF, DMF
+pip install -e ".[tensorflow]"    # VAE, RBM
+pip install -e ".[lenskit]"       # ItemKNN, UserKNN, ImplicitMF
+pip install -e ".[all]"           # everything
 ```
+> The `recbole` extra pulls a dependency with no Python 3.12+ wheels yet — use Python 3.10 or 3.11
+> for that one (`python3.11 -m venv .venv && ...`).
 
-<details>
-<summary><b>Run from source (for development)</b></summary>
-
-```bash
-uv sync --extra dev                    # creates .venv from uv.lock (core + dev tools)
-python scripts/fetch_data.py --dataset ml-latest-small
-cd server && uv run flask --debug run  # http://localhost:5000
-```
-No [uv](https://docs.astral.sh/uv/)? `python -m venv .venv && source .venv/bin/activate && pip install -e ".[dev]"` works too.
-</details>
-
-## Installation & dependency extras
-
-EasyStudy isn't published on PyPI yet — install from a clone. The **core install is deliberately
-lightweight** (Flask + pandas/numpy/scikit-learn). Heavy or optional backends live behind extras —
-nobody installs TensorFlow or PyTorch to run a books-vs-movies study:
-
-```bash
-uv sync                        # lightweight core (default)
-uv sync --extra recbole        # + RecBole model zoo (BPR, LightGCN, NGCF, NeuMF, DMF)
-uv sync --extra tensorflow     # + TensorFlow / TF-Recommenders algorithms (VAE, RBM)
-uv sync --extra lenskit        # + LensKit baseline wrappers
-uv sync --extra redis          # + redis-backed sessions
-uv sync --extra all            # everything
-```
-(Or the pip equivalent: `pip install -e ".[recbole]"`, etc.)
+Once published, all of the above becomes clone-free: `pip install "easystudy[recbole]"`.
 
 Configuration is via environment variables (see [`.env.example`](.env.example)): `SECRET_KEY`,
 `DATABASE_URL` (SQLite by default, Postgres for scale), `SESSION_TYPE`/`REDIS_URL`, `PORT`.
 
+### Also works with `uv`
+
+This repo is itself developed with [uv](https://docs.astral.sh/uv/) — `uv sync` (backed by the
+committed `uv.lock`) is what our own CI uses. It's a drop-in, much faster alternative to pip + venv,
+and does a couple of things pip doesn't:
+- **Speed** — dependency resolution/installs are typically 10–100× faster.
+- **One lockfile** — `uv.lock` pins exact versions across *every* extra, resolved together; there's
+  no equivalent to that with plain pip.
+- **Manages Python itself** — `uv venv --python 3.11` downloads that Python for you if you don't
+  have it (handy for the `recbole` extra above); plain pip just uses whichever Python is already active.
+
+```bash
+git clone https://github.com/pdokoupil/EasyStudy.git
+cd EasyStudy
+uv sync --extra dev                              # creates .venv from uv.lock
+uv run easystudy fetch-data --dataset ml-latest-small
+uv run easystudy create-user you@example.com yourpassword
+uv run easystudy serve --debug
+```
+Extras work the same way: `uv sync --extra recbole`, etc.
+
+### Docker
+
+Useful if you'd rather not install any Python locally, or want something closer to a real
+deployment (gunicorn, optional redis-backed sessions):
+
+```bash
+git clone https://github.com/pdokoupil/EasyStudy.git
+cd EasyStudy
+python scripts/fetch_data.py --dataset ml-latest-small
+docker compose up --build                          # http://localhost:8000
+```
+Create an account at `/signup`, or `docker compose exec app flask create-user you@example.com yourpassword`.
+
+To unlock more algorithms, rebuild with extras (same Python 3.11 caveat for `recbole` applies):
+```bash
+EASYSTUDY_EXTRAS="recbole" docker compose up --build
+PYTHON_VERSION=3.11 EASYSTUDY_EXTRAS="recbole" docker compose up --build
+```
+
+### pip/uv vs. Docker — what actually differs
+
+All three paths run the identical app; they only differ in *how much Docker sets up for you*:
+
+| | `easystudy serve` | `easystudy serve --prod` | Docker |
+|---|---|---|---|
+| WSGI server | Flask dev server (not for production) | gunicorn | gunicorn |
+| Redis-backed sessions | run your own `redis-server` + set `SESSION_TYPE`/`REDIS_URL` | same | `docker compose --profile redis up` starts one for you |
+| Heavy extras | `pip install -e ".[recbole]"` / `uv sync --extra recbole` | same | `EASYSTUDY_EXTRAS=recbole` build arg |
+| Default port | 8000 (`--port` to change) | 8000 | 8000 (`PORT` env var to change) |
+
+Gunicorn is a core dependency either way — Docker doesn't add capability, it just automates
+the setup (and gives you an isolated container). Redis works identically regardless of how you
+installed EasyStudy; it's just an environment-variable switch.
+
 ## Datasets
 
-Datasets and item images are **fetched on demand** (they are intentionally not committed to git):
+Datasets and item images are **fetched on demand** (they are intentionally not committed to git). Use
+`python scripts/fetch_data.py` before installing anything (it's stdlib-only), or `easystudy fetch-data`
+after `pip install`/`uv sync` — same script either way:
 
 ```bash
 python scripts/fetch_data.py --dataset ml-latest-small   # small, fast demo (recommended first try)

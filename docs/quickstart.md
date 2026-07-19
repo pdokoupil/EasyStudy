@@ -1,7 +1,7 @@
 # Quickstart (15 minutes)
 
 Goal: clone EasyStudy, start it, create a study comparing two recommenders from the web UI, join it as a
-participant, and find your collected data. You need only **Docker** (recommended) or **Python 3.10+**.
+participant, and find your collected data. You need **Python 3.10+** (with `pip` or `uv`) or **Docker**.
 
 ## 1. Get the code
 
@@ -31,35 +31,46 @@ This populates `server/static/datasets/ml-latest-small/`. Other options:
     first-view delay, pre-fetch them all up front (~1 minute for `ml-latest-small`):
     `python scripts/fetch_images.py --dataset ml-latest-small`
 
-## 3. Start the server
+## 3. Install & start the server
 
+=== "pip"
+    ```bash
+    pip install -e ".[dev]"                # lightweight core + dev tools
+    easystudy create-user you@example.com yourpassword
+    easystudy serve --debug
+    ```
+    Open **<http://localhost:8000>**. `easystudy` commands use whichever directory you run them from
+    for the dataset/DB, so no need to `cd server`.
+
+    `--debug` runs Flask's own dev server — fine for trying things out, not for a real deployment.
+    Gunicorn is already installed alongside the core package; `easystudy serve --prod` uses it
+    directly (same server Docker below runs), no Docker required.
+=== "uv"
+    ```bash
+    uv sync --extra dev                    # creates .venv from uv.lock
+    uv run easystudy create-user you@example.com yourpassword
+    uv run easystudy serve --debug
+    ```
+    Open **<http://localhost:8000>**. See the [README](https://github.com/pdokoupil/EasyStudy#also-works-with-uv)
+    for why this repo itself is developed with uv.
 === "Docker"
     ```bash
     docker compose up --build
+    docker compose exec app flask create-user you@example.com yourpassword
     ```
     Open **<http://localhost:8000>**. To unlock more algorithms (RecBole, TensorFlow, LensKit), rebuild
-    with extras — see the [README Quickstart](https://github.com/pdokoupil/EasyStudy#quickstart-docker-recommended).
-=== "Python (uv, recommended)"
-    ```bash
-    uv sync --extra dev                    # creates .venv from uv.lock (core + dev tools)
-    cd server && uv run flask --debug run
-    ```
-    Open **<http://localhost:5000>**.
-=== "Python (pip)"
-    ```bash
-    python -m venv .venv && source .venv/bin/activate
-    pip install -e ".[dev]"                # lightweight core + dev tools
-    cd server && flask --debug run
-    ```
-    Open **<http://localhost:5000>**.
+    with extras — see the [README Quickstart](https://github.com/pdokoupil/EasyStudy#quickstart).
 
-## 4. Create an administrator account
+Not sure which of the three to pick? See the
+[pip/uv vs. Docker comparison](https://github.com/pdokoupil/EasyStudy#pipuv-vs-docker--what-actually-differs)
+in the README — short version: they run the identical app, Docker just automates the setup
+(gunicorn, redis) that pip/uv leave to you.
+
+## 4. Log in
 
 The root URL redirects straight to the administration UI, which redirects to `/login` if you're not
-signed in yet. Either:
-
-- click **Sign up** and create an account through the web form, or
-- (Docker) run `docker compose exec app flask create-user you@example.com yourpassword`.
+signed in yet — log in with the account you just created above. (You can also self-register through the
+web form at `/signup` instead of `create-user`, if you prefer.)
 
 ## 5. Create a study with `fastcompare`
 
@@ -77,7 +88,8 @@ signed in yet. Either:
 
 !!! note "Lightweight core"
     With just the core install (no extras), only **EASE**, **Popularity**, and **Random** appear.
-    Install `easystudy[recbole]` / `[tensorflow]` / `[lenskit]` to unlock more algorithms.
+    Install the `recbole` / `tensorflow` / `lenskit` extra (`pip install -e ".[recbole]"` or
+    `uv sync --extra recbole`) to unlock more.
 
 ## 6. Take the study as a participant
 
