@@ -27,23 +27,7 @@ shows people *items*, records how they *interact*, and asks them *questions*, Ea
 ## Who is this for?
 
 - **RS / IR / HCI researchers** who want user studies without rebuilding UI, tracking, and elicitation each time.
-- **Non-CS researchers** (social science, education, journalism) who have outgrown Google Forms and want
-  personalized or interactive stimuli — increasingly with **no code** (see the roadmap).
 - **Instructors & students** — try algorithms live, or implement and evaluate an extension in a single plugin.
-
-## How EasyStudy compares
-
-| | EasyStudy | Informfully | CARE | POPROX | Google Forms |
-|---|:--:|:--:|:--:|:--:|:--:|
-| Open-source & self-hostable | ✅ | ✅ | ✅ | ✅ | ❌ |
-| **Ships algorithms + datasets + preference elicitation** | ✅ | ❌ (bring your own RS) | ❌ | ✅ | ❌ |
-| Create a study with **no external RS needed** | ✅ | ❌ | ➖ | ➖ | ✅ |
-| Reusable **study-flow** components / plugins | ✅ | ✅ | ➖ | ➖ | ❌ |
-| Built-in questionnaires | ✅ | ✅ | ➖ (external) | ➖ | ✅ |
-| Multi-modal (audio/video) · mobile app · longitudinal field studies | 🔜 | ✅ | ❌ | ✅ | ❌ |
-
-EasyStudy's niche: the only tool that is **self-contained (batteries included)**, **fully open/self-hostable**,
-*and* built around **reusable study-flow components**.
 
 ## Used in research
 
@@ -171,7 +155,7 @@ If you use EasyStudy in your research, please cite the RecSys'23 paper (see [CIT
 ```bibtex
 @inproceedings{dokoupil2023easystudy,
   title     = {EasyStudy: Framework for Easy Deployment of User Studies on Recommender Systems},
-  author    = {Dokoupil, Patrik and Peska, Ladislav and Boratto, Ludovico},
+  author    = {Dokoupil, Patrik and Peska, Ladislav},
   booktitle = {Proceedings of the 17th ACM Conference on Recommender Systems (RecSys '23)},
   pages     = {1196--1199},
   year      = {2023},
