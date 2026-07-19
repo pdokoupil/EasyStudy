@@ -39,6 +39,15 @@ For MovieLens loaders, posters are fetched from IMDb on first view and cached to
 Custom datasets must return valid `get_item_*_image_url(...)` (a `static` URL is fastest; remote
 `http://…` works but is slow).
 
+## Pre-fetched images/data don't seem to be used — everything is slow, like it's fetching live
+You likely ran `python scripts/fetch_data.py`/`fetch_images.py` directly in the same checkout
+directory where you also use `easystudy serve`. The raw scripts always write to
+`server/static/datasets`; the CLI instead redirects data to your *current directory*, a
+different location — so `easystudy serve` never sees what the raw scripts fetched, and
+re-fetches everything live (slowly) instead. `easystudy serve`/`create-user`/etc. print a
+warning when this situation is detected. Fix: use `easystudy fetch-data`/`easystudy
+fetch-images` instead of the raw scripts once you're using the CLI from that directory.
+
 ## Sessions reset / users logged out after restart
 Set a fixed `SECRET_KEY` (see [Deployment](deployment.md)); the default is randomized per boot.
 
