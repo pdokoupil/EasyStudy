@@ -74,6 +74,10 @@ def main(argv=None):
     p.add_argument("--workers", type=int, default=8, help="parallel downloads (default 8)")
     p.add_argument("--width", type=int, default=200, help="poster width in px to request/save")
     p.add_argument("--limit", type=int, default=0, help="only the first N movies (0 = all)")
+    p.add_argument("--min-ratings", type=int, default=0,
+                   help="only movies with >= this many positive (>=4) ratings — matches the "
+                        "'MovieLens Latest Small (demo)' loader with --min-ratings 10 (~1.2k). "
+                        "0 = every movie in links.csv (~9.7k for ml-latest-small).")
     args = p.parse_args(argv)
 
     ds_dir = os.path.normpath(os.path.join(DATASETS_DIR, args.dataset))
@@ -89,17 +93,36 @@ def main(argv=None):
         sys.exit(f"imdbinfo unavailable ({e}); install with: pip install imdbinfo   (or run "
                  f"this inside the container: docker compose run --rm app python scripts/fetch_images.py …)")
 
+    # Optionally restrict to the popular subset the demo loader actually shows (so we don't
+    # fetch ~9.7k posters when the demo only uses ~1.2k). Counts positive ratings per movie.
+    keep_ids = None
+    if args.min_ratings > 0:
+        ratings_path = os.path.join(ds_dir, "ratings.csv")
+        if not os.path.exists(ratings_path):
+            sys.exit(f"--min-ratings needs ratings.csv at {ratings_path}")
+        from collections import Counter
+        counts_by_movie = Counter()
+        with open(ratings_path, newline="") as f:
+            for r in csv.DictReader(f):
+                try:
+                    if float(r["rating"]) >= 4.0:
+                        counts_by_movie[r["movieId"]] += 1
+                except (KeyError, ValueError):
+                    pass
+        keep_ids = {mid for mid, c in counts_by_movie.items() if c >= args.min_ratings}
+
     # links.csv columns: movieId,imdbId,tmdbId
     rows = []
     with open(links_path, newline="") as f:
         for r in csv.DictReader(f):
-            if r.get("imdbId"):
+            if r.get("imdbId") and (keep_ids is None or r["movieId"] in keep_ids):
                 rows.append((r["movieId"], r["imdbId"]))
     if args.limit:
         rows = rows[:args.limit]
 
     total = len(rows)
-    print(f"[{args.dataset}] {total} movies -> {img_dir} ({args.workers} workers)")
+    subset = f" (filtered to >={args.min_ratings} positive ratings)" if args.min_ratings else ""
+    print(f"[{args.dataset}] {total} movies{subset} -> {img_dir} ({args.workers} workers)")
     counts, done = {}, 0
     with ThreadPoolExecutor(max_workers=args.workers) as ex:
         futs = [ex.submit(_fetch_one, mid, iid, img_dir, args.width) for mid, iid in rows]

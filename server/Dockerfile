@@ -4,7 +4,12 @@
 #
 # By default this installs the LIGHTWEIGHT core. To include heavy backends, pass extras:
 #   docker build -f server/Dockerfile --build-arg EASYSTUDY_EXTRAS="tensorflow,lenskit" -t easy-study .
-FROM python:3.12-slim
+#
+# Some heavy extras pin OLD transitive deps without wheels for the newest Python (e.g. the
+# `recbole` extra needs `ray`, which only ships wheels up to cp311). Build those on 3.11:
+#   PYTHON_VERSION=3.11 EASYSTUDY_EXTRAS=recbole docker compose up --build
+ARG PYTHON_VERSION=3.12
+FROM python:${PYTHON_VERSION}-slim
 
 # comma-separated pyproject extras, e.g. "recbole,tensorflow,lenskit,redis"; empty => core only
 ARG EASYSTUDY_EXTRAS=""

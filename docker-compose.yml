@@ -16,6 +16,7 @@ services:
       dockerfile: server/Dockerfile
       args:
         EASYSTUDY_EXTRAS: "${EASYSTUDY_EXTRAS:-}"
+        PYTHON_VERSION: "${PYTHON_VERSION:-3.12}"
     ports:
       - "${PORT:-8000}:8000"
     environment:
