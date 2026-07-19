@@ -31,14 +31,15 @@ from plugins.fastcompare.algo.algorithm_base import (
 class TinyDataLoader(DataLoaderBase):
     """A minimal, in-memory dataset for tests — no files, no network.
 
-    Demonstrates the ``item_id`` vs ``item_index`` distinction on purpose: the eight items
-    have *ids* ``100..107`` (as an underlying dataset might), while their zero-based
-    *indices* are ``0..7`` (what NumPy math uses). ``ratings_df`` exposes the dense ``user``
-    / ``item`` (index) / ``rating`` columns that fastcompare algorithms consume.
+    Demonstrates the ``item_id`` vs ``item_index`` distinction on purpose: the items have
+    *ids* ``100..149`` (as an underlying dataset might), while their zero-based *indices* are
+    ``0..49`` (what NumPy math uses). ``ratings_df`` exposes the dense ``user`` / ``item``
+    (index) / ``rating`` columns that fastcompare algorithms consume. Sized (30 users × 50
+    items) so preference-elicitation sampling has enough items to draw from.
     """
 
-    _N_USERS = 6
-    _ITEM_IDS = list(range(100, 108))  # non-zero-based ids -> indices 0..7
+    _N_USERS = 30
+    _ITEM_IDS = list(range(100, 150))  # 50 non-zero-based ids -> indices 0..49
     _CATEGORIES = ["cat_a", "cat_b", "cat_c"]
 
     def __init__(self, **kwargs):
@@ -47,7 +48,7 @@ class TinyDataLoader(DataLoaderBase):
         rows = []
         for user in range(self._N_USERS):
             # each user rates a deterministic-random subset, so CF has signal to learn
-            liked = rng.choice(n_items, size=4, replace=False)
+            liked = rng.choice(n_items, size=15, replace=False)
             for item_index in liked:
                 rows.append((user, int(item_index), float(rng.integers(3, 6))))
         self._ratings = pd.DataFrame(rows, columns=["user", "item", "rating"])
