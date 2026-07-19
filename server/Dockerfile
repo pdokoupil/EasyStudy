@@ -31,9 +31,14 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 # Install dependencies first (better layer caching). uv.lock pins the exact resolution.
+# --no-install-project: the CMD below runs gunicorn directly against server/app.py, not
+# through the `easystudy` package/CLI, so the image never needs the local project built —
+# just its third-party dependencies. Skipping it also avoids a build failure: building it
+# would need src/+server/+scripts/ (per pyproject.toml's package-dir mapping), none of which
+# are copied yet at this point (deliberately, so editing app code doesn't bust this layer).
 COPY pyproject.toml uv.lock README.md ./
 RUN EXTRA_ARGS=""; for e in $(echo "$EASYSTUDY_EXTRAS" | tr ',' ' '); do EXTRA_ARGS="$EXTRA_ARGS --extra $e"; done; \
-    uv sync --frozen --no-dev $EXTRA_ARGS
+    uv sync --frozen --no-dev --no-install-project $EXTRA_ARGS
 
 # App source
 COPY server/ ./server/
