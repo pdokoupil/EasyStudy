@@ -1,3 +1,4 @@
+import os
 import sys
 
 [sys.path.append(i) for i in ['.', '..']]
@@ -26,7 +27,10 @@ def join():
 
 ### Long running initialization is here ####
 def long_initialization(guid):
-    engine = create_engine('sqlite:///instance/db.sqlite')
+    # Same DATABASE_URL config.py/create_app() use — a hardcoded relative path here would
+    # silently open/create a DIFFERENT, empty database whenever the app isn't run with CWD ==
+    # server/ (e.g. the easystudy CLI, which points DATABASE_URL at the user's project dir).
+    engine = create_engine(os.environ.get("DATABASE_URL", "sqlite:///instance/db.sqlite"))
     session = Session(engine)
     q = session.query(UserStudy).filter(UserStudy.guid == guid).first()
 

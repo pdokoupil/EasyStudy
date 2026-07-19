@@ -609,7 +609,10 @@ def filter_params(actual_parameters, factory):
 def long_initialization(guid):
     # Activate the user study once the initialization is done
     # We have to use SQLAlchemy directly because we are outside of the Flask context (since we are running on a daemon thread)
-    engine = create_engine('sqlite:///instance/db.sqlite')
+    # Same DATABASE_URL config.py/create_app() use — a hardcoded relative path here would
+    # silently open/create a DIFFERENT, empty database whenever the app isn't run with CWD ==
+    # server/ (e.g. the easystudy CLI, which points DATABASE_URL at the user's project dir).
+    engine = create_engine(os.environ.get("DATABASE_URL", "sqlite:///instance/db.sqlite"))
     session = Session(engine)
     q = session.query(UserStudy).filter(UserStudy.guid == guid).first()
     try:
