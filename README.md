@@ -220,12 +220,20 @@ If you use EasyStudy in your research, please cite the RecSys'23 paper (see [CIT
 
 ```bibtex
 @inproceedings{dokoupil2023easystudy,
-  title     = {EasyStudy: Framework for Easy Deployment of User Studies on Recommender Systems},
-  author    = {Dokoupil, Patrik and Peska, Ladislav},
-  booktitle = {Proceedings of the 17th ACM Conference on Recommender Systems (RecSys '23)},
-  pages     = {1196--1199},
-  year      = {2023},
-  doi       = {10.1145/3604915.3610640}
+author = {Dokoupil, Patrik and Peska, Ladislav},
+title = {EasyStudy: Framework for Easy Deployment of User Studies on Recommender Systems},
+year = {2023},
+isbn = {9798400702419},
+publisher = {Association for Computing Machinery},
+address = {New York, NY, USA},
+url = {https://doi.org/10.1145/3604915.3610640},
+doi = {10.1145/3604915.3610640},
+booktitle = {Proceedings of the 17th ACM Conference on Recommender Systems},
+pages = {1196–1199},
+numpages = {4},
+keywords = {Recommender systems, evaluation frameworks, user centric, user studies},
+location = {Singapore, Singapore},
+series = {RecSys '23}
 }
 ```
 
